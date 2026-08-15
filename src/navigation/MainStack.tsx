@@ -1,0 +1,23 @@
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { MainTabs } from './MainTabs';
+import RoundHistoryScreen from '../screens/main/RoundHistoryScreen';
+import { MainStackParamList } from './types';
+import { colors, typography } from '../theme/theme';
+
+const Stack = createNativeStackNavigator<MainStackParamList>();
+
+export function MainStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+        headerTitleStyle: { fontSize: typography.h3.fontSize, fontWeight: typography.h3.fontWeight },
+        headerShadowVisible: false,
+      }}
+    >
+      <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="RoundHistory" component={RoundHistoryScreen} options={{ title: 'Round History' }} />
+    </Stack.Navigator>
+  );
+}
