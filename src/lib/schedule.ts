@@ -1,13 +1,14 @@
 import { RoundSlot, RoundStatus } from '../types';
 
-// 5 daily rounds: submit at 09/12/15/18/21, settle 1hr later
-export const ROUND_SLOTS: RoundSlot[] = [
-  { id: 'r1', index: 1, submitTime: '09:00', settleTime: '10:00' },
-  { id: 'r2', index: 2, submitTime: '12:00', settleTime: '13:00' },
-  { id: 'r3', index: 3, submitTime: '15:00', settleTime: '16:00' },
-  { id: 'r4', index: 4, submitTime: '18:00', settleTime: '19:00' },
-  { id: 'r5', index: 5, submitTime: '21:00', settleTime: '22:00' },
-];
+// 24 rounds a day, one per hour: opens on the hour, closes 50 minutes later
+// (e.g. Round 2 opens 1:00 AM, closes 1:50 AM; Round 3 opens 2:00 AM, closes 2:50 AM).
+// Round N (1-24) = hour (N-1), so Round 1 is midnight and Round 24 is 11 PM.
+export const ROUND_SLOTS: RoundSlot[] = Array.from({ length: 24 }, (_, hour) => ({
+  id: `r${hour + 1}`,
+  index: hour + 1,
+  submitTime: `${String(hour).padStart(2, '0')}:00`,
+  settleTime: `${String(hour).padStart(2, '0')}:50`,
+}));
 
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);

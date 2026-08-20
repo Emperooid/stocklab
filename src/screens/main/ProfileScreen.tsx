@@ -83,7 +83,7 @@ export default function ProfileScreen() {
 
       <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
 
-      <Text style={styles.footer}>StockGod · v1.0.0</Text>
+      <Text style={styles.footer}>StockLab · v1.0.0</Text>
     </Screen>
   );
 }

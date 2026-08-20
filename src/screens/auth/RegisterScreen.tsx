@@ -52,7 +52,7 @@ export default function RegisterScreen({ navigation }: Props) {
   return (
     <Screen>
       <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Join StockGod and start predicting.</Text>
+      <Text style={styles.subtitle}>Join StockLab and start predicting.</Text>
 
       <View style={styles.form}>
         <Input label="Full name" value={name} onChangeText={setName} placeholder="Ada Obi" />

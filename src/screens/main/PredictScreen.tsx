@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
@@ -9,9 +9,11 @@ import { CountdownBadge } from '../../components/CountdownBadge';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, shadow, spacing, typography } from '../../theme/theme';
 import { useRoundsStore } from '../../store/roundsStore';
+import { useAutoPlayStore } from '../../store/autoPlayStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
 import { formatTime12h } from '../../lib/format';
+import { ROUND_STAKE } from '../../lib/payout';
 
 const VALUES = [1, 2, 3, 4, 5];
 
@@ -61,7 +63,7 @@ export default function PredictScreen() {
           <EmptyState
             icon="hourglass-outline"
             title="No round is open right now"
-            message="Predictions open five times a day. Check the countdown above for the next window."
+            message="A new round opens every hour. Check the countdown above for the next window."
           />
         </Card>
       )}
@@ -120,18 +122,68 @@ export default function PredictScreen() {
         </Card>
       )}
 
+      <AutoPlaySection />
+
       <Card style={styles.infoCard}>
         <View style={styles.infoHeader}>
           <Ionicons name="bulb-outline" size={18} color={colors.primary} />
           <Text style={styles.infoTitle}>How scoring works</Text>
         </View>
         <Text style={styles.infoText}>
-          The Stock Value is the rounded average of every prediction submitted this round. The closer your number is
-          to the Stock Value, the more you gain — the farther away, the more you lose, capped at 0.5% of your
-          balance per round.
+          Every round costs ₦{ROUND_STAKE} to play, charged from your wallet. The Stock Value is set by the
+          operator for each round — the closer your number is to it, the more you gain; the farther away, the more
+          you lose, capped at 0.5% of your balance per round.
         </Text>
       </Card>
     </Screen>
+  );
+}
+
+function AutoPlaySection() {
+  const { enabled, paused, preferredValue, setEnabled, setPaused, setPreferredValue } = useAutoPlayStore();
+
+  return (
+    <Card style={styles.autoPlayCard}>
+      <View style={styles.autoPlayHeaderRow}>
+        <View style={{ flex: 1, marginRight: spacing.md }}>
+          <Text style={styles.autoPlayTitle}>Auto Play</Text>
+          <Text style={styles.autoPlaySubtitle}>
+            Automatically plays your preferred number every open round for ₦{ROUND_STAKE} each.
+          </Text>
+        </View>
+        <Switch
+          value={enabled}
+          onValueChange={setEnabled}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={colors.text}
+        />
+      </View>
+
+      {enabled && (
+        <>
+          <Text style={styles.autoPlayLabel}>Preferred number</Text>
+          <View style={styles.autoPlayValuesRow}>
+            {VALUES.map((v) => (
+              <TouchableOpacity
+                key={v}
+                style={[styles.autoPlayValueBtn, preferredValue === v && styles.autoPlayValueBtnSelected]}
+                onPress={() => setPreferredValue(v)}
+              >
+                <Text style={[styles.autoPlayValueText, preferredValue === v && styles.autoPlayValueTextSelected]}>{v}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Button
+            title={paused ? 'Resume Auto Play' : 'Pause Auto Play'}
+            variant={paused ? 'primary' : 'outline'}
+            size="sm"
+            onPress={() => setPaused(!paused)}
+            style={{ marginTop: spacing.md }}
+          />
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -186,4 +238,23 @@ const styles = StyleSheet.create({
   infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
   infoTitle: { ...typography.h3, color: colors.text },
   infoText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+  autoPlayCard: { marginTop: spacing.lg },
+  autoPlayHeaderRow: { flexDirection: 'row', alignItems: 'center' },
+  autoPlayTitle: { ...typography.h3, color: colors.text },
+  autoPlaySubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
+  autoPlayLabel: { ...typography.small, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.sm },
+  autoPlayValuesRow: { flexDirection: 'row', gap: spacing.sm },
+  autoPlayValueBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoPlayValueBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  autoPlayValueText: { ...typography.h3, color: colors.text },
+  autoPlayValueTextSelected: { color: colors.onPrimary },
 });

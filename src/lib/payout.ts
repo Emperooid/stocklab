@@ -1,19 +1,23 @@
 /**
- * StockGod payout math.
+ * StockLab payout math.
  *
- * Two models from the spec:
- *  - "Conservative adjustment": per-user balance change based purely on how
- *    close their own prediction was to the Stock Value. Used for the
- *    Rounds screen display (matches the mockup's Change %/Value Gained columns).
- *  - "Zero-sum pool": the fair, real-money model. A round pool is collected
- *    from all participants (riskRate * balance each) and redistributed
- *    proportionally to winners by |score|. Losers fund the pool, winners split it.
- *    This is what a real backend should use for actual settlement.
+ * The Stock Value for each round is set manually by an operator (not
+ * computed from user predictions), then every participant's gain/loss is
+ * based on how close their own prediction was to that value.
+ *
+ * Two models:
+ *  - "Conservative adjustment": per-user balance change based on distance
+ *    from the Stock Value. Used for the Rounds screen display.
+ *  - "Zero-sum pool": an alternative fair-payout model where a round pool is
+ *    collected from all participants (riskRate * balance each) and
+ *    redistributed proportionally to winners by |score|. Not currently wired
+ *    up, kept here as a documented option for a real backend.
  */
 
 export const MIN_VALUE = 1;
 export const MAX_VALUE = 5;
 export const DEFAULT_RISK_RATE = 0.005; // 0.5% max risk per round
+export const ROUND_STAKE = 10; // ₦ charged from the wallet to enter each round
 
 // distance -> adjustment rate (conservative table, Section 4 of spec)
 const CONSERVATIVE_RATES: Record<number, number> = {
@@ -32,15 +36,6 @@ const SCORE_TABLE: Record<number, number> = {
   3: -1,
   4: -2,
 };
-
-export function computeStockValue(submissions: number[]): { average: number; stockValue: number } {
-  if (submissions.length === 0) {
-    return { average: 0, stockValue: MIN_VALUE };
-  }
-  const average = submissions.reduce((sum, v) => sum + v, 0) / submissions.length;
-  const stockValue = Math.min(MAX_VALUE, Math.max(MIN_VALUE, Math.round(average)));
-  return { average, stockValue };
-}
 
 export function computeDistance(prediction: number, stockValue: number): number {
   return Math.abs(prediction - stockValue);

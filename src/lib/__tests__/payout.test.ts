@@ -1,32 +1,10 @@
 import {
   applyConservativeAdjustment,
   computeDistance,
-  computeStockValue,
   getAdjustmentRate,
   getScore,
   settleRoundPool,
 } from '../payout';
-
-describe('computeStockValue', () => {
-  it('rounds the average of submissions to the nearest whole number (spec example: 2,3,4,3,2 -> 2.8 -> 3)', () => {
-    const { average, stockValue } = computeStockValue([2, 3, 4, 3, 2]);
-    expect(average).toBeCloseTo(2.8);
-    expect(stockValue).toBe(3);
-  });
-
-  it('rounds down when the average is below the midpoint', () => {
-    expect(computeStockValue([1, 1, 1, 2]).stockValue).toBe(1);
-  });
-
-  it('clamps to the 1-5 range even with degenerate input', () => {
-    expect(computeStockValue([5, 5, 5]).stockValue).toBe(5);
-    expect(computeStockValue([1, 1, 1]).stockValue).toBe(1);
-  });
-
-  it('returns the minimum value and zero average for no submissions', () => {
-    expect(computeStockValue([])).toEqual({ average: 0, stockValue: 1 });
-  });
-});
 
 describe('computeDistance', () => {
   it('is the absolute difference between prediction and stock value', () => {
@@ -73,14 +51,15 @@ describe('applyConservativeAdjustment', () => {
 
 describe('settleRoundPool (zero-sum model from spec Section 5)', () => {
   it('is zero-sum: total payouts across all participants sum to ~0', () => {
+    // stockValue 1 (an extreme) so distance 4 is actually reachable within the 1-5 range.
     const participants = [
-      { userId: 'a', balance: 5000, prediction: 3 }, // distance 0 -> winner
-      { userId: 'b', balance: 5000, prediction: 3 }, // distance 0 -> winner
+      { userId: 'a', balance: 5000, prediction: 1 }, // distance 0 -> winner
+      { userId: 'b', balance: 5000, prediction: 1 }, // distance 0 -> winner
       { userId: 'c', balance: 5000, prediction: 5 }, // distance 4 -> loser (funds the pool)
-      { userId: 'd', balance: 5000, prediction: 1 }, // distance 2 -> neutral
+      { userId: 'd', balance: 5000, prediction: 3 }, // distance 2 -> neutral
     ];
 
-    const settlements = settleRoundPool(participants, 3);
+    const settlements = settleRoundPool(participants, 1);
     const totalPayout = settlements.reduce((sum, s) => sum + s.payout, 0);
 
     expect(totalPayout).toBeCloseTo(0, 2);
@@ -88,13 +67,13 @@ describe('settleRoundPool (zero-sum model from spec Section 5)', () => {
 
   it('splits the pool proportionally to |points| among winners, and neutral users break even', () => {
     const participants = [
-      { userId: 'winner-1', balance: 5000, prediction: 3 }, // distance 0, points +2
-      { userId: 'winner-2', balance: 5000, prediction: 3 }, // distance 0, points +2
+      { userId: 'winner-1', balance: 5000, prediction: 1 }, // distance 0, points +2
+      { userId: 'winner-2', balance: 5000, prediction: 1 }, // distance 0, points +2
       { userId: 'loser', balance: 5000, prediction: 5 }, // distance 4, points -2
-      { userId: 'neutral', balance: 5000, prediction: 1 }, // distance 2, points 0
+      { userId: 'neutral', balance: 5000, prediction: 3 }, // distance 2, points 0
     ];
 
-    const settlements = settleRoundPool(participants, 3);
+    const settlements = settleRoundPool(participants, 1);
     const byId = Object.fromEntries(settlements.map((s) => [s.userId, s]));
 
     // pool = 4 users * 5000 * 0.5% = 100; two equal-strength winners split it evenly

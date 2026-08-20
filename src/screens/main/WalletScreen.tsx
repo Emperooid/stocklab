@@ -23,6 +23,7 @@ type ActiveAction = 'deposit' | 'withdraw' | null;
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
   withdrawal: 'arrow-up-circle',
+  round_stake: 'game-controller-outline',
   round_gain: 'trending-up',
   round_loss: 'trending-down',
 };

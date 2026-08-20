@@ -1,20 +1,28 @@
 import { Bank, DailyHistoryEntry, DailyRound, ResolvedBankAccount, RoundResult, User, WalletTransaction } from '../types';
 import { ROUND_SLOTS, getSlotStatus } from '../lib/schedule';
-import { applyConservativeAdjustment, computeStockValue } from '../lib/payout';
+import { applyConservativeAdjustment, ROUND_STAKE } from '../lib/payout';
 
 // In-memory mock backend. Swap this module out for src/api/httpApi.ts
 // once real endpoints are available — see src/api/index.ts.
 
+// MOCK: this single demo account defaults to 'admin' so it can exercise the
+// Round Controls (Set/Update Stock Value, defaults) while there's only one
+// user in the system. A real backend must assign role from the database
+// based on the authenticated account — never trust a client-sent role, and
+// never default a real user to admin.
 let currentUser: User = {
   id: 'u1',
   name: 'Ada Obi',
   email: 'ada@example.com',
+  role: 'admin',
   balance: 5000,
   totalProfit: 0,
   totalProfitPercent: 0,
 };
 
 const predictions = new Map<string, number>(); // roundId -> user's value
+const stockValues = new Map<string, number>(); // roundId -> operator-set Stock Value for today
+const defaultStockValues = new Map<string, number>(); // slot id -> default, reapplied every day unless overridden
 const results = new Map<string, RoundResult>(); // roundId -> settled result
 const transactions: WalletTransaction[] = [];
 const historyByDate = new Map<string, DailyRound[]>(); // past days, archived on rollover
@@ -25,11 +33,6 @@ function delay<T>(value: T, ms = 400): Promise<T> {
 
 function failAfterDelay(message: string, ms = 400): Promise<never> {
   return new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms));
-}
-
-function simulateCrowd(): number[] {
-  const count = 40 + Math.floor(Math.random() * 60);
-  return Array.from({ length: count }, () => 1 + Math.floor(Math.random() * 5));
 }
 
 function dateKey(d: Date): string {
@@ -57,6 +60,7 @@ function rolloverDayIfNeeded(now: Date) {
       predictions.has(slot.id)
         ? { roundId: slot.id, value: predictions.get(slot.id)!, submittedAt: activeDateKey }
         : undefined,
+    stockValue: stockValues.get(slot.id),
     result: results.get(slot.id),
   }));
   if (rounds.some((r) => r.result)) {
@@ -64,6 +68,7 @@ function rolloverDayIfNeeded(now: Date) {
   }
 
   predictions.clear();
+  stockValues.clear(); // manual overrides don't carry over; defaultStockValues does
   results.clear();
   activeDateKey = todayKey;
 }
@@ -78,16 +83,13 @@ function seedSyntheticHistory() {
 
     const rounds: DailyRound[] = ROUND_SLOTS.map((slot) => {
       const predictedValue = 1 + Math.floor(Math.random() * 5);
-      const crowd = simulateCrowd();
-      const { average, stockValue } = computeStockValue([...crowd, predictedValue]);
+      const stockValue = 1 + Math.floor(Math.random() * 5);
       const adj = applyConservativeAdjustment(runningBalance, predictedValue, stockValue);
       runningBalance = adj.balanceAfter;
 
       const result: RoundResult = {
         roundId: slot.id,
         stockValue,
-        averageRaw: average,
-        totalParticipants: crowd.length + 1,
         userPrediction: predictedValue,
         distance: adj.distance,
         changePercent: adj.changePercent,
@@ -99,6 +101,7 @@ function seedSyntheticHistory() {
         slot,
         status: 'settled',
         prediction: { roundId: slot.id, value: predictedValue, submittedAt: day.toISOString() },
+        stockValue,
         result,
       };
     });
@@ -140,42 +143,43 @@ export const mockApi = {
 
       return delay(
         ROUND_SLOTS.map((slot) => {
-          const status = getSlotStatus(slot, now);
+          let status = getSlotStatus(slot, now);
           const predictedValue = predictions.get(slot.id);
+          const stockValue = stockValues.get(slot.id) ?? defaultStockValues.get(slot.id);
           let result = results.get(slot.id);
 
-          // auto-settle rounds whose window has passed but weren't settled yet
-          if (status === 'settled' && !result && predictedValue !== undefined) {
-            const crowd = simulateCrowd();
-            const { average, stockValue } = computeStockValue([...crowd, predictedValue]);
-            const adj = applyConservativeAdjustment(currentUser.balance, predictedValue, stockValue);
-            result = {
-              roundId: slot.id,
-              stockValue,
-              averageRaw: average,
-              totalParticipants: crowd.length + 1,
-              userPrediction: predictedValue,
-              distance: adj.distance,
-              changePercent: adj.changePercent,
-              valueGained: adj.valueGained,
-              balanceAfter: adj.balanceAfter,
-            };
-            results.set(slot.id, result);
+          // Closing time has passed — settle it if the operator has set a Stock Value.
+          if (status === 'settled' && !result) {
+            if (stockValue === undefined) {
+              // Closed, but no Stock Value set yet — waiting on the operator.
+              status = 'awaiting_result';
+            } else if (predictedValue !== undefined) {
+              const adj = applyConservativeAdjustment(currentUser.balance, predictedValue, stockValue);
+              result = {
+                roundId: slot.id,
+                stockValue,
+                userPrediction: predictedValue,
+                distance: adj.distance,
+                changePercent: adj.changePercent,
+                valueGained: adj.valueGained,
+                balanceAfter: adj.balanceAfter,
+              };
+              results.set(slot.id, result);
 
-            currentUser = {
-              ...currentUser,
-              balance: adj.balanceAfter,
-              totalProfit: currentUser.totalProfit + adj.valueGained,
-              totalProfitPercent:
-                ((currentUser.totalProfit + adj.valueGained) / 5000) * 100,
-            };
-            transactions.unshift({
-              id: `t-${slot.id}`,
-              type: adj.valueGained >= 0 ? 'round_gain' : 'round_loss',
-              amount: adj.valueGained,
-              createdAt: new Date().toISOString(),
-              description: `Round ${slot.index} settlement (Stock Value ${stockValue})`,
-            });
+              currentUser = {
+                ...currentUser,
+                balance: adj.balanceAfter,
+                totalProfit: currentUser.totalProfit + adj.valueGained,
+                totalProfitPercent: ((currentUser.totalProfit + adj.valueGained) / 5000) * 100,
+              };
+              transactions.unshift({
+                id: `t-${slot.id}`,
+                type: adj.valueGained >= 0 ? 'round_gain' : 'round_loss',
+                amount: adj.valueGained,
+                createdAt: new Date().toISOString(),
+                description: `Round ${slot.index} settlement (Stock Value ${stockValue})`,
+              });
+            }
           }
 
           return {
@@ -185,15 +189,62 @@ export const mockApi = {
               predictedValue !== undefined
                 ? { roundId: slot.id, value: predictedValue, submittedAt: new Date().toISOString() }
                 : undefined,
+            stockValue,
             result,
           };
         })
       );
     },
 
+    /** Charges the round stake from the wallet, then records the prediction. */
     async submitPrediction(roundId: string, value: number) {
+      if (currentUser.balance < ROUND_STAKE) {
+        return failAfterDelay(`You need at least ₦${ROUND_STAKE} in your wallet to play a round.`, 300);
+      }
+      const slot = ROUND_SLOTS.find((s) => s.id === roundId);
+      currentUser = { ...currentUser, balance: currentUser.balance - ROUND_STAKE };
+      transactions.unshift({
+        id: `stake-${roundId}-${Date.now()}`,
+        type: 'round_stake',
+        amount: -ROUND_STAKE,
+        createdAt: new Date().toISOString(),
+        description: `Round ${slot?.index ?? ''} entry fee`.trim(),
+      });
       predictions.set(roundId, value);
       return delay({ ok: true });
+    },
+
+    /**
+     * Sets or updates today's Stock Value for a round. Can be called any
+     * time before it settles. Operator-only — a real backend must re-check
+     * the caller's role server-side exactly like this, never trusting the
+     * client to simply hide the button from non-admins.
+     */
+    async setStockValue(roundId: string, value: number): Promise<void> {
+      if (currentUser.role !== 'admin') {
+        return failAfterDelay('Only an operator can set the Stock Value.', 300);
+      }
+      if (results.has(roundId)) {
+        return failAfterDelay('This round has already settled and its Stock Value can no longer be changed.', 300);
+      }
+      stockValues.set(roundId, value);
+      return delay(undefined, 300);
+    },
+
+    async getDefaultStockValues(): Promise<Record<string, number>> {
+      return delay(Object.fromEntries(defaultStockValues));
+    },
+
+    /** Default Stock Values applied to each of today's 5 rounds unless individually overridden. Operator-only. */
+    async setDefaultStockValues(values: Record<string, number>): Promise<void> {
+      if (currentUser.role !== 'admin') {
+        return failAfterDelay('Only an operator can set default Stock Values.', 300);
+      }
+      defaultStockValues.clear();
+      for (const [slotId, value] of Object.entries(values)) {
+        defaultStockValues.set(slotId, value);
+      }
+      return delay(undefined, 300);
     },
 
     async getHistory(): Promise<DailyHistoryEntry[]> {

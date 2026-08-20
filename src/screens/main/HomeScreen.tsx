@@ -14,6 +14,7 @@ import { useRoundsStore } from '../../store/roundsStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
 import { formatMoney, formatPercent, formatSigned } from '../../lib/format';
+import { DailyRound } from '../../types';
 import { MainTabParamList } from '../../navigation/types';
 
 export default function HomeScreen() {
@@ -39,6 +40,7 @@ export default function HomeScreen() {
 
   const openRound = rounds.find((r) => getSlotStatus(r.slot, now) === 'open' && !r.prediction);
   const settledToday = rounds.filter((r) => r.result).length;
+  const latestResult = [...rounds].reverse().find((r) => r.result);
   const isProfitPositive = totalProfit >= 0;
 
   return (
@@ -77,6 +79,8 @@ export default function HomeScreen() {
         <CountdownBadge />
       </View>
 
+      {latestResult && <LatestResultCard round={latestResult} />}
+
       {openRound ? (
         <Card style={styles.ctaCard}>
           <View style={styles.ctaIconCircle}>
@@ -104,7 +108,7 @@ export default function HomeScreen() {
       <View style={styles.statsRow}>
         <Card style={styles.statCard}>
           <Ionicons name="checkmark-done-circle-outline" size={20} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue}>{settledToday}/5</Text>
+          <Text style={styles.statValue}>{settledToday}/{rounds.length}</Text>
           <Text style={styles.statLabel}>Rounds settled today</Text>
         </Card>
         <Card style={styles.statCard}>
@@ -114,6 +118,27 @@ export default function HomeScreen() {
         </Card>
       </View>
     </Screen>
+  );
+}
+
+function LatestResultCard({ round }: { round: DailyRound }) {
+  const result = round.result!;
+  const gainPositive = (result.valueGained ?? 0) >= 0;
+
+  return (
+    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.success : colors.danger }]}>
+      <View style={styles.resultHeaderRow}>
+        <Text style={styles.resultTitle}>Latest Result · Round {round.slot.index}</Text>
+        <View style={[styles.resultPill, { backgroundColor: gainPositive ? colors.successTint : colors.dangerTint }]}>
+          <Text style={[styles.resultPillText, { color: gainPositive ? colors.success : colors.danger }]}>
+            {formatSigned(result.valueGained ?? 0)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.resultSubtitle}>
+        You picked {result.userPrediction ?? '—'} · Stock Value {result.stockValue} · Deviation {result.distance ?? '—'}
+      </Text>
+    </Card>
   );
 }
 
@@ -138,6 +163,12 @@ const styles = StyleSheet.create({
   balance: { ...typography.h1, color: colors.text, marginTop: spacing.xs },
   profit: { ...typography.small, marginTop: 4, fontWeight: '600' },
   countdownWrap: { marginTop: spacing.lg },
+  resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
+  resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  resultTitle: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
+  resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  resultPillText: { ...typography.small, fontWeight: '800' },
+  resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
   ctaCard: { marginTop: spacing.lg },
   ctaIconCircle: {
     width: 44,

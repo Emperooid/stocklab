@@ -15,9 +15,7 @@ export interface UserPrediction {
 
 export interface RoundResult {
   roundId: string;
-  stockValue: number; // 1-5, rounded average
-  averageRaw: number;
-  totalParticipants: number;
+  stockValue: number; // 1-5, the value set by the operator for this round
   userPrediction?: number;
   distance?: number;
   points?: number;
@@ -30,6 +28,8 @@ export interface DailyRound {
   slot: RoundSlot;
   status: RoundStatus;
   prediction?: UserPrediction;
+  /** The operator-set Stock Value for this round, editable until it settles. */
+  stockValue?: number;
   result?: RoundResult;
 }
 
@@ -45,7 +45,7 @@ export type TransactionStatus = 'pending' | 'success' | 'failed';
 
 export interface WalletTransaction {
   id: string;
-  type: 'deposit' | 'withdrawal' | 'round_gain' | 'round_loss';
+  type: 'deposit' | 'withdrawal' | 'round_stake' | 'round_gain' | 'round_loss';
   amount: number;
   createdAt: string;
   description: string;
@@ -63,10 +63,13 @@ export interface ResolvedBankAccount {
   accountName: string;
 }
 
+export type UserRole = 'admin' | 'user';
+
 export interface User {
   id: string;
   name: string;
   email: string;
+  role: UserRole;
   balance: number;
   totalProfit: number;
   totalProfitPercent: number;

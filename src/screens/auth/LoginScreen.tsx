@@ -44,7 +44,7 @@ export default function LoginScreen({ navigation }: Props) {
           <Ionicons name="trending-up" size={30} color={colors.onPrimary} />
         </View>
         <Text style={styles.logo}>
-          STOCK<Text style={{ color: colors.primary }}>GOD</Text>
+          STOCK<Text style={{ color: colors.primary }}>LAB</Text>
         </Text>
         <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
       </View>
