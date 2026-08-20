@@ -37,6 +37,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Claude Code / AI agent files — never tracked, any location
+.claude/
+CLAUDE.md
+AGENTS.md
+
 # generated native folders
 /ios
 /android
