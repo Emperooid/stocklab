@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { EmptyState } from '../../components/EmptyState';
-import { colors, radius, spacing, typography } from '../../theme/theme';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { api } from '../../api';
 import { DailyHistoryEntry } from '../../types';
 import { formatPercent, formatSigned } from '../../lib/format';
@@ -16,6 +16,8 @@ const MONTH_NAMES = [
 ];
 
 export default function RoundHistoryScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [entries, setEntries] = useState<DailyHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -135,6 +137,8 @@ export default function RoundHistoryScreen() {
 }
 
 function FilterPill({ label, sublabel, onPress }: { label: string; sublabel: string; onPress: () => void }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={{ flex: 1 }}>
       <Text style={styles.filterSublabel}>{sublabel}</Text>
@@ -162,6 +166,8 @@ function PickerModal<T extends string | number>({
   onSelect: (value: T) => void;
   onClose: () => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -190,6 +196,8 @@ function PickerModal<T extends string | number>({
 }
 
 function SummaryStat({ label, value, color }: { label: string; value: string; color?: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
       <Text style={styles.summaryLabel}>{label}</Text>
@@ -199,6 +207,8 @@ function SummaryStat({ label, value, color }: { label: string; value: string; co
 }
 
 function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expanded: boolean; onToggle: () => void }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const gainColor = entry.totalGain >= 0 ? colors.success : colors.danger;
 
   return (
@@ -224,13 +234,17 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
             <View key={r.slot.id} style={styles.detailRow}>
               <Text style={styles.detailLabel}>Round {r.slot.index}</Text>
               <Text style={styles.detailInfo}>
-                {r.prediction ? `predicted ${r.prediction.value}` : 'no prediction'}
+                {r.prediction ? `picked ${r.prediction.value}` : 'no stock pick'}
                 {r.result ? ` · SV ${r.result.stockValue}` : ''}
               </Text>
               <Text
                 style={[
                   styles.detailGain,
-                  { color: (r.result?.valueGained ?? 0) >= 0 ? colors.success : colors.danger },
+                  {
+                    color: (r.result?.finalOutcome ? r.result.finalOutcome === 'gain' : (r.result?.valueGained ?? 0) >= 0)
+                      ? colors.success
+                      : colors.danger,
+                  },
                 ]}
               >
                 {r.result ? formatSigned(r.result.valueGained ?? 0) : '—'}
@@ -248,58 +262,60 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-const styles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', gap: spacing.md },
-  filterSublabel: { ...typography.tiny, color: colors.textMuted, marginBottom: spacing.xs },
-  filterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    height: 44,
-  },
-  filterPillText: { ...typography.body, color: colors.text, fontWeight: '600', flex: 1 },
-  summaryCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
-  summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
-  summaryLabel: { ...typography.tiny, color: colors.textMuted },
-  summaryValue: { ...typography.h3, marginTop: 2 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  dateIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateText: { ...typography.h3, color: colors.text },
-  subText: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-  gainText: { ...typography.h3 },
-  detail: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
-  detailRow: { flexDirection: 'row', alignItems: 'center' },
-  detailLabel: { ...typography.small, color: colors.textMuted, width: 64 },
-  detailInfo: { ...typography.small, color: colors.text, flex: 1 },
-  detailGain: { ...typography.small, fontWeight: '700', width: 90, textAlign: 'right' },
-  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  modalTitle: { ...typography.h3, color: colors.text },
-  modalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalRowText: { ...typography.body, color: colors.text },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    filterRow: { flexDirection: 'row', gap: spacing.md },
+    filterSublabel: { ...typography.tiny, color: colors.textMuted, marginBottom: spacing.xs },
+    filterPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      height: 44,
+    },
+    filterPillText: { ...typography.body, color: colors.text, fontWeight: '600', flex: 1 },
+    summaryCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
+    summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
+    summaryLabel: { ...typography.tiny, color: colors.textMuted },
+    summaryValue: { ...typography.h3, marginTop: 2 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    dateIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.md,
+      backgroundColor: colors.primaryTint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dateText: { ...typography.h3, color: colors.text },
+    subText: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
+    gainText: { ...typography.h3 },
+    detail: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
+    detailRow: { flexDirection: 'row', alignItems: 'center' },
+    detailLabel: { ...typography.small, color: colors.textMuted, width: 64 },
+    detailInfo: { ...typography.small, color: colors.text, flex: 1 },
+    detailGain: { ...typography.small, fontWeight: '700', width: 90, textAlign: 'right' },
+    modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+    modalSheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      padding: spacing.lg,
+      paddingBottom: spacing.xl,
+    },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+    modalTitle: { ...typography.h3, color: colors.text },
+    modalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalRowText: { ...typography.body, color: colors.text },
+  });
+}

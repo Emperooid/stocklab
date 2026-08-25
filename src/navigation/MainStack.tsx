@@ -2,11 +2,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MainTabs } from './MainTabs';
 import RoundHistoryScreen from '../screens/main/RoundHistoryScreen';
 import { MainStackParamList } from './types';
-import { colors, typography } from '../theme/theme';
+import { typography, useColors } from '../theme/theme';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 export function MainStack() {
+  const colors = useColors();
   return (
     <Stack.Navigator
       screenOptions={{

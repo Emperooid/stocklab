@@ -1,5 +1,5 @@
 import { Bank, DailyHistoryEntry, DailyRound, ResolvedBankAccount, RoundResult, User, WalletTransaction } from '../types';
-import { ROUND_SLOTS, getSlotStatus } from '../lib/schedule';
+import { ROUND_SLOTS, getOperatingDayStart, getSlotStatus } from '../lib/schedule';
 import { applyConservativeAdjustment, ROUND_STAKE } from '../lib/payout';
 
 // In-memory mock backend. Swap this module out for src/api/httpApi.ts
@@ -13,12 +13,14 @@ import { applyConservativeAdjustment, ROUND_STAKE } from '../lib/payout';
 let currentUser: User = {
   id: 'u1',
   name: 'Ada Obi',
-  email: 'ada@example.com',
+  phone: '08012345678',
   role: 'admin',
   balance: 5000,
   totalProfit: 0,
   totalProfitPercent: 0,
 };
+
+const pendingOtps = new Map<string, string>(); // phone -> OTP, for register/reset flows
 
 const predictions = new Map<string, number>(); // roundId -> user's value
 const stockValues = new Map<string, number>(); // roundId -> operator-set Stock Value for today
@@ -46,11 +48,15 @@ function summarizeDay(date: string, rounds: DailyRound[]): DailyHistoryEntry {
   return { date, rounds, roundsSettled: settled.length, totalGain, totalChangePercent };
 }
 
-let activeDateKey = dateKey(new Date());
+let activeDateKey = dateKey(getOperatingDayStart(new Date()));
 
-/** Archives the current day's rounds (if any were settled) and resets state for a new day. */
+/**
+ * Archives the current operating day's rounds (if any were settled) and
+ * resets state for a new day. The operating day rolls over at midnight (see
+ * DAY_START_HOUR in schedule.ts), matching Round 1 opening at 12:00 AM.
+ */
 function rolloverDayIfNeeded(now: Date) {
-  const todayKey = dateKey(now);
+  const todayKey = dateKey(getOperatingDayStart(now));
   if (todayKey === activeDateKey) return;
 
   const rounds = ROUND_SLOTS.map((slot) => ({
@@ -113,25 +119,34 @@ seedSyntheticHistory();
 
 export const mockApi = {
   auth: {
-    async login(email: string, _password: string) {
-      currentUser = { ...currentUser, email };
+    async login(phone: string, _pin: string) {
+      currentUser = { ...currentUser, phone };
       return delay(currentUser);
     },
-    async register(name: string, email: string, _password: string) {
-      currentUser = { ...currentUser, name, email };
+    async registerStart(phone: string) {
+      pendingOtps.set(phone, '123456'); // mock: always "sends" the same code
+      return delay({ ok: true });
+    },
+    async registerComplete(phone: string, fullname: string, _gender: string, _pin: string, otp: string) {
+      if (pendingOtps.get(phone) !== otp) {
+        return failAfterDelay('Invalid or expired code.', 300);
+      }
+      pendingOtps.delete(phone);
+      currentUser = { ...currentUser, name: fullname, phone };
       return delay(currentUser);
     },
     async me() {
       return delay(currentUser);
     },
-    async requestPasswordReset(_email: string) {
-      // Mock: always "sends" a 6-digit code. A real backend emails/SMSes this.
+    async requestPasswordReset(phone: string) {
+      pendingOtps.set(phone, '123456');
       return delay({ ok: true });
     },
-    async resetPassword(_email: string, code: string, _newPassword: string) {
-      if (code !== '123456') {
+    async resetPassword(phone: string, code: string, _newPin: string) {
+      if (pendingOtps.get(phone) !== code) {
         return failAfterDelay('Invalid or expired code.', 300);
       }
+      pendingOtps.delete(phone);
       return delay({ ok: true });
     },
   },
@@ -196,17 +211,17 @@ export const mockApi = {
       );
     },
 
-    /** Charges the round stake from the wallet, then records the prediction. */
-    async submitPrediction(roundId: string, value: number) {
-      if (currentUser.balance < ROUND_STAKE) {
-        return failAfterDelay(`You need at least ₦${ROUND_STAKE} in your wallet to play a round.`, 300);
+    /** Charges the chosen play amount from the wallet, then records the prediction. */
+    async submitPrediction(roundId: string, value: number, amount: number = ROUND_STAKE) {
+      if (currentUser.balance < amount) {
+        return failAfterDelay(`You need at least ₦${amount} in your wallet to play this round.`, 300);
       }
       const slot = ROUND_SLOTS.find((s) => s.id === roundId);
-      currentUser = { ...currentUser, balance: currentUser.balance - ROUND_STAKE };
+      currentUser = { ...currentUser, balance: currentUser.balance - amount };
       transactions.unshift({
         id: `stake-${roundId}-${Date.now()}`,
         type: 'round_stake',
-        amount: -ROUND_STAKE,
+        amount: -amount,
         createdAt: new Date().toISOString(),
         description: `Round ${slot?.index ?? ''} entry fee`.trim(),
       });
@@ -275,7 +290,9 @@ export const mockApi = {
         description: 'Wallet deposit',
         status: 'pending',
       });
-      return delay({ reference, email: currentUser.email });
+      // Paystack's checkout requires an email; the app no longer collects
+      // one (auth is phone-only), so synthesize a placeholder from the phone.
+      return delay({ reference, email: `${currentUser.phone.replace(/\D/g, '')}@stocklab.app` });
     },
 
     /**

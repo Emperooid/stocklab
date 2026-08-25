@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -7,10 +7,10 @@ import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { CountdownBadge } from '../../components/CountdownBadge';
-import { colors, radius, spacing, typography } from '../../theme/theme';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
-import { useRoundsStore } from '../../store/roundsStore';
+import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
 import { formatMoney, formatPercent, formatSigned } from '../../lib/format';
@@ -18,17 +18,20 @@ import { DailyRound } from '../../types';
 import { MainTabParamList } from '../../navigation/types';
 
 export default function HomeScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const user = useAuthStore((s) => s.user);
-  const { balance, totalProfit, totalProfitPercent, refresh } = useWalletStore();
+  const { balance, refresh } = useWalletStore();
   const { rounds, fetchRounds } = useRoundsStore();
   const now = useRoundsLiveRefresh();
   const [refreshing, setRefreshing] = useState(false);
+  const { profit: totalProfit, profitPercent: totalProfitPercent } = computeTodayProfit(rounds);
 
   useFocusEffect(
     useCallback(() => {
-      refresh();
-      fetchRounds();
+      refresh().catch(() => {});
+      fetchRounds().catch(() => {});
     }, [])
   );
 
@@ -71,7 +74,7 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.balance}>{formatMoney(balance)}</Text>
         <Text style={[styles.profit, { color: isProfitPositive ? colors.success : colors.danger }]}>
-          {formatSigned(totalProfit)} total profit
+          {formatSigned(totalProfit)} today
         </Text>
       </Card>
 
@@ -88,9 +91,9 @@ export default function HomeScreen() {
           </View>
           <View style={styles.ctaTextWrap}>
             <Text style={styles.ctaTitle}>Round {openRound.slot.index} is open</Text>
-            <Text style={styles.ctaSubtitle}>Submit your prediction before {openRound.slot.settleTime}.</Text>
+            <Text style={styles.ctaSubtitle}>Submit your stock pick before {openRound.slot.settleTime}.</Text>
           </View>
-          <Button title="Predict Now" onPress={() => navigation.navigate('Predict')} size="sm" style={{ marginTop: spacing.md }} />
+          <Button title="Pick Stock Now" onPress={() => navigation.navigate('Predict')} size="sm" style={{ marginTop: spacing.md }} />
         </Card>
       ) : (
         <Card style={styles.ctaCard}>
@@ -122,8 +125,10 @@ export default function HomeScreen() {
 }
 
 function LatestResultCard({ round }: { round: DailyRound }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const result = round.result!;
-  const gainPositive = (result.valueGained ?? 0) >= 0;
+  const gainPositive = result.finalOutcome ? result.finalOutcome === 'gain' : (result.valueGained ?? 0) >= 0;
 
   return (
     <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.success : colors.danger }]}>
@@ -142,48 +147,50 @@ function LatestResultCard({ round }: { round: DailyRound }) {
   );
 }
 
-const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
-  eyebrow: { ...typography.tiny, color: colors.textDim, letterSpacing: 1 },
-  greeting: { ...typography.h2, color: colors.text, marginTop: 2 },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { ...typography.h3, color: colors.onPrimary },
-  balanceCard: { alignItems: 'flex-start' },
-  balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
-  balanceLabel: { ...typography.small, color: colors.textMuted },
-  profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
-  profitPillText: { ...typography.tiny, fontWeight: '700' },
-  balance: { ...typography.h1, color: colors.text, marginTop: spacing.xs },
-  profit: { ...typography.small, marginTop: 4, fontWeight: '600' },
-  countdownWrap: { marginTop: spacing.lg },
-  resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
-  resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  resultTitle: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
-  resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  resultPillText: { ...typography.small, fontWeight: '800' },
-  resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
-  ctaCard: { marginTop: spacing.lg },
-  ctaIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  ctaTextWrap: {},
-  ctaTitle: { ...typography.h3, color: colors.text },
-  ctaSubtitle: { ...typography.small, color: colors.textMuted, marginTop: 4 },
-  statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-  statCard: { flex: 1, alignItems: 'center' },
-  statValue: { ...typography.h2, color: colors.primary },
-  statLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+    eyebrow: { ...typography.tiny, color: colors.textDim, letterSpacing: 1 },
+    greeting: { ...typography.h2, color: colors.text, marginTop: 2 },
+    avatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { ...typography.h3, color: colors.onPrimary },
+    balanceCard: { alignItems: 'flex-start' },
+    balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+    balanceLabel: { ...typography.small, color: colors.textMuted },
+    profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
+    profitPillText: { ...typography.tiny, fontWeight: '700' },
+    balance: { ...typography.h1, color: colors.text, marginTop: spacing.xs },
+    profit: { ...typography.small, marginTop: 4, fontWeight: '600' },
+    countdownWrap: { marginTop: spacing.lg },
+    resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
+    resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    resultTitle: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
+    resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+    resultPillText: { ...typography.small, fontWeight: '800' },
+    resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
+    ctaCard: { marginTop: spacing.lg },
+    ctaIconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    ctaTextWrap: {},
+    ctaTitle: { ...typography.h3, color: colors.text },
+    ctaSubtitle: { ...typography.small, color: colors.textMuted, marginTop: 4 },
+    statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+    statCard: { flex: 1, alignItems: 'center' },
+    statValue: { ...typography.h2, color: colors.primary },
+    statLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
+  });
+}

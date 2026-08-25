@@ -1,36 +1,67 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
-import { colors, spacing, typography } from '../../theme/theme';
-import { useAuthStore } from '../../store/authStore';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
+import { RegisteredButLoginFailedError, useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
-import { getErrorMessage, isValidEmail, validatePassword } from '../../lib/validation';
+import { getErrorMessage, isValidEmail, isValidPhone, validatePassword } from '../../lib/validation';
+import { saveCredentials } from '../../lib/biometric';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+type Step = 'phone' | 'otp' | 'details';
+type Gender = 'Male' | 'Female';
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [name, setName] = useState('');
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [step, setStep] = useState<Step>('phone');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [gender, setGender] = useState<Gender>('Male');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const register = useAuthStore((s) => s.register);
+  const registerStart = useAuthStore((s) => s.registerStart);
+  const registerComplete = useAuthStore((s) => s.registerComplete);
   const isLoading = useAuthStore((s) => s.isLoading);
 
-  const rules = [
-    { label: 'At least 8 characters', met: password.length >= 8 },
-    { label: 'One uppercase letter', met: /[A-Z]/.test(password) },
-    { label: 'One number', met: /[0-9]/.test(password) },
-  ];
-
-  async function handleRegister() {
+  async function handleSendOtp() {
     setError('');
-    if (!name.trim()) {
-      setError('Enter your full name.');
+    if (!isValidPhone(phone)) {
+      setError('Enter a valid phone number (e.g. 08012345678).');
+      return;
+    }
+    try {
+      await registerStart(phone);
+      setStep('otp');
+    } catch (e) {
+      setError(getErrorMessage(e, 'Could not send a code to that number.'));
+    }
+  }
+
+  function handleOtpContinue() {
+    setError('');
+    if (otp.trim().length !== 6) {
+      setError('Enter the 6-digit code we sent you.');
+      return;
+    }
+    // Frontend check only — the backend doesn't verify the code until the
+    // final step (G11 combines OTP verification with account creation), so
+    // a wrong code will only surface after the details form is submitted.
+    setStep('details');
+  }
+
+  async function handleCompleteRegistration() {
+    setError('');
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Enter your first and last name.');
       return;
     }
     if (!isValidEmail(email)) {
@@ -42,67 +73,175 @@ export default function RegisterScreen({ navigation }: Props) {
       setError(passwordError);
       return;
     }
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
     try {
-      await register(name.trim(), email.trim(), password);
+      await registerComplete(phone, fullName, gender, password, otp.trim(), email.trim());
+      await saveCredentials(phone, password).catch(() => {}); // best-effort — enables biometric login later
+      // No "done" screen needed — RootNavigator swaps to the app automatically
+      // once registerComplete signs the user in.
     } catch (e) {
-      setError(getErrorMessage(e, 'Could not create your account. Please try again.'));
+      if (e instanceof RegisteredButLoginFailedError) {
+        // The account was created successfully — this is not a failure.
+        // Send them to Login instead of showing an error that would invite
+        // a retry (which would just hit "already registered").
+        navigation.navigate('Login', { infoMessage: e.message, prefillPhone: phone });
+        return;
+      }
+      setError(getErrorMessage(e, 'Could not verify that code or create your account.'));
     }
   }
 
-  return (
-    <Screen>
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Join StockLab and start predicting.</Text>
+  if (step === 'otp') {
+    return (
+      <Screen style={styles.centerContent}>
+        <Text style={styles.title}>Enter the code</Text>
+        <Text style={styles.subtitle}>We sent a 6-digit code to {phone}.</Text>
 
-      <View style={styles.form}>
-        <Input label="Full name" value={name} onChangeText={setName} placeholder="Ada Obi" />
-        <Input
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          style={{ marginTop: spacing.md }}
-        />
-        <Input
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="••••••••"
-          style={{ marginTop: spacing.md }}
-        />
+        <View style={styles.form}>
+          <Input
+            label="Verification code"
+            value={otp}
+            onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+            placeholder="123456"
+          />
 
-        {password.length > 0 && (
-          <View style={styles.rules}>
-            {rules.map((rule) => (
-              <View key={rule.label} style={styles.ruleRow}>
-                <Ionicons
-                  name={rule.met ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={14}
-                  color={rule.met ? colors.success : colors.textDim}
-                />
-                <Text style={[styles.ruleText, rule.met && { color: colors.success }]}>{rule.label}</Text>
-              </View>
+          {!!error && <FormError message={error} />}
+
+          <Button title="Continue" onPress={handleOtpContinue} style={{ marginTop: spacing.lg }} />
+          <Button title="Resend code" variant="ghost" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.sm }} />
+          <Button title="Use a different number" variant="ghost" onPress={() => setStep('phone')} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (step === 'details') {
+    return (
+      <Screen style={styles.centerContent}>
+        <Text style={styles.title}>Tell us about you</Text>
+        <Text style={styles.subtitle}>Almost done — just a few more details.</Text>
+
+        <View style={styles.form}>
+          <View style={styles.verifiedPhoneBox}>
+            <View>
+              <Text style={styles.verifiedPhoneLabel}>Phone number</Text>
+              <Text style={styles.verifiedPhoneValue}>{phone}</Text>
+            </View>
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+              <Text style={styles.verifiedBadgeText}>Verified</Text>
+            </View>
+          </View>
+
+          <View style={[styles.nameRow, { marginTop: spacing.md }]}>
+            <Input label="First name" value={firstName} onChangeText={setFirstName} placeholder="Ada" containerStyle={styles.nameInput} />
+            <Input label="Last name" value={lastName} onChangeText={setLastName} placeholder="Obi" containerStyle={styles.nameInput} />
+          </View>
+
+          <Text style={styles.genderLabel}>Gender</Text>
+          <View style={styles.genderRow}>
+            {(['Male', 'Female'] as Gender[]).map((g) => (
+              <TouchableOpacity
+                key={g}
+                style={[styles.genderBtn, gender === g && styles.genderBtnSelected]}
+                onPress={() => setGender(g)}
+              >
+                <Text style={[styles.genderText, gender === g && styles.genderTextSelected]}>{g}</Text>
+              </TouchableOpacity>
             ))}
           </View>
-        )}
+
+          <Input
+            label="Email address"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="you@example.com"
+            containerStyle={{ marginTop: spacing.md }}
+          />
+
+          <Input
+            label="Choose a password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            placeholder="At least 6 characters"
+            style={{ marginTop: spacing.md }}
+          />
+
+          {!!error && <FormError message={error} />}
+
+          <Button title="Create Account" onPress={handleCompleteRegistration} loading={isLoading} style={{ marginTop: spacing.lg }} />
+        </View>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen style={styles.centerContent}>
+      <Text style={styles.title}>Create your account</Text>
+      <Text style={styles.subtitle}>Enter your phone number to get started.</Text>
+
+      <View style={styles.form}>
+        <Input
+          label="Phone number"
+          value={phone}
+          onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 11))}
+          keyboardType="phone-pad"
+          placeholder="08012345678"
+        />
 
         {!!error && <FormError message={error} />}
 
-        <Button title="Create Account" onPress={handleRegister} loading={isLoading} style={{ marginTop: spacing.lg }} />
+        <Button title="Send Code" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.lg }} />
         <Button title="I already have an account" variant="ghost" onPress={() => navigation.navigate('Login')} style={{ marginTop: spacing.sm }} />
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { ...typography.h2, color: colors.text, marginTop: spacing.lg },
-  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
-  form: { gap: spacing.sm },
-  rules: { gap: 6, marginTop: spacing.sm, marginBottom: spacing.xs },
-  ruleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  ruleText: { ...typography.tiny, color: colors.textDim },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    centerContent: { flexGrow: 1, justifyContent: 'center' },
+    title: { ...typography.h2, color: colors.text, textAlign: 'center' },
+    subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl, textAlign: 'center' },
+    form: { gap: spacing.sm },
+    nameRow: { flexDirection: 'row', gap: spacing.sm },
+    nameInput: { flex: 1 },
+    verifiedPhoneBox: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    verifiedPhoneLabel: { ...typography.tiny, color: colors.textMuted },
+    verifiedPhoneValue: { ...typography.body, color: colors.text, fontWeight: '600', marginTop: 2 },
+    verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    verifiedBadgeText: { ...typography.tiny, color: colors.success, fontWeight: '700' },
+    genderLabel: { ...typography.small, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs },
+    genderRow: { flexDirection: 'row', gap: spacing.sm },
+    genderBtn: {
+      flex: 1,
+      height: 44,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    genderBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+    genderText: { ...typography.body, color: colors.text, fontWeight: '600' },
+    genderTextSelected: { color: colors.onPrimary },
+  });
+}

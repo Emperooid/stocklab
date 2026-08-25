@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,17 +6,19 @@ import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
-import { colors, spacing, typography } from '../../theme/theme';
+import { Colors, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
-import { isValidEmail, validatePassword } from '../../lib/validation';
+import { isValidPhone, validatePassword } from '../../lib/validation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 type Step = 'request' | 'reset' | 'done';
 
 export default function ForgotPasswordScreen({ navigation }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [step, setStep] = useState<Step>('request');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,12 +28,12 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
 
   async function handleRequest() {
     setError('');
-    if (!isValidEmail(email)) {
-      setError('Enter a valid email address.');
+    if (!isValidPhone(phone)) {
+      setError('Enter a valid phone number (e.g. 08012345678).');
       return;
     }
     try {
-      await requestPasswordReset(email);
+      await requestPasswordReset(phone);
       setStep('reset');
     } catch {
       setError('Could not send a reset code. Please try again.');
@@ -50,7 +52,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
       return;
     }
     try {
-      await resetPassword(email, code.trim(), newPassword);
+      await resetPassword(phone, code.trim(), newPassword);
       setStep('done');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reset your password.');
@@ -78,13 +80,13 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
     return (
       <Screen>
         <Text style={styles.title}>Enter reset code</Text>
-        <Text style={styles.subtitle}>We sent a 6-digit code to {email}. Enter it below with your new password.</Text>
+        <Text style={styles.subtitle}>We sent a 6-digit code to {phone}. Enter it below with your new password.</Text>
 
         <View style={styles.form}>
           <Input
             label="Reset code"
             value={code}
-            onChangeText={setCode}
+            onChangeText={(t) => setCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
             keyboardType="number-pad"
             maxLength={6}
             placeholder="123456"
@@ -94,7 +96,8 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
             value={newPassword}
             onChangeText={setNewPassword}
             secureTextEntry
-            placeholder="••••••••"
+            autoCapitalize="none"
+            placeholder="At least 6 characters"
             style={{ marginTop: spacing.md }}
           />
 
@@ -110,16 +113,15 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
   return (
     <Screen>
       <Text style={styles.title}>Forgot password</Text>
-      <Text style={styles.subtitle}>Enter your account email and we'll send you a reset code.</Text>
+      <Text style={styles.subtitle}>Enter your phone number and we'll send you a reset code.</Text>
 
       <View style={styles.form}>
         <Input
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="you@example.com"
+          label="Phone number"
+          value={phone}
+          onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 11))}
+          keyboardType="phone-pad"
+          placeholder="08012345678"
         />
 
         {!!error && <FormError message={error} />}
@@ -131,18 +133,20 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { ...typography.h2, color: colors.text, marginTop: spacing.lg },
-  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
-  form: { gap: spacing.sm },
-  centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  successCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    title: { ...typography.h2, color: colors.text, marginTop: spacing.lg },
+    subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
+    form: { gap: spacing.sm },
+    centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    successCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.lg,
+    },
+  });
+}

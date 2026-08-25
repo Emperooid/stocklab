@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 
 export function FormError({ message }: { message: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!message) return null;
   return (
     <View style={styles.wrap}>
@@ -12,15 +15,17 @@ export function FormError({ message }: { message: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.dangerTint,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  text: { ...typography.small, color: colors.danger, flex: 1 },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    wrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.dangerTint,
+      borderRadius: radius.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+    },
+    text: { ...typography.small, color: colors.danger, flex: 1 },
+  });
+}

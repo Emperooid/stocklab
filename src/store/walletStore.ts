@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { Bank, ResolvedBankAccount, WalletTransaction } from '../types';
 import { api } from '../api';
+import { useAuthStore } from './authStore';
+
+interface PendingDeposit {
+  amount: number;
+  balanceBefore: number;
+  startedAt: number;
+}
 
 interface WalletState {
   balance: number;
@@ -9,10 +16,15 @@ interface WalletState {
   transactions: WalletTransaction[];
   banks: Bank[];
   isLoading: boolean;
+  // Deposits are credited by a server-side webhook with no client-side
+  // confirm/verify call available (see createDepositReference) — this is
+  // purely a UI cue so "why hasn't my balance changed yet" doesn't look like
+  // the app silently ate the deposit while the webhook is still catching up.
+  pendingDeposit: PendingDeposit | null;
   refresh: () => Promise<void>;
-  createDepositReference: (amount: number) => Promise<{ reference: string; email: string }>;
-  verifyDeposit: (reference: string) => Promise<void>;
-  cancelDeposit: (reference: string) => Promise<void>;
+  createDepositReference: (amount: number) => Promise<{ redirectUrl: string; reference: string }>;
+  startPendingDeposit: (amount: number) => void;
+  dismissPendingDeposit: () => void;
   fetchBanks: () => Promise<void>;
   resolveBankAccount: (accountNumber: string, bankCode: string) => Promise<ResolvedBankAccount>;
   requestWithdrawal: (amount: number, bank: Bank, account: ResolvedBankAccount) => Promise<void>;
@@ -25,29 +37,39 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   transactions: [],
   banks: [],
   isLoading: false,
+  pendingDeposit: null,
 
   refresh: async () => {
     set({ isLoading: true });
-    const [{ balance, totalProfit, totalProfitPercent }, transactions] = await Promise.all([
-      api.wallet.getBalance(),
-      api.wallet.getTransactions(),
-    ]);
-    set({ balance, totalProfit, totalProfitPercent, transactions, isLoading: false });
+    try {
+      const [{ balance, totalProfit, totalProfitPercent }, transactions] = await Promise.all([
+        api.wallet.getBalance(),
+        api.wallet.getTransactions(),
+      ]);
+      const pending = get().pendingDeposit;
+      // The webhook credit is the only signal we have that a pending deposit
+      // resolved — once the balance actually moves off what it was when the
+      // deposit started, treat it as settled and drop the banner.
+      const stillPending = pending && balance === pending.balanceBefore ? pending : null;
+      set({ balance, totalProfit, totalProfitPercent, transactions, isLoading: false, pendingDeposit: stillPending });
+    } catch (e) {
+      // Keep the last known balance/transactions on a failed refresh rather
+      // than wiping them to zero — a transient failure here used to look
+      // like "your balance disappeared" until you logged out and back in.
+      set({ isLoading: false });
+      throw e;
+    }
   },
 
   createDepositReference: async (amount) => {
-    return api.wallet.createDepositReference(amount);
+    return api.wallet.createDepositReference(amount, useAuthStore.getState().user?.email);
   },
 
-  verifyDeposit: async (reference) => {
-    await api.wallet.verifyDeposit(reference);
-    await get().refresh();
+  startPendingDeposit: (amount) => {
+    set({ pendingDeposit: { amount, balanceBefore: get().balance, startedAt: Date.now() } });
   },
 
-  cancelDeposit: async (reference) => {
-    await api.wallet.cancelDeposit(reference);
-    await get().refresh();
-  },
+  dismissPendingDeposit: () => set({ pendingDeposit: null }),
 
   fetchBanks: async () => {
     if (get().banks.length > 0) return;

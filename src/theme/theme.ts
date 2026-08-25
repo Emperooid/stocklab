@@ -1,4 +1,5 @@
 import { Dimensions, Platform } from 'react-native';
+import { useThemeStore } from '../store/themeStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -24,7 +25,7 @@ export const layout = {
   contentMaxWidth: 520,
 };
 
-export const colors = {
+export const darkColors = {
   background: '#0B0F0D',
   surface: '#121815',
   surfaceAlt: '#161D19',
@@ -49,6 +50,44 @@ export const colors = {
   blueTint: 'rgba(96, 165, 250, 0.14)',
   overlay: 'rgba(0, 0, 0, 0.6)',
 };
+
+export const lightColors = {
+  background: '#F5F8F6',
+  surface: '#FFFFFF',
+  surfaceAlt: '#EEF3EF',
+  surfaceRaised: '#FFFFFF',
+  border: '#DCE5DF',
+  borderLight: '#E8EFEA',
+  primary: '#16A34A',
+  primaryDark: '#15803D',
+  onPrimary: '#FFFFFF',
+  text: '#0F241A',
+  textMuted: '#57685F',
+  textDim: '#8C9A92',
+  success: '#16A34A',
+  successTint: 'rgba(22, 163, 74, 0.10)',
+  danger: '#DC2626',
+  dangerTint: 'rgba(220, 38, 38, 0.08)',
+  warning: '#B45309',
+  warningTint: 'rgba(180, 83, 9, 0.09)',
+  primaryTint: 'rgba(22, 163, 74, 0.10)',
+  purple: '#7C3AED',
+  blue: '#2563EB',
+  blueTint: 'rgba(37, 99, 235, 0.10)',
+  overlay: 'rgba(15, 36, 26, 0.4)',
+};
+
+export type Colors = typeof darkColors;
+
+// Kept as a static export for now, always the dark palette — see useColors()
+// below for the reactive, theme-aware version every screen should use.
+export const colors: Colors = darkColors;
+
+/** The current theme's palette — reactive, re-renders the calling component when the mode toggles. */
+export function useColors(): Colors {
+  const mode = useThemeStore((s) => s.mode);
+  return mode === 'light' ? lightColors : darkColors;
+}
 
 export const spacing = {
   xs: moderateScale(4),

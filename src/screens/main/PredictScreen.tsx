@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
@@ -7,26 +7,26 @@ import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { CountdownBadge } from '../../components/CountdownBadge';
 import { EmptyState } from '../../components/EmptyState';
-import { colors, radius, shadow, spacing, typography } from '../../theme/theme';
+import { FormError } from '../../components/FormError';
+import { PredictionControl } from '../../components/PredictionControl';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useRoundsStore } from '../../store/roundsStore';
-import { useAutoPlayStore } from '../../store/autoPlayStore';
+import { AutoPlayMode, useAutoPlayStore } from '../../store/autoPlayStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
 import { formatTime12h } from '../../lib/format';
-import { ROUND_STAKE } from '../../lib/payout';
-
-const VALUES = [1, 2, 3, 4, 5];
+import { getErrorMessage, MIN_SLOT_AMOUNT, validateSlotAmount } from '../../lib/validation';
 
 export default function PredictScreen() {
-  const { rounds, fetchRounds, submitPrediction, isLoading } = useRoundsStore();
-  const [selected, setSelected] = useState<number | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { rounds, fetchRounds, submitPrediction } = useRoundsStore();
   const [refreshing, setRefreshing] = useState(false);
   const now = useRoundsLiveRefresh();
 
   useFocusEffect(
     useCallback(() => {
-      fetchRounds();
+      fetchRounds().catch(() => {});
     }, [])
   );
 
@@ -36,91 +36,54 @@ export default function PredictScreen() {
     setRefreshing(false);
   }
 
-  const openRound = rounds.find((r) => getSlotStatus(r.slot, now) === 'open');
-  const alreadyPredicted = !!openRound?.prediction;
-
-  async function handleSubmit() {
-    if (!openRound || selected === null) return;
-    setSubmitting(true);
-    try {
-      await submitPrediction(openRound.slot.id, selected);
-      setSelected(null);
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  // A round accepts a stock pick any time before it settles — not just
+  // during its own hour — so this lists every unsettled round today, not
+  // just whichever one happens to be "open" right now.
+  const openRounds = rounds
+    .filter((r) => getSlotStatus(r.slot, now) !== 'settled')
+    .sort((a, b) => a.slot.index - b.slot.index);
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Text style={styles.title}>Predict</Text>
+      <Text style={styles.title}>Stock</Text>
 
       <View style={{ marginBottom: spacing.lg }}>
         <CountdownBadge />
       </View>
 
-      {!openRound && (
+      {openRounds.length === 0 && (
         <Card>
           <EmptyState
             icon="hourglass-outline"
-            title="No round is open right now"
-            message="A new round opens every hour. Check the countdown above for the next window."
+            title="No rounds left to pick a stock for today"
+            message="Check back after the next operating day starts."
           />
         </Card>
       )}
 
-      {openRound && (
-        <Card>
-          <View style={styles.roundHeader}>
-            <View style={styles.roundIndexCircle}>
-              <Text style={styles.roundIndexText}>{openRound.slot.index}</Text>
+      <View style={{ gap: spacing.md }}>
+        {openRounds.map((round) => (
+          <Card key={round.slot.id}>
+            <View style={styles.roundHeader}>
+              <View style={styles.roundIndexCircle}>
+                <Text style={styles.roundIndexText}>{round.slot.index}</Text>
+              </View>
+              <View>
+                <Text style={styles.roundLabel}>Round {round.slot.index}</Text>
+                <Text style={styles.roundTime}>
+                  Opens {formatTime12h(round.slot.submitTime)} · Settles {formatTime12h(round.slot.settleTime)}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.roundLabel}>Round {openRound.slot.index}</Text>
-              <Text style={styles.roundTime}>
-                Submit by {formatTime12h(openRound.slot.submitTime)} · Settles {formatTime12h(openRound.slot.settleTime)}
-              </Text>
-            </View>
-          </View>
 
-          {alreadyPredicted ? (
-            <View style={styles.submittedBox}>
-              <View style={styles.submittedIconCircle}>
-                <Ionicons name="checkmark" size={20} color={colors.onPrimary} />
-              </View>
-              <Text style={styles.submittedText}>
-                You predicted <Text style={styles.submittedValue}>{openRound.prediction!.value}</Text> for this round.
-                Results land once it settles.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.pickLabel}>Pick a number from 1 to 5</Text>
-              <View style={styles.valuesRow}>
-                {VALUES.map((v) => {
-                  const isSelected = selected === v;
-                  return (
-                    <TouchableOpacity
-                      key={v}
-                      style={[styles.valueBtn, isSelected && styles.valueBtnSelected]}
-                      onPress={() => setSelected(v)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[styles.valueText, isSelected && styles.valueTextSelected]}>{v}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <Button
-                title="Submit Prediction"
-                onPress={handleSubmit}
-                loading={submitting || isLoading}
-                disabled={selected === null}
-                style={{ marginTop: spacing.xl }}
-              />
-            </>
-          )}
-        </Card>
-      )}
+            <PredictionControl
+              roundId={round.slot.id}
+              currentValue={round.prediction?.value}
+              onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
+            />
+          </Card>
+        ))}
+      </View>
 
       <AutoPlaySection />
 
@@ -130,9 +93,11 @@ export default function PredictScreen() {
           <Text style={styles.infoTitle}>How scoring works</Text>
         </View>
         <Text style={styles.infoText}>
-          Every round costs ₦{ROUND_STAKE} to play, charged from your wallet. The Stock Value is set by the
-          operator for each round — the closer your number is to it, the more you gain; the farther away, the more
-          you lose, capped at 0.5% of your balance per round.
+          Pick a number and how much to play each round with — that amount comes out of your wallet balance,
+          separate from the rest. You can pick a stock for any round today in advance, not just the one currently
+          open, but each round can only be played once — there's no changing it after you submit. The Stock Value
+          is drawn automatically and only revealed once a round settles — the closer your number is to it, the
+          more you gain, the farther away, the more you lose. Minimum ₦{MIN_SLOT_AMOUNT} per round.
         </Text>
       </Card>
     </Screen>
@@ -140,7 +105,53 @@ export default function PredictScreen() {
 }
 
 function AutoPlaySection() {
-  const { enabled, paused, preferredValue, setEnabled, setPaused, setPreferredValue } = useAutoPlayStore();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { enabled, mode, amountPerSlot, configured, saving, error, configure, setEnabled, clearError } = useAutoPlayStore();
+
+  // Local drafts, seeded from the last-saved store values — nothing is sent
+  // to the server just from tapping a mode or typing an amount. Saving
+  // (or turning Auto Play on for the first time) is what actually commits
+  // a draft via configure() (G26).
+  const [draftMode, setDraftMode] = useState<AutoPlayMode>(mode);
+  const [amountText, setAmountText] = useState(String(amountPerSlot));
+  const [amountError, setAmountError] = useState('');
+
+  const isDirty = draftMode !== mode || Number(amountText) !== amountPerSlot;
+
+  function handleAmountChange(raw: string) {
+    setAmountText(raw.replace(/[^0-9]/g, ''));
+  }
+
+  async function handleSave(nextEnabled: boolean) {
+    clearError();
+    setAmountError('');
+    const validationError = validateSlotAmount(amountText);
+    if (validationError) {
+      setAmountError(validationError);
+      return;
+    }
+    try {
+      await configure(draftMode, Number(amountText), nextEnabled);
+    } catch {
+      // error already captured in the store; nothing else to do here
+    }
+  }
+
+  async function handleToggleSwitch(next: boolean) {
+    clearError();
+    // Turning it on for the very first time (or with unsaved mode/amount
+    // changes pending) needs the full profile call, not just the toggle.
+    if (!configured || (next && isDirty)) {
+      await handleSave(next);
+      return;
+    }
+    try {
+      await setEnabled(next);
+    } catch {
+      // error already captured in the store
+    }
+  }
 
   return (
     <Card style={styles.autoPlayCard}>
@@ -148,113 +159,128 @@ function AutoPlaySection() {
         <View style={{ flex: 1, marginRight: spacing.md }}>
           <Text style={styles.autoPlayTitle}>Auto Play</Text>
           <Text style={styles.autoPlaySubtitle}>
-            Automatically plays your preferred number every open round for ₦{ROUND_STAKE} each.
+            The server plays every round for you automatically — even while the app is closed.
           </Text>
         </View>
         <Switch
           value={enabled}
-          onValueChange={setEnabled}
+          onValueChange={handleToggleSwitch}
+          disabled={saving}
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor={colors.text}
         />
       </View>
 
-      {enabled && (
-        <>
-          <Text style={styles.autoPlayLabel}>Preferred number</Text>
-          <View style={styles.autoPlayValuesRow}>
-            {VALUES.map((v) => (
-              <TouchableOpacity
-                key={v}
-                style={[styles.autoPlayValueBtn, preferredValue === v && styles.autoPlayValueBtnSelected]}
-                onPress={() => setPreferredValue(v)}
-              >
-                <Text style={[styles.autoPlayValueText, preferredValue === v && styles.autoPlayValueTextSelected]}>{v}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      {!!error && (
+        <View style={styles.autoPlayErrorBanner}>
+          <Ionicons name="alert-circle-outline" size={14} color={colors.danger} />
+          <Text style={styles.autoPlayErrorText}>{error}</Text>
+        </View>
+      )}
 
-          <Button
-            title={paused ? 'Resume Auto Play' : 'Pause Auto Play'}
-            variant={paused ? 'primary' : 'outline'}
-            size="sm"
-            onPress={() => setPaused(!paused)}
-            style={{ marginTop: spacing.md }}
-          />
-        </>
+      <Text style={styles.autoPlayLabel}>Rounds per day</Text>
+      <View style={styles.autoPlayValuesRow}>
+        {(['half', 'full'] as AutoPlayMode[]).map((m) => (
+          <TouchableOpacity
+            key={m}
+            style={[styles.modeBtn, draftMode === m && styles.modeBtnSelected]}
+            onPress={() => setDraftMode(m)}
+          >
+            <Text style={[styles.modeBtnText, draftMode === m && styles.modeBtnTextSelected]}>
+              {m === 'half' ? 'Half · 12 rounds' : 'Full · 24 rounds'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.autoPlayLabel}>Amount per round</Text>
+      <View style={styles.amountRow}>
+        <Text style={styles.amountPrefix}>₦</Text>
+        <TextInput
+          style={styles.amountInput}
+          value={amountText}
+          onChangeText={handleAmountChange}
+          keyboardType="number-pad"
+          placeholder={String(MIN_SLOT_AMOUNT)}
+          placeholderTextColor={colors.textDim}
+        />
+      </View>
+      {!!amountError && <FormError message={amountError} />}
+
+      {(isDirty || !configured) && (
+        <Button
+          title={enabled ? 'Save Changes' : 'Turn On Auto Play'}
+          size="sm"
+          loading={saving}
+          onPress={() => handleSave(true)}
+          style={{ marginTop: spacing.md }}
+        />
       )}
     </Card>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
-  roundHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-  roundIndexCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    backgroundColor: colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roundIndexText: { ...typography.h3, color: colors.primary },
-  roundLabel: { ...typography.h3, color: colors.text },
-  roundTime: { ...typography.small, color: colors.textMuted, marginTop: 2 },
-  pickLabel: { ...typography.small, color: colors.textMuted, marginBottom: spacing.md },
-  valuesRow: { flexDirection: 'row', gap: spacing.sm },
-  valueBtn: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  valueBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primary, ...shadow.md },
-  valueText: { ...typography.h2, color: colors.text },
-  valueTextSelected: { color: colors.onPrimary },
-  submittedBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.successTint,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  submittedIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submittedText: { ...typography.small, color: colors.textMuted, flex: 1, lineHeight: 18 },
-  submittedValue: { color: colors.primary, fontWeight: '800' },
-  infoCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
-  infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-  infoTitle: { ...typography.h3, color: colors.text },
-  infoText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
-  autoPlayCard: { marginTop: spacing.lg },
-  autoPlayHeaderRow: { flexDirection: 'row', alignItems: 'center' },
-  autoPlayTitle: { ...typography.h3, color: colors.text },
-  autoPlaySubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
-  autoPlayLabel: { ...typography.small, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.sm },
-  autoPlayValuesRow: { flexDirection: 'row', gap: spacing.sm },
-  autoPlayValueBtn: {
-    flex: 1,
-    height: 40,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  autoPlayValueBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  autoPlayValueText: { ...typography.h3, color: colors.text },
-  autoPlayValueTextSelected: { color: colors.onPrimary },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
+    roundHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+    roundIndexCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 13,
+      backgroundColor: colors.primaryTint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    roundIndexText: { ...typography.h3, color: colors.primary },
+    roundLabel: { ...typography.h3, color: colors.text },
+    roundTime: { ...typography.small, color: colors.textMuted, marginTop: 2 },
+    amountRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: spacing.md,
+      height: 48,
+    },
+    amountPrefix: { ...typography.h3, color: colors.textMuted },
+    amountInput: { ...typography.h3, color: colors.text, flex: 1, padding: 0 },
+    infoCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
+    infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
+    infoTitle: { ...typography.h3, color: colors.text },
+    infoText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+    autoPlayCard: { marginTop: spacing.lg },
+    autoPlayHeaderRow: { flexDirection: 'row', alignItems: 'center' },
+    autoPlayTitle: { ...typography.h3, color: colors.text },
+    autoPlaySubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
+    autoPlayErrorBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.xs,
+      backgroundColor: colors.dangerTint,
+      borderRadius: radius.md,
+      padding: spacing.sm,
+      marginTop: spacing.md,
+    },
+    autoPlayErrorText: { ...typography.tiny, color: colors.danger, flex: 1, lineHeight: 15 },
+    autoPlayLabel: { ...typography.small, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.sm },
+    autoPlayValuesRow: { flexDirection: 'row', gap: spacing.sm },
+    modeBtn: {
+      flex: 1,
+      height: 44,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+    },
+    modeBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+    modeBtnText: { ...typography.small, color: colors.text, fontWeight: '600' },
+    modeBtnTextSelected: { color: colors.onPrimary },
+  });
+}

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, layout, spacing } from '../theme/theme';
+import { Colors, layout, spacing, useColors } from '../theme/theme';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -12,6 +12,9 @@ interface ScreenProps {
 }
 
 export function Screen({ children, scroll = true, style, refreshing, onRefresh }: ScreenProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const refreshControl =
     onRefresh != null ? (
       <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
@@ -44,10 +47,12 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh }
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  centered: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    flex: { flex: 1 },
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+    centered: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
+  });
+}

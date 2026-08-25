@@ -1,5 +1,5 @@
 export type AuthStackParamList = {
-  Login: undefined;
+  Login: { infoMessage?: string; prefillPhone?: string } | undefined;
   Register: undefined;
   ForgotPassword: undefined;
 };

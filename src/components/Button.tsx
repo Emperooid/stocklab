@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -10,7 +10,7 @@ import {
   Text,
   ViewStyle,
 } from 'react-native';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
   title: string;
@@ -22,6 +22,8 @@ interface ButtonProps extends Omit<PressableProps, 'style'> {
 }
 
 export function Button({ title, variant = 'primary', size = 'md', loading, style, disabled, onPressIn, onPressOut, ...rest }: ButtonProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isDisabled = disabled || loading;
 
@@ -53,7 +55,7 @@ export function Button({ title, variant = 'primary', size = 'md', loading, style
         {loading ? (
           <ActivityIndicator color={variant === 'primary' || variant === 'danger' ? colors.onPrimary : colors.primary} />
         ) : (
-          <Text style={[styles.text, size === 'sm' && styles.textSm, TEXT_STYLE[variant]]} numberOfLines={1}>
+          <Text style={[styles.text, size === 'sm' && styles.textSm, TEXT_STYLE(colors)[variant]]} numberOfLines={1}>
             {title}
           </Text>
         )}
@@ -62,27 +64,29 @@ export function Button({ title, variant = 'primary', size = 'md', loading, style
   );
 }
 
-const TEXT_STYLE = {
+const TEXT_STYLE = (colors: Colors) => ({
   primary: { color: colors.onPrimary },
   danger: { color: colors.onPrimary },
   outline: { color: colors.primary },
   ghost: { color: colors.primary },
-};
-
-const styles = StyleSheet.create({
-  base: {
-    height: 50,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  baseSm: { height: 40, paddingHorizontal: spacing.md },
-  primary: { backgroundColor: colors.primary },
-  danger: { backgroundColor: colors.danger },
-  outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
-  ghost: { backgroundColor: 'transparent' },
-  disabled: { opacity: 0.5 },
-  text: { ...typography.h3 },
-  textSm: { fontSize: typography.body.fontSize },
 });
+
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    base: {
+      height: 50,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    baseSm: { height: 40, paddingHorizontal: spacing.md },
+    primary: { backgroundColor: colors.primary },
+    danger: { backgroundColor: colors.danger },
+    outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
+    ghost: { backgroundColor: 'transparent' },
+    disabled: { opacity: 0.5 },
+    text: { ...typography.h3 },
+    textSm: { fontSize: typography.body.fontSize },
+  });
+}

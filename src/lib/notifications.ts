@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { DailyRound } from '../types';
-import { timeOnDate } from './schedule';
+import { slotSettleAt, slotSubmitAt } from './schedule';
 
 const CHANNEL_ID = 'stockgod-rounds';
 
@@ -54,8 +54,8 @@ export async function scheduleTodaysRoundNotifications(rounds: DailyRound[]) {
   const now = new Date();
 
   for (const round of rounds) {
-    const openAt = timeOnDate(round.slot.submitTime, now);
-    const settleAt = timeOnDate(round.slot.settleTime, now);
+    const openAt = slotSubmitAt(round.slot, now);
+    const settleAt = slotSettleAt(round.slot, now);
 
     if (openAt.getTime() > now.getTime()) {
       await Notifications.scheduleNotificationAsync({

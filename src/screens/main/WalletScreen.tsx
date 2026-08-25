@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
@@ -9,14 +9,12 @@ import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
 import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
-import { PaystackCheckout } from '../../components/PaystackCheckout';
 import { BankPickerModal } from '../../components/BankPickerModal';
-import { colors, radius, spacing, typography } from '../../theme/theme';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
 import { Bank, ResolvedBankAccount, WalletTransaction } from '../../types';
 import { getErrorMessage, validateDepositAmount } from '../../lib/validation';
 import { formatMoney, formatSigned } from '../../lib/format';
-import { isPaystackConfigured } from '../../config/paystack';
 
 type ActiveAction = 'deposit' | 'withdraw' | null;
 
@@ -29,14 +27,17 @@ const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap>
 };
 
 export default function WalletScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     balance,
     transactions,
     banks,
+    pendingDeposit,
     refresh,
     createDepositReference,
-    verifyDeposit,
-    cancelDeposit,
+    startPendingDeposit,
+    dismissPendingDeposit,
     fetchBanks,
     resolveBankAccount,
     requestWithdrawal,
@@ -46,10 +47,9 @@ export default function WalletScreen() {
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
 
   // Deposit state
-  const [amount, setAmount] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
   const [depositing, setDepositing] = useState(false);
   const [depositError, setDepositError] = useState('');
-  const [checkout, setCheckout] = useState<{ reference: string; email: string; amount: number } | null>(null);
 
   // Withdrawal state
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -63,8 +63,8 @@ export default function WalletScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      refresh();
-      fetchBanks();
+      refresh().catch(() => {});
+      fetchBanks().catch(() => {});
     }, [])
   );
 
@@ -72,38 +72,29 @@ export default function WalletScreen() {
     setActiveAction((current) => (current === action ? null : action));
   }
 
-  async function handleStartDeposit() {
+  async function handleDeposit() {
     setDepositError('');
-    const validationError = validateDepositAmount(amount);
+    const validationError = validateDepositAmount(depositAmount);
     if (validationError) {
       setDepositError(validationError);
       return;
     }
     setDepositing(true);
     try {
-      const { reference, email } = await createDepositReference(Number(amount));
-      setCheckout({ reference, email, amount: Number(amount) });
+      const depositValue = Number(depositAmount);
+      const { redirectUrl } = await createDepositReference(depositValue);
+      // Balance updates automatically via a server-side webhook once
+      // payment completes (confirmed by Mr Yemi) — nothing to verify or
+      // poll for here beyond the wallet's existing G25 refresh on focus.
+      startPendingDeposit(depositValue);
+      await Linking.openURL(redirectUrl);
+      setDepositAmount('');
+      setActiveAction(null);
     } catch (e) {
       setDepositError(getErrorMessage(e, 'Could not start your deposit.'));
     } finally {
       setDepositing(false);
     }
-  }
-
-  async function handleDepositSuccess(reference: string) {
-    setCheckout(null);
-    try {
-      await verifyDeposit(reference);
-      setAmount('');
-      setActiveAction(null);
-    } catch (e) {
-      setDepositError(getErrorMessage(e, 'We could not confirm your payment.'));
-    }
-  }
-
-  async function handleDepositCancel() {
-    if (checkout) await cancelDeposit(checkout.reference).catch(() => {});
-    setCheckout(null);
   }
 
   function resetWithdrawForm() {
@@ -195,26 +186,40 @@ export default function WalletScreen() {
               </View>
             </Card>
 
+            {pendingDeposit && (
+              <Card style={styles.pendingCard}>
+                <ActivityIndicator size="small" color={colors.warning} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pendingTitle}>Confirming {formatMoney(pendingDeposit.amount)} deposit</Text>
+                  <Text style={styles.pendingBody}>
+                    This can take a minute after you complete payment. We'll update your balance automatically.
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={dismissPendingDeposit} hitSlop={8}>
+                  <Ionicons name="close" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </Card>
+            )}
+
             {activeAction === 'deposit' && (
               <Card style={styles.actionCard}>
                 <Text style={styles.actionTitle}>Deposit funds</Text>
-                {!isPaystackConfigured() && (
-                  <View style={styles.warnBanner}>
-                    <Ionicons name="warning-outline" size={14} color={colors.warning} />
-                    <Text style={styles.warnText}>
-                      No Paystack public key set. Add EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY to your .env file to charge real cards.
-                    </Text>
-                  </View>
-                )}
+                <View style={styles.warnBanner}>
+                  <Ionicons name="information-circle-outline" size={14} color={colors.warning} />
+                  <Text style={styles.warnText}>
+                    Opens a secure checkout page in your browser. Your balance updates automatically once payment
+                    completes.
+                  </Text>
+                </View>
                 <Input
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="numeric"
+                  value={depositAmount}
+                  onChangeText={(t) => setDepositAmount(t.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
                   placeholder="Amount (₦)"
                   style={{ marginTop: spacing.sm }}
                 />
                 {!!depositError && <FormError message={depositError} />}
-                <Button title="Continue to Checkout" onPress={handleStartDeposit} loading={depositing} style={{ marginTop: spacing.md }} />
+                <Button title="Continue to Checkout" onPress={handleDeposit} loading={depositing} style={{ marginTop: spacing.md }} />
               </Card>
             )}
 
@@ -253,8 +258,8 @@ export default function WalletScreen() {
 
                 <Input
                   value={withdrawAmount}
-                  onChangeText={setWithdrawAmount}
-                  keyboardType="numeric"
+                  onChangeText={(t) => setWithdrawAmount(t.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
                   placeholder="Amount (₦)"
                   style={{ marginTop: spacing.sm }}
                 />
@@ -279,17 +284,6 @@ export default function WalletScreen() {
         }
         renderItem={({ item }) => <TransactionRow tx={item} />}
       />
-
-      {checkout && (
-        <PaystackCheckout
-          visible
-          amount={checkout.amount}
-          email={checkout.email}
-          reference={checkout.reference}
-          onSuccess={handleDepositSuccess}
-          onCancel={handleDepositCancel}
-        />
-      )}
 
       <BankPickerModal
         visible={bankPickerVisible}
@@ -316,6 +310,8 @@ function QuickAction({
   active: boolean;
   onPress: () => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity style={[styles.quickActionBtn, active && styles.quickActionBtnActive]} onPress={onPress} activeOpacity={0.8}>
       <Ionicons name={icon} size={18} color={active ? colors.onPrimary : colors.primary} />
@@ -325,6 +321,8 @@ function QuickAction({
 }
 
 function TransactionRow({ tx }: { tx: WalletTransaction }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isPositive = tx.amount >= 0;
   return (
     <Card style={styles.txCard}>
@@ -346,59 +344,71 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  balanceCard: { marginHorizontal: spacing.lg },
-  balanceLabel: { ...typography.small, color: colors.textMuted },
-  balance: { ...typography.h1, color: colors.text, marginTop: 4 },
-  quickActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  quickActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: 'transparent',
-  },
-  quickActionBtnActive: { backgroundColor: colors.primary },
-  quickActionText: { ...typography.small, color: colors.primary, fontWeight: '700' },
-  actionCard: { marginHorizontal: spacing.lg, marginTop: spacing.md },
-  actionTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
-  warnBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.warningTint,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-  },
-  warnText: { ...typography.tiny, color: colors.warning, flex: 1, lineHeight: 15 },
-  inlineRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, alignItems: 'flex-start' },
-  bankSelect: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    height: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
-  bankSelectText: { ...typography.body, color: colors.text },
-  bankSelectPlaceholder: { ...typography.body, color: colors.textDim },
-  resolvedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
-  resolvedText: { ...typography.small, color: colors.success, fontWeight: '600' },
-  sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
-  txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-  txIconCircle: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  txDescription: { ...typography.body, color: colors.text },
-  txMetaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: spacing.sm },
-  txDate: { ...typography.tiny, color: colors.textMuted },
-  txAmount: { ...typography.h3 },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+    balanceCard: { marginHorizontal: spacing.lg },
+    balanceLabel: { ...typography.small, color: colors.textMuted },
+    balance: { ...typography.h1, color: colors.text, marginTop: 4 },
+    quickActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+    quickActionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      height: 44,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: 'transparent',
+    },
+    quickActionBtnActive: { backgroundColor: colors.primary },
+    quickActionText: { ...typography.small, color: colors.primary, fontWeight: '700' },
+    pendingCard: {
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.warningTint,
+    },
+    pendingTitle: { ...typography.small, color: colors.text, fontWeight: '700' },
+    pendingBody: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
+    actionCard: { marginHorizontal: spacing.lg, marginTop: spacing.md },
+    actionTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+    warnBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.warningTint,
+      borderRadius: radius.md,
+      padding: spacing.sm,
+    },
+    warnText: { ...typography.tiny, color: colors.warning, flex: 1, lineHeight: 15 },
+    inlineRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, alignItems: 'flex-start' },
+    bankSelect: {
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      height: 50,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.sm,
+    },
+    bankSelectText: { ...typography.body, color: colors.text },
+    bankSelectPlaceholder: { ...typography.body, color: colors.textDim },
+    resolvedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+    resolvedText: { ...typography.small, color: colors.success, fontWeight: '600' },
+    sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
+    txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+    txIconCircle: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    txDescription: { ...typography.body, color: colors.text },
+    txMetaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: spacing.sm },
+    txDate: { ...typography.tiny, color: colors.textMuted },
+    txAmount: { ...typography.h3 },
+  });
+}
