@@ -131,6 +131,10 @@ export const httpApi = {
         balance: 0, // WBalance IS present in this response (confirmed), but G25 is the dedicated/canonical balance lookup — see wallet.getBalance()
         totalProfit: 0,
         totalProfitPercent: 0,
+        // Defensive — not confirmed present on G22 (only seen on G24 so
+        // far), but read it here too in case it's nested under Profile the
+        // same way email is. refreshUser() (G24) is the confirmed source.
+        slotAmount: profile.SlotAmount != null ? Number(profile.SlotAmount) : undefined,
       };
     },
 
@@ -188,6 +192,12 @@ export const httpApi = {
      * response is {IsValid, ID, Phone, FullName, Gender, iStatus, DateIn,
      * TimeIn, WBalance, Message}. This is the same lookup wallet.getBalance()
      * below uses to refresh WBalance without a full re-login.
+     *
+     * NEW: G24 now also returns `SlotAmount` — a fixed, per-user stake
+     * amount. Per explicit product decision, this replaces the old
+     * free-text amount field entirely: users no longer choose how much to
+     * stake per round, they play with whatever SlotAmount their profile
+     * has, non-editable in the app.
      */
     async me(): Promise<User> {
       const { phone } = requireSession();
@@ -200,6 +210,7 @@ export const httpApi = {
         balance: Number(res?.WBalance ?? 0),
         totalProfit: 0,
         totalProfitPercent: 0,
+        slotAmount: res?.SlotAmount != null ? Number(res.SlotAmount) : undefined,
       };
     },
 
@@ -246,13 +257,24 @@ export const httpApi = {
       }
 
       const now = new Date();
-      return ROUND_SLOTS.map((slot) => ({
-        slot,
-        status: getSlotStatus(slot, now),
-        prediction: undefined, // not distinguishable from resultsBySlot without a confirmed response shape
-        stockValue: undefined, // drawn automatically server-side and only revealed at settlement (see result.stockValue below) — there's no operator to set this ahead of time
-        result: resultsBySlot.has(String(slot.index)) ? mapResult(slot.id, resultsBySlot.get(String(slot.index))) : undefined,
-      }));
+      return ROUND_SLOTS.map((slot) => {
+        const status = getSlotStatus(slot, now);
+        // CONFIRMED live: G13 creates a row for a round the moment it's
+        // played, well before that round actually settles — a still-OPEN
+        // round (40 minutes from closing) was already returning a row with
+        // placeholder zeros (StockValue 0, GLN "N"), which rendered as a
+        // fake "result" in the UI. Only treat a round as having a real
+        // result once it's actually settled by clock time — a played-but-
+        // pending row existing in G13 isn't a result yet.
+        const raw = status === 'settled' ? resultsBySlot.get(String(slot.index)) : undefined;
+        return {
+          slot,
+          status,
+          prediction: undefined, // not distinguishable from resultsBySlot without a confirmed response shape
+          stockValue: undefined, // drawn automatically server-side and only revealed at settlement (see result.stockValue below) — there's no operator to set this ahead of time
+          result: raw ? mapResult(slot.id, raw) : undefined,
+        };
+      });
     },
 
     /**
@@ -446,40 +468,60 @@ function requireSession() {
 }
 
 /**
- * CONFIRMED shape (Mr Yemi's API docs) for both G13 (results by date) and
- * G14 (play history) — same record shape, G14 just spans a month instead of
- * one day:
- *   {Id, Slot, Phone, StartBalance, PredValue, Average, StockValue, Datein,
- *    Timein, PValueGL, TotalFinalGain, TotalFinalLoss, NetMovement,
- *    EndBalance, DateComputed, TimeComputed, FinalGorL, UserDateIn, UserTimeIn}
+ * G13 (results by date) / G14 (play history) share one record shape, which
+ * has changed more than once live during backend development — field names
+ * below are read defensively (old name ?? new name) rather than assuming
+ * either is final:
+ *   - StartBalance -> renamed SlotAmount (the stake, per Mr Yemi — never a
+ *     wallet balance, so not used for changePercent either way)
+ *   - PValueGL -> split into Gain/GainPercent/Loss/LossPercent
+ *   - FinalGorL ('G'/'L') -> GLN ('G'/'L'/'N' — 'N' for neutral/unset)
+ *   - EndBalance -> renamed CurrentBalance
  *
- * CONFIRMED live field meanings (per Mr Yemi, correcting an earlier
- * assumption): StartBalance is the SlotAmount staked on this round, not the
- * wallet balance beforehand (a real captured round showed StartBalance:
- * "500.000000" exactly matching the SlotAmount played) — so it's NOT used
- * to derive changePercent. PValueGL is already the percentage gain/loss
- * itself (used directly as changePercent, not re-derived). FinalGorL is a
- * literal 'G'/'L' flag — the server's own gain/loss verdict, used instead of
- * inferring positive/negative from valueGained's sign.
+ * CONFIRMED live: settlement itself still looks incomplete server-side —
+ * every settled round captured so far (old shape and new) has come back
+ * with a neutral/zeroed verdict (PValueGL/GLN "N", Gain/Loss/NetMovement
+ * all 0) regardless of how close the prediction was, including one exact
+ * PredValue==StockValue match. Don't treat a 0 valueGained as necessarily
+ * meaningful yet — it may just mean "not computed."
  *
- * `distance` isn't provided directly — computed here as |PredValue - StockValue|.
+ * `distance` isn't read from `Closeness` (unconfirmed what it actually
+ * measures — the one sample seen was 0 despite PredValue/StockValue being 3
+ * apart, i.e. real placeholder data) — computed here as
+ * |PredValue - StockValue| instead, same as before.
  */
 function mapResult(roundId: string, raw: any) {
   const stockValue = Number(raw.StockValue ?? raw.stockValue ?? 0);
   const userPrediction = raw.PredValue != null ? Number(raw.PredValue) : (raw.predfigure ?? raw.PredFigure ?? undefined);
-  const valueGained = raw.NetMovement != null ? Number(raw.NetMovement) : (raw.value ?? raw.Value ?? raw.amount ?? undefined);
-  const balanceAfter = raw.EndBalance != null ? Number(raw.EndBalance) : (raw.balance ?? raw.Balance ?? undefined);
-  // CONFIRMED live: PValueGL isn't always numeric — a real settled round
-  // (exact prediction match, StockValue 2 == PredValue 2) came back with
-  // PValueGL: "N" instead of a percentage. Settlement logic still looks
-  // incomplete server-side (that same round settled with NetMovement/
-  // TotalFinalGain/TotalFinalLoss all 0 despite a perfect prediction), so
-  // guard against non-numeric values here rather than let them silently
-  // become NaN and corrupt the change% display.
-  const parsedPValueGL = raw.PValueGL != null && raw.PValueGL !== '' ? Number(raw.PValueGL) : NaN;
-  const changePercent = Number.isFinite(parsedPValueGL) ? parsedPValueGL : undefined;
-  const finalOutcome: 'gain' | 'loss' | undefined =
-    raw.FinalGorL === 'G' ? 'gain' : raw.FinalGorL === 'L' ? 'loss' : undefined;
+  const balanceAfter =
+    raw.CurrentBalance != null
+      ? Number(raw.CurrentBalance)
+      : raw.EndBalance != null
+        ? Number(raw.EndBalance)
+        : (raw.balance ?? raw.Balance ?? undefined);
+
+  let valueGained: number | undefined;
+  if (raw.Gain != null || raw.Loss != null) {
+    valueGained = Number(raw.Gain ?? 0) - Number(raw.Loss ?? 0);
+  } else if (raw.NetMovement != null) {
+    valueGained = Number(raw.NetMovement);
+  } else {
+    valueGained = raw.value ?? raw.Value ?? raw.amount ?? undefined;
+  }
+
+  let changePercent: number | undefined;
+  if (raw.GainPercent != null || raw.LossPercent != null) {
+    changePercent = Number(raw.GainPercent ?? 0) - Number(raw.LossPercent ?? 0);
+  } else {
+    // CONFIRMED live: PValueGL isn't always numeric — came back as "N"
+    // (neutral) instead of a percentage on an incomplete settlement. Guard
+    // against that becoming NaN and corrupting the display.
+    const parsedPValueGL = raw.PValueGL != null && raw.PValueGL !== '' ? Number(raw.PValueGL) : NaN;
+    changePercent = Number.isFinite(parsedPValueGL) ? parsedPValueGL : undefined;
+  }
+
+  const glFlag = raw.GLN ?? raw.FinalGorL;
+  const finalOutcome: 'gain' | 'loss' | undefined = glFlag === 'G' ? 'gain' : glFlag === 'L' ? 'loss' : undefined;
 
   return {
     roundId,

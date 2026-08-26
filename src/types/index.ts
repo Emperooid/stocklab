@@ -81,4 +81,6 @@ export interface User {
   balance: number;
   totalProfit: number;
   totalProfitPercent: number;
+  /** From G24's SlotAmount — the fixed, non-editable stake every prediction is played with. */
+  slotAmount?: number;
 }

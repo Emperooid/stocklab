@@ -9,7 +9,7 @@ import { FormError } from '../../components/FormError';
 import { Colors, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
-import { isValidPhone, validatePassword } from '../../lib/validation';
+import { getErrorMessage, isValidPhone, validatePassword } from '../../lib/validation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 type Step = 'request' | 'reset' | 'done';
@@ -35,8 +35,12 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
     try {
       await requestPasswordReset(phone);
       setStep('reset');
-    } catch {
-      setError('Could not send a reset code. Please try again.');
+    } catch (e) {
+      // CONFIRMED live: this used to swallow the real error and always show
+      // a generic message, which hid a real backend bug (G20 incorrectly
+      // rejecting a genuinely registered phone) behind "try again" with no
+      // way to tell what actually went wrong.
+      setError(getErrorMessage(e, 'Could not send a reset code. Please try again.'));
     }
   }
 
@@ -55,7 +59,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
       await resetPassword(phone, code.trim(), newPassword);
       setStep('done');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not reset your password.');
+      setError(getErrorMessage(e, 'Could not reset your password.'));
     }
   }
 

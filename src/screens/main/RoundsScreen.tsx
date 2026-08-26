@@ -10,6 +10,7 @@ import { PredictionControl } from '../../components/PredictionControl';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
 import { useWalletStore } from '../../store/walletStore';
+import { useAuthStore } from '../../store/authStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus, slotSettleAt, formatCountdown } from '../../lib/schedule';
 import { formatMoney, formatPercent, formatSigned, formatTime12h } from '../../lib/format';
@@ -104,6 +105,7 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const submitPrediction = useRoundsStore((s) => s.submitPrediction);
+  const slotAmount = useAuthStore((s) => s.user?.slotAmount);
   const status = getSlotStatus(round.slot, now);
   const result = round.result;
   const gainPositive = result?.finalOutcome ? result.finalOutcome === 'gain' : (result?.valueGained ?? 0) >= 0;
@@ -179,6 +181,7 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
           <PredictionControl
             roundId={round.slot.id}
             currentValue={round.prediction?.value}
+            slotAmount={slotAmount}
             onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
           />
         </View>

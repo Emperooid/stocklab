@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
 import { FormError } from './FormError';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
-import { getErrorMessage, MIN_SLOT_AMOUNT, validateSlotAmount } from '../lib/validation';
+import { getErrorMessage } from '../lib/validation';
+import { formatMoney } from '../lib/format';
 
 const VALUES = [1, 2, 3, 4, 5];
 
@@ -24,20 +25,25 @@ function valueColor(colors: Colors, value: number): string {
  * hatch, which no longer matches how the backend actually behaves — it was
  * removed rather than left as a button that would just fail or (worse)
  * create a duplicate entry.
+ *
+ * Per explicit product decision, the stake amount is no longer user-editable
+ * either — it's a fixed, per-user amount from the profile (G24's
+ * SlotAmount), shown read-only rather than as a free-text input.
  */
 export function PredictionControl({
   roundId,
   currentValue,
+  slotAmount,
   onSubmit,
 }: {
   roundId: string;
   currentValue: number | undefined;
+  slotAmount: number | undefined;
   onSubmit: (value: number, amount: number) => Promise<void>;
 }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [selected, setSelected] = useState<number | null>(null);
-  const [amountText, setAmountText] = useState(String(MIN_SLOT_AMOUNT));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,14 +53,13 @@ export function PredictionControl({
       setError('Pick a number from 1 to 5.');
       return;
     }
-    const amountError = validateSlotAmount(amountText);
-    if (amountError) {
-      setError(amountError);
+    if (!slotAmount) {
+      setError('Your play amount is still loading. Please try again in a moment.');
       return;
     }
     setSaving(true);
     try {
-      await onSubmit(selected, Number(amountText));
+      await onSubmit(selected, slotAmount);
     } catch (e) {
       setError(getErrorMessage(e, 'Could not submit your stock pick.'));
     } finally {
@@ -100,15 +105,7 @@ export function PredictionControl({
       </View>
       <Text style={styles.amountLabel}>Amount to play with</Text>
       <View style={styles.amountRow}>
-        <Text style={styles.amountPrefix}>₦</Text>
-        <TextInput
-          style={styles.amountInput}
-          value={amountText}
-          onChangeText={(t) => setAmountText(t.replace(/[^0-9]/g, ''))}
-          keyboardType="number-pad"
-          placeholder={String(MIN_SLOT_AMOUNT)}
-          placeholderTextColor={colors.textDim}
-        />
+        <Text style={styles.amountValue}>{slotAmount != null ? formatMoney(slotAmount) : 'Loading…'}</Text>
       </View>
       <Text style={styles.onceNote}>You can only play this round once — there's no changing it after you submit.</Text>
       <Button
@@ -117,7 +114,7 @@ export function PredictionControl({
         size="sm"
         onPress={handleSubmit}
         loading={saving}
-        disabled={selected == null}
+        disabled={selected == null || slotAmount == null}
         style={{ marginTop: spacing.sm }}
       />
       {!!error && <FormError message={error} />}
@@ -144,7 +141,6 @@ function createStyles(colors: Colors) {
     amountRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
       borderRadius: radius.md,
       borderWidth: 1.5,
       borderColor: colors.border,
@@ -152,8 +148,7 @@ function createStyles(colors: Colors) {
       paddingHorizontal: spacing.md,
       height: 44,
     },
-    amountPrefix: { ...typography.h3, color: colors.textMuted },
-    amountInput: { ...typography.h3, color: colors.text, flex: 1, padding: 0 },
+    amountValue: { ...typography.h3, color: colors.text },
     onceNote: { ...typography.tiny, color: colors.textDim, marginTop: spacing.sm, lineHeight: 15 },
     submittedRow: {
       flexDirection: 'row',

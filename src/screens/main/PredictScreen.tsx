@@ -11,6 +11,7 @@ import { FormError } from '../../components/FormError';
 import { PredictionControl } from '../../components/PredictionControl';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useRoundsStore } from '../../store/roundsStore';
+import { useAuthStore } from '../../store/authStore';
 import { AutoPlayMode, useAutoPlayStore } from '../../store/autoPlayStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
@@ -21,6 +22,7 @@ export default function PredictScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { rounds, fetchRounds, submitPrediction } = useRoundsStore();
+  const slotAmount = useAuthStore((s) => s.user?.slotAmount);
   const [refreshing, setRefreshing] = useState(false);
   const now = useRoundsLiveRefresh();
 
@@ -79,6 +81,7 @@ export default function PredictScreen() {
             <PredictionControl
               roundId={round.slot.id}
               currentValue={round.prediction?.value}
+              slotAmount={slotAmount}
               onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
             />
           </Card>
@@ -93,11 +96,11 @@ export default function PredictScreen() {
           <Text style={styles.infoTitle}>How scoring works</Text>
         </View>
         <Text style={styles.infoText}>
-          Pick a number and how much to play each round with — that amount comes out of your wallet balance,
+          Pick a number — each round is played with your fixed stake amount, which comes out of your wallet balance,
           separate from the rest. You can pick a stock for any round today in advance, not just the one currently
           open, but each round can only be played once — there's no changing it after you submit. The Stock Value
           is drawn automatically and only revealed once a round settles — the closer your number is to it, the
-          more you gain, the farther away, the more you lose. Minimum ₦{MIN_SLOT_AMOUNT} per round.
+          more you gain, the farther away, the more you lose.
         </Text>
       </Card>
     </Screen>

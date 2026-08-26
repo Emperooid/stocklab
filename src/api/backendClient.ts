@@ -44,6 +44,28 @@ function devLog(...args: unknown[]) {
   if (__DEV__) console.log(...args);
 }
 
+// CONFIRMED live: the backend can hang indefinitely on a request with no
+// response at all (seen on both G21 and G13, on different occasions — not
+// one broken endpoint, looks server/infra-side). Plain `fetch()` has no
+// timeout of its own, so without this every call site below would leave the
+// UI spinning forever with no way out whenever that happens. 25s is well
+// past every real response time seen this session (worst case ~1-2s).
+const REQUEST_TIMEOUT_MS = 25000;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 let session: Session | null = null;
 let cachedBearerToken: string | null = null;
 let cachedAt = 0;
@@ -78,7 +100,7 @@ async function fetchBearerToken(): Promise<string> {
   devLog(`[backend] -> AuthSP (${BACKEND_BASE_URL})`);
   let res: Response;
   try {
-    res = await fetch(`${BACKEND_BASE_URL}/st/AuthSP`, {
+    res = await fetchWithTimeout(`${BACKEND_BASE_URL}/st/AuthSP`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: BACKEND_AUTH_USER_ID, secretKey: BACKEND_AUTH_SECRET_KEY }),
@@ -86,7 +108,9 @@ async function fetchBearerToken(): Promise<string> {
   } catch (networkError) {
     devLog('[backend] <- AuthSP NETWORK ERROR', networkError);
     throw new BackendError(
-      'Could not reach the server. Check your internet connection and try again.'
+      isAbortError(networkError)
+        ? 'The server took too long to respond. Please try again.'
+        : 'Could not reach the server. Check your internet connection and try again.'
     );
   }
   const data = await res.json();
@@ -136,14 +160,18 @@ async function mintTransToken(phone: string, sessionId: string, deviceId: string
 
   let res: Response;
   try {
-    res = await fetch(`${BACKEND_BASE_URL}/st/myhandler`, {
+    res = await fetchWithTimeout(`${BACKEND_BASE_URL}/st/myhandler`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ theKey: 'G1001', sessionToken: sessionId, phone, deviceId }),
     });
   } catch (networkError) {
     devLog('[backend] <- G1001 NETWORK ERROR', networkError);
-    throw new BackendError('Could not reach the server. Check your internet connection and try again.');
+    throw new BackendError(
+      isAbortError(networkError)
+        ? 'The server took too long to respond. Please try again.'
+        : 'Could not reach the server. Check your internet connection and try again.'
+    );
   }
 
   const data = await res.json();
@@ -229,7 +257,7 @@ export async function callGateway<T = any>(
 
     let res: Response;
     try {
-      res = await fetch(`${BACKEND_BASE_URL}/st/myhandler`, {
+      res = await fetchWithTimeout(`${BACKEND_BASE_URL}/st/myhandler`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
@@ -237,7 +265,9 @@ export async function callGateway<T = any>(
     } catch (networkError) {
       devLog(`[backend] <- ${theKey} NETWORK ERROR`, networkError);
       throw new BackendError(
-        'Could not reach the server. Check your internet connection and try again.'
+        isAbortError(networkError)
+          ? 'The server took too long to respond. Please try again.'
+          : 'Could not reach the server. Check your internet connection and try again.'
       );
     }
 

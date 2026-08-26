@@ -69,6 +69,11 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await api.auth.login(phone, pin);
           set({ user: preserveEmail(get().user, user), session: getSession(), isLoading: false });
+          // G22's own response may not carry every profile field (SlotAmount
+          // confirmed only on G24 so far) — best-effort follow-up so a
+          // fresh login has the fixed stake amount without waiting on some
+          // other screen to incidentally trigger a refresh first.
+          get().refreshUser().catch(() => {});
         } catch (e) {
           set({ isLoading: false });
           throw e;
@@ -112,6 +117,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await api.auth.login(phone, pin);
           set({ user: { ...user, email: registeredEmail }, session: getSession(), isLoading: false });
+          get().refreshUser().catch(() => {});
         } catch {
           set({ isLoading: false });
           throw new RegisteredButLoginFailedError(
