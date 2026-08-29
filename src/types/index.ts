@@ -15,7 +15,15 @@ export interface UserPrediction {
 
 export interface RoundResult {
   roundId: string;
-  stockValue: number; // 1-5, drawn automatically server-side, revealed at settlement
+  // CONFIRMED live: G13/G14's `StockValue` isn't a 1-5 "drawn value" — it
+  // exactly equals CurrentBalance in every real settled record captured
+  // (and was wildly out of range, 97979, in an earlier one). There's no
+  // server-drawn stock value at all — scoring is based on `Average` (the
+  // mean prediction across all players for that round) instead, so that's
+  // what the app now shows and measures distance against.
+  average?: number;
+  /** 0-1 fraction from G13/G14's `Closeness` — how near the prediction was to `average`, when present. */
+  closeness?: number;
   userPrediction?: number;
   distance?: number;
   points?: number;
@@ -30,8 +38,6 @@ export interface DailyRound {
   slot: RoundSlot;
   status: RoundStatus;
   prediction?: UserPrediction;
-  /** The automatically-drawn Stock Value for this round, only revealed at settlement. */
-  stockValue?: number;
   result?: RoundResult;
 }
 
@@ -65,6 +71,36 @@ export interface ResolvedBankAccount {
   accountName: string;
 }
 
+/** The user's existing on-file payout account — the withdrawal page shows this, it doesn't let the user pick a new one. */
+export interface LinkedBankAccount {
+  bankName: string;
+  accountNumber: string;
+  fullName: string;
+}
+
+/**
+ * From G19 (Admin Contact) — the app's own "reach the developers" support
+ * details. Field names are a best-effort guess matching this backend's own
+ * established naming (Email/Phone elsewhere in G22/G24), since G19 has
+ * never returned a populated response yet — no admin contact is configured
+ * server-side. Not fully confirmed; expect to adjust once real data appears.
+ */
+export interface SupportContact {
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+  message?: string;
+}
+
+export interface WithdrawalHistoryEntry {
+  id: string;
+  dateRequested: string;
+  balanceBefore: number;
+  balanceAfter: number;
+  status: 'open' | 'closed';
+  dateCredited?: string;
+}
+
 export type UserRole = 'admin' | 'user';
 
 export interface User {
@@ -83,4 +119,8 @@ export interface User {
   totalProfitPercent: number;
   /** From G24's SlotAmount — the fixed, non-editable stake every prediction is played with. */
   slotAmount?: number;
+  /** From G22/G24's nested Profile.AmountDeposited — lifetime deposits. */
+  totalDeposited?: number;
+  /** From G22/G24's nested Profile.AmountWithdrawn — lifetime withdrawals. */
+  totalWithdrawn?: number;
 }

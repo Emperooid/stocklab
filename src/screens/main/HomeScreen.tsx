@@ -114,11 +114,6 @@ export default function HomeScreen() {
           <Text style={styles.statValue}>{settledToday}/{rounds.length}</Text>
           <Text style={styles.statLabel}>Rounds settled today</Text>
         </Card>
-        <Card style={styles.statCard}>
-          <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue}>0.5%</Text>
-          <Text style={styles.statLabel}>Max risk per round</Text>
-        </Card>
       </View>
     </Screen>
   );
@@ -141,7 +136,8 @@ function LatestResultCard({ round }: { round: DailyRound }) {
         </View>
       </View>
       <Text style={styles.resultSubtitle}>
-        You picked {result.userPrediction ?? '—'} · Stock Value {result.stockValue} · Deviation {result.distance ?? '—'}
+        You picked {result.userPrediction ?? '—'} · Avg Pick {result.average != null ? result.average.toFixed(2) : '—'} ·
+        Deviation {result.distance != null ? result.distance.toFixed(2) : '—'}
       </Text>
     </Card>
   );

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Linking, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -8,15 +9,24 @@ import { Colors, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useRoundsStore } from '../../store/roundsStore';
+import { useWalletStore } from '../../store/walletStore';
 import { useThemeStore } from '../../store/themeStore';
 import { formatMoney, formatSigned } from '../../lib/format';
 import { getDeviceId } from '../../lib/deviceId';
+import { api } from '../../api';
+import { SupportContact } from '../../types';
 
 export default function ProfileScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  // user.balance is always 0 — G22/G24 aren't the canonical balance source
+  // (G25 is, see wallet.getBalance()), so this screen was showing a
+  // permanently-zero balance regardless of the account's real balance.
+  const balance = useWalletStore((s) => s.balance);
+  const refreshWallet = useWalletStore((s) => s.refresh);
   const notificationsEnabled = useSettingsStore((s) => s.notificationsEnabled);
   const setNotificationsEnabled = useSettingsStore((s) => s.setNotificationsEnabled);
   const rounds = useRoundsStore((s) => s.rounds);
@@ -24,10 +34,25 @@ export default function ProfileScreen() {
   const toggleTheme = useThemeStore((s) => s.toggleMode);
   const [togglingNotifications, setTogglingNotifications] = useState(false);
   const [deviceId, setDeviceId] = useState('');
+  const [supportContact, setSupportContact] = useState<SupportContact | null>(null);
+  const [loadingSupport, setLoadingSupport] = useState(false);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshWallet().catch(() => {});
+      refreshUser().catch(() => {});
+      setLoadingSupport(true);
+      api.auth
+        .getSupportContact()
+        .then(setSupportContact)
+        .catch(() => setSupportContact(null))
+        .finally(() => setLoadingSupport(false));
+    }, [])
+  );
 
   async function handleToggleNotifications(value: boolean) {
     setTogglingNotifications(true);
@@ -56,7 +81,7 @@ export default function ProfileScreen() {
       <View style={styles.statsRow}>
         <Card style={styles.statCard}>
           <Ionicons name="wallet-outline" size={18} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue}>{formatMoney(user?.balance ?? 0)}</Text>
+          <Text style={styles.statValue}>{formatMoney(balance)}</Text>
           <Text style={styles.statLabel}>Balance</Text>
         </Card>
         <Card style={styles.statCard}>
@@ -109,6 +134,43 @@ export default function ProfileScreen() {
         </View>
       </Card>
 
+      <Text style={styles.sectionTitle}>Support</Text>
+      <Card style={styles.section}>
+        {loadingSupport ? (
+          <Text style={styles.rowHint}>Loading…</Text>
+        ) : supportContact ? (
+          <>
+            {!!supportContact.message && <Text style={[styles.rowHint, { marginBottom: spacing.sm }]}>{supportContact.message}</Text>}
+            {!!supportContact.email && (
+              <SupportRow
+                icon="mail-outline"
+                label="Email"
+                value={supportContact.email}
+                onPress={() => Linking.openURL(`mailto:${supportContact.email}`)}
+              />
+            )}
+            {!!supportContact.phone && (
+              <SupportRow
+                icon="call-outline"
+                label="Phone"
+                value={supportContact.phone}
+                onPress={() => Linking.openURL(`tel:${supportContact.phone}`)}
+              />
+            )}
+            {!!supportContact.whatsapp && (
+              <SupportRow
+                icon="logo-whatsapp"
+                label="WhatsApp"
+                value={supportContact.whatsapp}
+                onPress={() => Linking.openURL(`https://wa.me/${supportContact.whatsapp!.replace(/\D/g, '')}`)}
+              />
+            )}
+          </>
+        ) : (
+          <Text style={styles.rowHint}>Support contact isn't available yet — check back soon.</Text>
+        )}
+      </Card>
+
       <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
 
       <Text style={styles.footer}>StockLab · v1.0.0</Text>
@@ -118,6 +180,33 @@ export default function ProfileScreen() {
         </Text>
       )}
     </Screen>
+  );
+}
+
+function SupportRow({
+  icon,
+  label,
+  value,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={[styles.row, styles.supportRow]} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.rowIconCircle}>
+        <Ionicons name={icon} size={18} color={colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={styles.rowHint}>{value}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
@@ -145,6 +234,7 @@ function createStyles(colors: Colors) {
     section: {},
     row: { flexDirection: 'row', alignItems: 'center' },
     rowDivider: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+    supportRow: { marginTop: spacing.sm },
     rowIconCircle: {
       width: 36,
       height: 36,

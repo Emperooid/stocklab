@@ -15,4 +15,5 @@ export type MainTabParamList = {
 export type MainStackParamList = {
   MainTabs: undefined;
   RoundHistory: undefined;
+  Withdrawal: undefined;
 };

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -9,14 +10,14 @@ import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
 import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
-import { BankPickerModal } from '../../components/BankPickerModal';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
-import { Bank, ResolvedBankAccount, WalletTransaction } from '../../types';
+import { WalletTransaction } from '../../types';
 import { getErrorMessage, validateDepositAmount } from '../../lib/validation';
 import { formatMoney, formatSigned } from '../../lib/format';
+import { MainStackParamList } from '../../navigation/types';
 
-type ActiveAction = 'deposit' | 'withdraw' | null;
+type ActiveAction = 'deposit' | null;
 
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
@@ -29,20 +30,9 @@ const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap>
 export default function WalletScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const {
-    balance,
-    transactions,
-    banks,
-    pendingDeposit,
-    refresh,
-    createDepositReference,
-    startPendingDeposit,
-    dismissPendingDeposit,
-    fetchBanks,
-    resolveBankAccount,
-    requestWithdrawal,
-    isLoading,
-  } = useWalletStore();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { balance, transactions, pendingDeposit, refresh, createDepositReference, startPendingDeposit, dismissPendingDeposit, isLoading } =
+    useWalletStore();
 
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
 
@@ -51,24 +41,13 @@ export default function WalletScreen() {
   const [depositing, setDepositing] = useState(false);
   const [depositError, setDepositError] = useState('');
 
-  // Withdrawal state
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [bankPickerVisible, setBankPickerVisible] = useState(false);
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
-  const [accountNumber, setAccountNumber] = useState('');
-  const [resolvedAccount, setResolvedAccount] = useState<ResolvedBankAccount | null>(null);
-  const [resolving, setResolving] = useState(false);
-  const [withdrawing, setWithdrawing] = useState(false);
-  const [withdrawError, setWithdrawError] = useState('');
-
   useFocusEffect(
     useCallback(() => {
       refresh().catch(() => {});
-      fetchBanks().catch(() => {});
     }, [])
   );
 
-  function toggleAction(action: 'deposit' | 'withdraw') {
+  function toggleAction(action: 'deposit') {
     setActiveAction((current) => (current === action ? null : action));
   }
 
@@ -82,11 +61,12 @@ export default function WalletScreen() {
     setDepositing(true);
     try {
       const depositValue = Number(depositAmount);
-      const { redirectUrl } = await createDepositReference(depositValue);
-      // Balance updates automatically via a server-side webhook once
-      // payment completes (confirmed by Mr Yemi) — nothing to verify or
-      // poll for here beyond the wallet's existing G25 refresh on focus.
-      startPendingDeposit(depositValue);
+      const { redirectUrl, reference } = await createDepositReference(depositValue);
+      // Balance updates via a server-side webhook once payment completes —
+      // RootNavigator's deep-link handler actively requeries this reference
+      // (via GR) when the checkout redirects back, rather than only
+      // passively waiting for G25 to reflect it.
+      startPendingDeposit(depositValue, reference);
       await Linking.openURL(redirectUrl);
       setDepositAmount('');
       setActiveAction(null);
@@ -94,63 +74,6 @@ export default function WalletScreen() {
       setDepositError(getErrorMessage(e, 'Could not start your deposit.'));
     } finally {
       setDepositing(false);
-    }
-  }
-
-  function resetWithdrawForm() {
-    setWithdrawAmount('');
-    setSelectedBank(null);
-    setAccountNumber('');
-    setResolvedAccount(null);
-    setWithdrawError('');
-  }
-
-  async function handleResolveAccount() {
-    setWithdrawError('');
-    if (!selectedBank) {
-      setWithdrawError('Choose a bank first.');
-      return;
-    }
-    if (accountNumber.length !== 10) {
-      setWithdrawError('Enter a valid 10-digit account number.');
-      return;
-    }
-    setResolving(true);
-    try {
-      const account = await resolveBankAccount(accountNumber, selectedBank.code);
-      setResolvedAccount(account);
-    } catch (e) {
-      setResolvedAccount(null);
-      setWithdrawError(getErrorMessage(e, 'Could not verify that account.'));
-    } finally {
-      setResolving(false);
-    }
-  }
-
-  async function handleWithdraw() {
-    setWithdrawError('');
-    const validationError = validateDepositAmount(withdrawAmount);
-    if (validationError) {
-      setWithdrawError(validationError);
-      return;
-    }
-    if (Number(withdrawAmount) > balance) {
-      setWithdrawError('That amount is more than your available balance.');
-      return;
-    }
-    if (!selectedBank || !resolvedAccount) {
-      setWithdrawError('Verify a bank account first.');
-      return;
-    }
-    setWithdrawing(true);
-    try {
-      await requestWithdrawal(Number(withdrawAmount), selectedBank, resolvedAccount);
-      resetWithdrawForm();
-      setActiveAction(null);
-    } catch (e) {
-      setWithdrawError(getErrorMessage(e, 'Could not process your withdrawal.'));
-    } finally {
-      setWithdrawing(false);
     }
   }
 
@@ -177,12 +100,7 @@ export default function WalletScreen() {
                   active={activeAction === 'deposit'}
                   onPress={() => toggleAction('deposit')}
                 />
-                <QuickAction
-                  icon="arrow-up-circle"
-                  label="Withdraw"
-                  active={activeAction === 'withdraw'}
-                  onPress={() => toggleAction('withdraw')}
-                />
+                <QuickAction icon="arrow-up-circle" label="Withdraw" active={false} onPress={() => navigation.navigate('Withdrawal')} />
               </View>
             </Card>
 
@@ -223,59 +141,6 @@ export default function WalletScreen() {
               </Card>
             )}
 
-            {activeAction === 'withdraw' && (
-              <Card style={styles.actionCard}>
-                <Text style={styles.actionTitle}>Withdraw to bank</Text>
-
-                <TouchableOpacity style={styles.bankSelect} onPress={() => setBankPickerVisible(true)}>
-                  <Text style={selectedBank ? styles.bankSelectText : styles.bankSelectPlaceholder}>
-                    {selectedBank ? selectedBank.name : 'Choose bank'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-
-                <View style={styles.inlineRow}>
-                  <Input
-                    value={accountNumber}
-                    onChangeText={(t) => {
-                      setAccountNumber(t.replace(/[^0-9]/g, '').slice(0, 10));
-                      setResolvedAccount(null);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    placeholder="10-digit account number"
-                    style={{ flex: 1 }}
-                  />
-                  <Button title="Verify" variant="outline" size="sm" onPress={handleResolveAccount} loading={resolving} />
-                </View>
-
-                {resolvedAccount && (
-                  <View style={styles.resolvedRow}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                    <Text style={styles.resolvedText}>{resolvedAccount.accountName}</Text>
-                  </View>
-                )}
-
-                <Input
-                  value={withdrawAmount}
-                  onChangeText={(t) => setWithdrawAmount(t.replace(/[^0-9]/g, ''))}
-                  keyboardType="number-pad"
-                  placeholder="Amount (₦)"
-                  style={{ marginTop: spacing.sm }}
-                />
-
-                {!!withdrawError && <FormError message={withdrawError} />}
-
-                <Button
-                  title="Withdraw"
-                  onPress={handleWithdraw}
-                  loading={withdrawing}
-                  disabled={!resolvedAccount}
-                  style={{ marginTop: spacing.md }}
-                />
-              </Card>
-            )}
-
             <Text style={styles.sectionTitle}>Transaction History</Text>
           </>
         }
@@ -283,17 +148,6 @@ export default function WalletScreen() {
           <EmptyState icon="receipt-outline" title="No transactions yet" message="Deposits, withdrawals, and round results will show up here." />
         }
         renderItem={({ item }) => <TransactionRow tx={item} />}
-      />
-
-      <BankPickerModal
-        visible={bankPickerVisible}
-        banks={banks}
-        onSelect={(bank) => {
-          setSelectedBank(bank);
-          setResolvedAccount(null);
-          setBankPickerVisible(false);
-        }}
-        onClose={() => setBankPickerVisible(false)}
       />
     </Screen>
   );
@@ -386,23 +240,6 @@ function createStyles(colors: Colors) {
       padding: spacing.sm,
     },
     warnText: { ...typography.tiny, color: colors.warning, flex: 1, lineHeight: 15 },
-    inlineRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, alignItems: 'flex-start' },
-    bankSelect: {
-      backgroundColor: colors.surfaceAlt,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      height: 50,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: spacing.sm,
-    },
-    bankSelectText: { ...typography.body, color: colors.text },
-    bankSelectPlaceholder: { ...typography.body, color: colors.textDim },
-    resolvedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
-    resolvedText: { ...typography.small, color: colors.success, fontWeight: '600' },
     sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
     txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
     txIconCircle: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

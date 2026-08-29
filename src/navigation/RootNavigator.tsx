@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Linking, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from '@react-navigation/native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainStack } from './MainStack';
@@ -9,6 +9,24 @@ import { useWalletStore } from '../store/walletStore';
 import { useRoundsStore } from '../store/roundsStore';
 import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { isBackendConfigured } from '../config/backend';
+
+/**
+ * Actively requeries the deposit (GR — nudges the gateway->PayHook
+ * crediting flow) then polls the balance a few times after returning from
+ * checkout, rather than only passively waiting for the webhook to land on
+ * its own (confirmed live: a completed deposit sometimes never reflects
+ * without a requery — see requeryDeposit in httpApi.ts). Stops early once
+ * walletStore's pendingDeposit clears, which it already does the moment
+ * refresh() sees the balance actually move.
+ */
+async function verifyDepositReturn() {
+  await useWalletStore.getState().requeryPendingDeposit();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await useWalletStore.getState().refresh().catch(() => {});
+    if (!useWalletStore.getState().pendingDeposit) return;
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
 
 function buildNavTheme(colors: Colors, mode: 'light' | 'dark'): Theme {
   const base = mode === 'dark' ? DarkTheme : DefaultTheme;
@@ -58,6 +76,26 @@ export function RootNavigator() {
       }
       appState.current = next;
     });
+    return () => subscription.remove();
+  }, [user]);
+
+  // The deposit checkout's returnUrl points back here (stocklab://deposit-return)
+  // instead of stranding the user on the gateway's own page — see
+  // wallet.createDepositReference(). This fires more precisely than the
+  // AppState listener above (which only knows "the app came back", not why),
+  // so it can poll specifically for this deposit landing instead of relying
+  // on a single generic foreground check.
+  useEffect(() => {
+    if (!user) return;
+    function handleUrl({ url }: { url: string }) {
+      if (url.startsWith('stocklab://deposit-return')) {
+        verifyDepositReturn();
+      }
+    }
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl({ url });
+    });
+    const subscription = Linking.addEventListener('url', handleUrl);
     return () => subscription.remove();
   }, [user]);
 

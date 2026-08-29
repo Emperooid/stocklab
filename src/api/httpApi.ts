@@ -1,4 +1,4 @@
-import { Bank, DailyHistoryEntry, DailyRound, ResolvedBankAccount, User, WalletTransaction } from '../types';
+import { Bank, DailyHistoryEntry, DailyRound, LinkedBankAccount, ResolvedBankAccount, SupportContact, User, WalletTransaction, WithdrawalHistoryEntry } from '../types';
 import { ROUND_SLOTS, getSlotStatus, localDateKey } from '../lib/schedule';
 import { getDeviceId } from '../lib/deviceId';
 import { callGateway, getSession, setSession } from './backendClient';
@@ -71,6 +71,34 @@ function notSupported(feature: string): never {
   throw new Error(`${feature} isn't available yet — no backend endpoint exists for it.`);
 }
 
+/**
+ * G22/G24's AmountDeposited/AmountPlayed/AmountGained/AmountWithdrawn come
+ * back as comma-formatted strings (e.g. "51,318,325.00") — a bare Number()
+ * on these silently produces NaN.
+ */
+function parseCommaNumber(value: unknown): number | undefined {
+  if (typeof value !== 'string' || value === '') return undefined;
+  const n = Number(value.replace(/,/g, ''));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * CONFIRMED live: both G22 and G24 now nest a profit/loss summary — `Profile`
+ * on G22, lowercase `profile` on G24, same shape either way:
+ *   {AmountDeposited, AmountPlayed, AmountGained, PercentGained, PercentLoss, AmountWithdrawn}
+ * PercentGained/PercentLoss both come back "0.00%" even against a real
+ * ₦1,080,100 loss — clearly not computed yet — so totalProfitPercent is
+ * derived here from the (reliable) amount fields instead of trusting them.
+ */
+function parseProfitSummary(raw: any): { totalProfit: number; totalProfitPercent: number; totalDeposited?: number; totalWithdrawn?: number } {
+  const summary = raw?.Profile ?? raw?.profile ?? {};
+  const totalDeposited = parseCommaNumber(summary.AmountDeposited);
+  const totalProfit = parseCommaNumber(summary.AmountGained) ?? 0;
+  const totalWithdrawn = parseCommaNumber(summary.AmountWithdrawn);
+  const totalProfitPercent = totalDeposited ? (totalProfit / totalDeposited) * 100 : 0;
+  return { totalProfit, totalProfitPercent, totalDeposited, totalWithdrawn };
+}
+
 export const httpApi = {
   auth: {
     /**
@@ -129,12 +157,12 @@ export const httpApi = {
         email: profile.email || undefined,
         role: 'user',
         balance: 0, // WBalance IS present in this response (confirmed), but G25 is the dedicated/canonical balance lookup — see wallet.getBalance()
-        totalProfit: 0,
-        totalProfitPercent: 0,
-        // Defensive — not confirmed present on G22 (only seen on G24 so
-        // far), but read it here too in case it's nested under Profile the
-        // same way email is. refreshUser() (G24) is the confirmed source.
-        slotAmount: profile.SlotAmount != null ? Number(profile.SlotAmount) : undefined,
+        // CONFIRMED live: SlotAmount is now on G22 too, but at the TOP
+        // LEVEL of the response (sibling to Profile/SessionID), not nested
+        // inside Profile like email is — a real live response showed
+        // {IsValid, SessionID, SlotAmount, WBalance, Profile: {...}}.
+        slotAmount: loginRes?.SlotAmount != null ? Number(loginRes.SlotAmount) : undefined,
+        ...parseProfitSummary(loginRes),
       };
     },
 
@@ -208,9 +236,8 @@ export const httpApi = {
         phone,
         role: 'user',
         balance: Number(res?.WBalance ?? 0),
-        totalProfit: 0,
-        totalProfitPercent: 0,
         slotAmount: res?.SlotAmount != null ? Number(res.SlotAmount) : undefined,
+        ...parseProfitSummary(res),
       };
     },
 
@@ -227,6 +254,26 @@ export const httpApi = {
     /** CONFIRMED working live — a deliberately wrong OTP returned {"success":false,"message":"Invalid or expired OTP."}. */
     async resetPassword(phone: string, otp: string, newPin: string): Promise<void> {
       await callGateway('G21', { Phone: phone, OTP: otp, NewPassword: newPin }, { requiresSession: false });
+    },
+
+    /**
+     * G19 (Admin Contact) — a "reach the developers" support contact for
+     * the Profile page. CONFIRMED live it responds with
+     * {"success":false,"message":"Admin contact not found."} regardless of
+     * what's sent, meaning no contact is configured server-side yet — not
+     * a request-format problem. Field names on a real success response are
+     * an unconfirmed guess (see SupportContact) since we've never seen one.
+     */
+    async getSupportContact(): Promise<SupportContact | null> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('G19', { phone }).catch(() => null);
+      if (!res || res.success === false) return null;
+      return {
+        email: res.Email ?? res.email ?? undefined,
+        phone: res.Phone ?? res.phone ?? undefined,
+        whatsapp: res.WhatsApp ?? res.Whatsapp ?? res.whatsapp ?? undefined,
+        message: res.Message ?? res.message ?? undefined,
+      };
     },
   },
 
@@ -271,7 +318,6 @@ export const httpApi = {
           slot,
           status,
           prediction: undefined, // not distinguishable from resultsBySlot without a confirmed response shape
-          stockValue: undefined, // drawn automatically server-side and only revealed at settlement (see result.stockValue below) — there's no operator to set this ahead of time
           result: raw ? mapResult(slot.id, raw) : undefined,
         };
       });
@@ -337,19 +383,25 @@ export const httpApi = {
     },
 
     /**
-     * ASSUMPTION (untestable until the session-validation bug is fixed):
-     * G14 returns a flat array of individual round plays for the month, not
-     * pre-grouped by day — same shape family as G13's per-round entries.
-     * Grouped into DailyHistoryEntry here the same way mockApi.summarizeDay
-     * does it. Field names are best-effort guesses (see mapResult) and need
-     * checking against a real response once one is available.
+     * CONFIRMED per Mr Yemi's official docs (G14_showPlayHistory): request
+     * is {"Year": "2026", "Month": "08", "Phone": "..."} — Year AND Month
+     * are both zero-padded/plain STRINGS, not numbers (matches what we'd
+     * already found live: a numeric Month fails validation with "Invalid
+     * Year, Month or Phone."). Response is {success, data: [...]}, same
+     * record shape family as G13 (see mapResult) — confirmed by the same
+     * docs showing a real example record with Gain/GainPercent/Closeness/GLN.
+     *
+     * Still unresolved live even with the correct request shape: the
+     * endpoint fails server-side with "Unable to convert MySQL date/time
+     * value to System.DateTime" — a real backend bug, not a request-format
+     * issue.
      */
     async getHistory(year?: number, month?: number): Promise<DailyHistoryEntry[]> {
       const { phone } = requireSession();
       const now = new Date();
       const res = await callGateway<any>('G14', {
-        Year: year ?? now.getFullYear(),
-        Month: (month ?? now.getMonth()) + 1,
+        Year: String(year ?? now.getFullYear()),
+        Month: String((month ?? now.getMonth()) + 1).padStart(2, '0'),
         Phone: phone,
       });
       // Same {success, data} vs. bare-array inconsistency seen on G13 — see
@@ -416,6 +468,16 @@ export const httpApi = {
       // sending the raw naira value unconverted. The old Paystack
       // integration handled this correctly (`amount * 100`); that
       // conversion was dropped when switching gateways.
+      //
+      // CONFIRMED live: the backend's own outgoing request to the gateway
+      // hardcodes `returnUrl: "https://www.shopy.com"` — after completing
+      // payment, the user gets stranded on that page with no way back into
+      // the app. We didn't send a returnUrl at all before, so there was
+      // nothing for the backend to use instead. Sending our app's own deep
+      // link here — NEEDS Mr Yemi to actually relay this value to the
+      // gateway's returnUrl instead of the hardcoded one for this to work;
+      // sending it alone doesn't guarantee he's reading it yet.
+      const returnUrl = `stocklab://deposit-return?ref=${encodeURIComponent(cref)}`;
       const res = await callGateway<any>('PAY', {
         cref,
         amount: Math.round(amount * 100),
@@ -423,6 +485,7 @@ export const httpApi = {
         cname: phone,
         femail,
         cmobile: phone,
+        returnUrl,
       });
 
       let inner = res?.response;
@@ -439,24 +502,68 @@ export const httpApi = {
       }
       return { redirectUrl, reference: inner?.responseData?.transactionReference ?? cref };
     },
+    /**
+     * CONFIRMED live (via manual testing with Mr Yemi): GR re-triggers the
+     * gateway->PayHook crediting flow for a given transaction reference —
+     * takes {phone, refNo}. Useful because passively waiting for the
+     * balance to change (G25 polling) depends entirely on the webhook
+     * having already landed; actively requerying nudges it instead of just
+     * hoping. `reference` must be the gateway's own transactionReference
+     * from createDepositReference()'s return value, not our own `cref`.
+     */
+    async requeryDeposit(reference: string): Promise<{ success: boolean; message?: string }> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('GR', { phone, refNo: reference });
+      return { success: !!res?.success, message: res?.message };
+    },
     async getBanks(): Promise<Bank[]> {
       notSupported('Listing banks');
     },
     async resolveBankAccount(_accountNumber: string, _bankCode: string): Promise<ResolvedBankAccount> {
       notSupported('Resolving a bank account name');
     },
-    async requestWithdrawal(_amount: number, _bank: Bank, _account: ResolvedBankAccount): Promise<WalletTransaction> {
-      notSupported('Requesting a withdrawal (G16 only shows withdrawal history, nothing creates one)');
+    /** No confirmed endpoint yet for the on-file payout account the withdrawal page displays. */
+    async getLinkedBankAccount(): Promise<LinkedBankAccount | null> {
+      notSupported('Looking up your payout bank account');
     },
     /**
-     * Same reasoning as getBalance(): a real unified list would need
-     * combining G15/G16/G17/G18 (each month-scoped, none confirmed yet).
-     * Returns an empty list instead of throwing so the wallet screen's
-     * auto-refresh doesn't break — an empty transaction history is at least
-     * honest, unlike fabricated mock entries.
+     * Per the confirmed payout page design, withdrawal uses whatever bank
+     * account is already on file — no bank/account picking here. No
+     * confirmed endpoint yet for actually creating a withdrawal request.
      */
-    async getTransactions(): Promise<WalletTransaction[]> {
-      return [];
+    async requestWithdrawal(_amount: number): Promise<void> {
+      notSupported('Requesting a withdrawal');
+    },
+    /** No confirmed endpoint yet for the withdrawal history table (Date Requested/Balance Before/After/Open-Closed/Date Credited). */
+    async getWithdrawalHistory(): Promise<WithdrawalHistoryEntry[]> {
+      notSupported('Fetching withdrawal history');
+    },
+    /**
+     * CONFIRMED shape (G15_ShowDepositsAND_Others, per Mr Yemi's docs):
+     * request {Year, Month, Phone, Code}, Code one of D(eposit)/W(ithdrawal)/
+     * G(ain)/P(lay); response {success, Code, Balance, TotalAmountWithinMonth,
+     * Records}.
+     *
+     * CONFIRMED live record shape (Records was empty until a server-side fix
+     * — this is real data, not a guess):
+     *   Deposit: {Id, Phone, Label:"DEPOSIT", LabelID:"D", Bank, Amount, Datein, Timein}
+     *   Play:    {Id, Phone, Label:"<slot index>", LabelID:"P", Bank, Amount (negative), Datein, Timein}
+     * Withdrawal/Gain records not seen populated yet (no withdrawals exist;
+     * settlement math isn't computing real gains yet) — mapped the same way
+     * defensively, on the assumption they share this shape.
+     */
+    async getTransactions(year?: number, month?: number): Promise<WalletTransaction[]> {
+      const { phone } = requireSession();
+      const now = new Date();
+      const yearStr = String(year ?? now.getFullYear());
+      const monthStr = String((month ?? now.getMonth()) + 1).padStart(2, '0');
+      const codes: Array<'D' | 'W' | 'G' | 'P'> = ['D', 'W', 'G', 'P'];
+      const responses = await Promise.all(
+        codes.map((Code) => callGateway<any>('G15', { Year: yearStr, Month: monthStr, Phone: phone, Code }).catch(() => null))
+      );
+      const allRecords = responses.flatMap((res) => (Array.isArray(res?.Records) ? res.Records : []));
+      const transactions = allRecords.map(mapTransaction).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return transactions;
     },
   },
 };
@@ -478,21 +585,22 @@ function requireSession() {
  *   - FinalGorL ('G'/'L') -> GLN ('G'/'L'/'N' — 'N' for neutral/unset)
  *   - EndBalance -> renamed CurrentBalance
  *
- * CONFIRMED live: settlement itself still looks incomplete server-side —
- * every settled round captured so far (old shape and new) has come back
- * with a neutral/zeroed verdict (PValueGL/GLN "N", Gain/Loss/NetMovement
- * all 0) regardless of how close the prediction was, including one exact
- * PredValue==StockValue match. Don't treat a 0 valueGained as necessarily
- * meaningful yet — it may just mean "not computed."
- *
- * `distance` isn't read from `Closeness` (unconfirmed what it actually
- * measures — the one sample seen was 0 despite PredValue/StockValue being 3
- * apart, i.e. real placeholder data) — computed here as
- * |PredValue - StockValue| instead, same as before.
+ * CONFIRMED live: there is no server-drawn "stock value" — `StockValue`
+ * exactly equals `CurrentBalance` in every real settled record seen (543.75
+ * == 543.75, 300 == 300, -187.5 == -187.5, across multiple rows), and was
+ * wildly out of range (97979) before that. Scoring is actually based on
+ * `Average` — the mean prediction across all players for that round —
+ * with `Closeness` (0-1) measuring how near a pick was to it: the closest
+ * pick to Average got a real gain, the farthest got a real loss, in the
+ * same real dataset. `distance` is computed here as |PredValue - Average|
+ * instead of the old (meaningless) |PredValue - StockValue|.
  */
 function mapResult(roundId: string, raw: any) {
-  const stockValue = Number(raw.StockValue ?? raw.stockValue ?? 0);
   const userPrediction = raw.PredValue != null ? Number(raw.PredValue) : (raw.predfigure ?? raw.PredFigure ?? undefined);
+  const parsedAverage = raw.Average != null && raw.Average !== '' ? Number(raw.Average) : NaN;
+  const average = Number.isFinite(parsedAverage) ? parsedAverage : undefined;
+  const parsedCloseness = raw.Closeness != null && raw.Closeness !== '' ? Number(raw.Closeness) : NaN;
+  const closeness = Number.isFinite(parsedCloseness) ? parsedCloseness : undefined;
   const balanceAfter =
     raw.CurrentBalance != null
       ? Number(raw.CurrentBalance)
@@ -525,13 +633,51 @@ function mapResult(roundId: string, raw: any) {
 
   return {
     roundId,
-    stockValue,
+    average,
+    closeness,
     userPrediction,
-    distance: userPrediction != null ? Math.abs(userPrediction - stockValue) : undefined,
+    distance: userPrediction != null && average != null ? Math.abs(userPrediction - average) : undefined,
     changePercent,
     valueGained,
     balanceAfter,
     finalOutcome,
+  };
+}
+
+/**
+ * Maps a G15 Records entry to a WalletTransaction — see the confirmed shape
+ * noted above wallet.getTransactions(). `LabelID` is the category
+ * (D/W/P, or G/L/N for a settled round outcome); `Label` is either a fixed
+ * string ("DEPOSIT") or the slot index as a string, depending on category.
+ */
+function mapTransaction(raw: any): WalletTransaction {
+  const labelId = raw.LabelID;
+  const amount = Number(raw.Amount ?? 0);
+  const createdAt = `${raw.Datein ?? ''}T${raw.Timein ?? '00:00:00'}`;
+
+  let type: WalletTransaction['type'];
+  let description: string;
+  if (labelId === 'D') {
+    type = 'deposit';
+    description = raw.Bank ? `Deposit via ${raw.Bank}` : 'Deposit';
+  } else if (labelId === 'W') {
+    type = 'withdrawal';
+    description = raw.Bank ? `Withdrawal to ${raw.Bank}` : 'Withdrawal';
+  } else if (labelId === 'P') {
+    type = 'round_stake';
+    description = `Round ${raw.Label} stake`;
+  } else {
+    // 'G'/'L'/'N' — a settled round's gain/loss outcome, not seen populated yet
+    type = amount >= 0 ? 'round_gain' : 'round_loss';
+    description = `Round ${raw.Label} result`;
+  }
+
+  return {
+    id: String(raw.Id),
+    type,
+    amount,
+    createdAt,
+    description,
   };
 }
 

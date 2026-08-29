@@ -53,8 +53,24 @@ export default function PredictScreen() {
         <CountdownBadge />
       </View>
 
+      <AutoPlaySection />
+
+      <Card style={styles.infoCard}>
+        <View style={styles.infoHeader}>
+          <Ionicons name="bulb-outline" size={18} color={colors.primary} />
+          <Text style={styles.infoTitle}>How scoring works</Text>
+        </View>
+        <Text style={styles.infoText}>
+          Pick a number — each round is played with your fixed stake amount, which comes out of your wallet balance,
+          separate from the rest. You can pick a stock for any round today in advance, not just the one currently
+          open, but each round can only be played once — there's no changing it after you submit. Once a round
+          settles, results are based on the average pick across all players that round — the closer your number
+          was to the average, the higher your gain; the farther away, the bigger the loss.
+        </Text>
+      </Card>
+
       {openRounds.length === 0 && (
-        <Card>
+        <Card style={{ marginTop: spacing.lg }}>
           <EmptyState
             icon="hourglass-outline"
             title="No rounds left to pick a stock for today"
@@ -63,7 +79,7 @@ export default function PredictScreen() {
         </Card>
       )}
 
-      <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
         {openRounds.map((round) => (
           <Card key={round.slot.id}>
             <View style={styles.roundHeader}>
@@ -87,22 +103,6 @@ export default function PredictScreen() {
           </Card>
         ))}
       </View>
-
-      <AutoPlaySection />
-
-      <Card style={styles.infoCard}>
-        <View style={styles.infoHeader}>
-          <Ionicons name="bulb-outline" size={18} color={colors.primary} />
-          <Text style={styles.infoTitle}>How scoring works</Text>
-        </View>
-        <Text style={styles.infoText}>
-          Pick a number — each round is played with your fixed stake amount, which comes out of your wallet balance,
-          separate from the rest. You can pick a stock for any round today in advance, not just the one currently
-          open, but each round can only be played once — there's no changing it after you submit. The Stock Value
-          is drawn automatically and only revealed once a round settles — the closer your number is to it, the
-          more you gain, the farther away, the more you lose.
-        </Text>
-      </Card>
     </Screen>
   );
 }

@@ -95,7 +95,7 @@ function seedSyntheticHistory() {
 
       const result: RoundResult = {
         roundId: slot.id,
-        stockValue,
+        average: stockValue,
         userPrediction: predictedValue,
         distance: adj.distance,
         changePercent: adj.changePercent,
@@ -172,7 +172,7 @@ export const mockApi = {
               const adj = applyConservativeAdjustment(currentUser.balance, predictedValue, stockValue);
               result = {
                 roundId: slot.id,
-                stockValue,
+                average: stockValue,
                 userPrediction: predictedValue,
                 distance: adj.distance,
                 changePercent: adj.changePercent,

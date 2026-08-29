@@ -219,7 +219,7 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.dateText}>{formatDate(entry.date)}</Text>
-          <Text style={styles.subText}>{entry.roundsSettled}/5 rounds settled</Text>
+          <Text style={styles.subText}>{entry.roundsSettled}/{entry.rounds.length} rounds settled</Text>
         </View>
         <View style={{ alignItems: 'flex-end', marginRight: spacing.xs }}>
           <Text style={[styles.gainText, { color: gainColor }]}>{formatSigned(entry.totalGain)}</Text>
@@ -235,7 +235,7 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
               <Text style={styles.detailLabel}>Round {r.slot.index}</Text>
               <Text style={styles.detailInfo}>
                 {r.prediction ? `picked ${r.prediction.value}` : 'no stock pick'}
-                {r.result ? ` · SV ${r.result.stockValue}` : ''}
+                {r.result?.average != null ? ` · Avg ${r.result.average.toFixed(2)}` : ''}
               </Text>
               <Text
                 style={[

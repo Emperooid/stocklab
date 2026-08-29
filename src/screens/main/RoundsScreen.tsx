@@ -92,9 +92,9 @@ export default function RoundsScreen() {
         <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
         <Text style={styles.noteText}>
           Every round accepts a stock pick right up until its own close time — you don't have to wait for its hour
-          to arrive, but you can only play each round once. The Stock Value is drawn automatically and only
-          revealed once a round settles. Change % is based on how close your entered value (1-5) was to it —
-          closer = higher gain, farther = small loss, capped at 0.5% of your balance per round.
+          to arrive, but you can only play each round once. Once a round settles, results are based on the
+          average pick across all players that round — the closer your number was to the average, the higher
+          your gain; the farther away, the bigger the loss.
         </Text>
       </Card>
     </Screen>
@@ -149,8 +149,8 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       {result && (
         <View style={styles.resultRow}>
           <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} colors={colors} />
-          <MiniStat label="Stock Value" value={String(result.stockValue)} colors={colors} />
-          <MiniStat label="Deviation" value={result.distance != null ? String(result.distance) : '—'} colors={colors} />
+          <MiniStat label="Avg Pick" value={result.average != null ? result.average.toFixed(2) : '—'} colors={colors} />
+          <MiniStat label="Deviation" value={result.distance != null ? result.distance.toFixed(2) : '—'} colors={colors} />
           <View style={styles.resultValueWrap}>
             <Text style={styles.miniStatLabel}>Value</Text>
             <View style={[styles.valuePill, { backgroundColor: gainPositive ? colors.successTint : colors.dangerTint }]}>
