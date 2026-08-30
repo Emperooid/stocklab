@@ -57,6 +57,17 @@ export function validateSlotAmount(rawAmount: string): string {
   return '';
 }
 
+// NUBAN (Nigerian bank account number) format — always exactly 10 digits.
+export function isValidBankAccountNumber(accountNumber: string): boolean {
+  return /^\d{10}$/.test(accountNumber.trim());
+}
+
+// A one-time verification code sent to confirm a payout account — 4-6
+// digits covers every OTP length this backend has used elsewhere (G10/G20).
+export function isValidOtp(otp: string): boolean {
+  return /^\d{4,6}$/.test(otp.trim());
+}
+
 export function getErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (error instanceof Error && error.message) return error.message;
   return fallback;

@@ -10,6 +10,7 @@ import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
 import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
+import { TourTarget } from '../../components/TourTarget';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
 import { WalletTransaction } from '../../types';
@@ -40,6 +41,14 @@ export default function WalletScreen() {
   const [depositAmount, setDepositAmount] = useState('');
   const [depositing, setDepositing] = useState(false);
   const [depositError, setDepositError] = useState('');
+
+  // Manual deposit-verification fallback state
+  const [verifyExpanded, setVerifyExpanded] = useState(false);
+  const [referenceInput, setReferenceInput] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  const [verifyResult, setVerifyResult] = useState<{ credited: boolean; message?: string } | null>(null);
+  const verifyDepositByReference = useWalletStore((s) => s.verifyDepositByReference);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,6 +86,28 @@ export default function WalletScreen() {
     }
   }
 
+  async function handleVerifyDeposit() {
+    setVerifyError('');
+    setVerifyResult(null);
+    const reference = referenceInput.trim();
+    if (!reference) {
+      setVerifyError('Paste the reference from your confirmation email.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      const result = await verifyDepositByReference(reference);
+      setVerifyResult(result);
+      if (result.credited) {
+        setReferenceInput('');
+      }
+    } catch (e) {
+      setVerifyError(getErrorMessage(e, 'Could not verify that reference. Please try again.'));
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   return (
     <Screen scroll={false}>
       <Text style={styles.title}>Wallet</Text>
@@ -91,9 +122,11 @@ export default function WalletScreen() {
           <>
             <Card style={styles.balanceCard}>
               <Text style={styles.balanceLabel}>Available Balance</Text>
-              <Text style={styles.balance}>{formatMoney(balance)}</Text>
+              <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatMoney(balance)}
+              </Text>
 
-              <View style={styles.quickActions}>
+              <TourTarget id="wallet-actions" style={styles.quickActions}>
                 <QuickAction
                   icon="arrow-down-circle"
                   label="Deposit"
@@ -101,7 +134,7 @@ export default function WalletScreen() {
                   onPress={() => toggleAction('deposit')}
                 />
                 <QuickAction icon="arrow-up-circle" label="Withdraw" active={false} onPress={() => navigation.navigate('Withdrawal')} />
-              </View>
+              </TourTarget>
             </Card>
 
             {pendingDeposit && (
@@ -116,6 +149,53 @@ export default function WalletScreen() {
                 <TouchableOpacity onPress={dismissPendingDeposit} hitSlop={8}>
                   <Ionicons name="close" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
+              </Card>
+            )}
+
+            <TouchableOpacity
+              style={styles.verifyToggle}
+              onPress={() => {
+                setVerifyExpanded((v) => !v);
+                setVerifyResult(null);
+                setVerifyError('');
+              }}
+            >
+              <Ionicons name="help-circle-outline" size={16} color={colors.primary} />
+              <Text style={styles.verifyToggleText}>Deposit not showing? Verify with your reference</Text>
+              <Ionicons name={verifyExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.primary} />
+            </TouchableOpacity>
+
+            {verifyExpanded && (
+              <Card style={styles.actionCard}>
+                <Text style={styles.actionTitle}>Verify a deposit</Text>
+                <Text style={styles.verifyDescription}>
+                  Paste the transaction reference from the confirmation email you received after paying — we'll check
+                  with the bank whether it's been credited yet.
+                </Text>
+                <Input
+                  value={referenceInput}
+                  onChangeText={setReferenceInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="e.g. SLGSER2026..."
+                  style={{ marginTop: spacing.sm }}
+                />
+                {!!verifyError && <FormError message={verifyError} />}
+                {verifyResult && (
+                  <View style={[styles.verifyResultBanner, { backgroundColor: verifyResult.credited ? colors.successTint : colors.warningTint }]}>
+                    <Ionicons
+                      name={verifyResult.credited ? 'checkmark-circle-outline' : 'time-outline'}
+                      size={16}
+                      color={verifyResult.credited ? colors.success : colors.warning}
+                    />
+                    <Text style={[styles.verifyResultText, { color: verifyResult.credited ? colors.success : colors.warning }]}>
+                      {verifyResult.credited
+                        ? 'Your balance has been updated.'
+                        : `Not credited yet. ${verifyResult.message ?? 'Please try again shortly, or contact support if this persists.'}`}
+                    </Text>
+                  </View>
+                )}
+                <Button title="Check Reference" onPress={handleVerifyDeposit} loading={verifying} style={{ marginTop: spacing.md }} />
               </Card>
             )}
 
@@ -240,6 +320,24 @@ function createStyles(colors: Colors) {
       padding: spacing.sm,
     },
     warnText: { ...typography.tiny, color: colors.warning, flex: 1, lineHeight: 15 },
+    verifyToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+    },
+    verifyToggleText: { ...typography.tiny, color: colors.primary, fontWeight: '700', flex: 1 },
+    verifyDescription: { ...typography.tiny, color: colors.textMuted, lineHeight: 15 },
+    verifyResultBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      borderRadius: radius.md,
+      padding: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    verifyResultText: { ...typography.tiny, flex: 1, lineHeight: 15 },
     sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
     txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
     txIconCircle: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

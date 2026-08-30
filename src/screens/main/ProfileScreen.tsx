@@ -5,12 +5,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
+import { TourTarget } from '../../components/TourTarget';
 import { Colors, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useRoundsStore } from '../../store/roundsStore';
 import { useWalletStore } from '../../store/walletStore';
 import { useThemeStore } from '../../store/themeStore';
+import { useTourStore } from '../../store/tourStore';
 import { formatMoney, formatSigned } from '../../lib/format';
 import { getDeviceId } from '../../lib/deviceId';
 import { api } from '../../api';
@@ -32,6 +34,7 @@ export default function ProfileScreen() {
   const rounds = useRoundsStore((s) => s.rounds);
   const themeMode = useThemeStore((s) => s.mode);
   const toggleTheme = useThemeStore((s) => s.toggleMode);
+  const startTour = useTourStore((s) => s.startTour);
   const [togglingNotifications, setTogglingNotifications] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [supportContact, setSupportContact] = useState<SupportContact | null>(null);
@@ -81,7 +84,9 @@ export default function ProfileScreen() {
       <View style={styles.statsRow}>
         <Card style={styles.statCard}>
           <Ionicons name="wallet-outline" size={18} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue}>{formatMoney(balance)}</Text>
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+            {formatMoney(balance)}
+          </Text>
           <Text style={styles.statLabel}>Balance</Text>
         </Card>
         <Card style={styles.statCard}>
@@ -91,7 +96,12 @@ export default function ProfileScreen() {
             color={totalProfit >= 0 ? colors.success : colors.danger}
             style={{ marginBottom: 6 }}
           />
-          <Text style={[styles.statValue, { color: totalProfit >= 0 ? colors.success : colors.danger }]}>
+          <Text
+            style={[styles.statValue, { color: totalProfit >= 0 ? colors.success : colors.danger }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+          >
             {formatSigned(totalProfit)}
           </Text>
           <Text style={styles.statLabel}>Total profit</Text>
@@ -122,7 +132,10 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1, marginRight: spacing.md }}>
             <Text style={styles.rowLabel}>Round reminders</Text>
-            <Text style={styles.rowHint}>Get notified when a round opens and when it settles.</Text>
+            <Text style={styles.rowHint}>
+              Alerts when a round opens, when it's about to close, when your result is ready, and a nudge if you
+              haven't played yet today.
+            </Text>
           </View>
           <Switch
             value={notificationsEnabled}
@@ -132,9 +145,21 @@ export default function ProfileScreen() {
             thumbColor={colors.text}
           />
         </View>
+
+        <TouchableOpacity style={[styles.row, styles.rowDivider]} onPress={startTour} activeOpacity={0.7}>
+          <View style={styles.rowIconCircle}>
+            <Ionicons name="compass-outline" size={18} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1, marginRight: spacing.md }}>
+            <Text style={styles.rowLabel}>Take the guided tour</Text>
+            <Text style={styles.rowHint}>Replay the walkthrough of the app's main screens.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
       </Card>
 
       <Text style={styles.sectionTitle}>Support</Text>
+      <TourTarget id="profile-support">
       <Card style={styles.section}>
         {loadingSupport ? (
           <Text style={styles.rowHint}>Loading…</Text>
@@ -170,6 +195,7 @@ export default function ProfileScreen() {
           <Text style={styles.rowHint}>Support contact isn't available yet — check back soon.</Text>
         )}
       </Card>
+      </TourTarget>
 
       <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
 

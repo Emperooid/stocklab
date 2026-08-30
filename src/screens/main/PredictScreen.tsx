@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
@@ -7,16 +7,15 @@ import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { CountdownBadge } from '../../components/CountdownBadge';
 import { EmptyState } from '../../components/EmptyState';
-import { FormError } from '../../components/FormError';
 import { PredictionControl } from '../../components/PredictionControl';
+import { TourTarget } from '../../components/TourTarget';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useRoundsStore } from '../../store/roundsStore';
 import { useAuthStore } from '../../store/authStore';
 import { AutoPlayMode, useAutoPlayStore } from '../../store/autoPlayStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
-import { formatTime12h } from '../../lib/format';
-import { getErrorMessage, MIN_SLOT_AMOUNT, validateSlotAmount } from '../../lib/validation';
+import { formatMoney, formatTime12h } from '../../lib/format';
 
 export default function PredictScreen() {
   const colors = useColors();
@@ -79,7 +78,7 @@ export default function PredictScreen() {
         </Card>
       )}
 
-      <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+      <TourTarget id="predict-rounds" style={{ gap: spacing.md, marginTop: spacing.lg }}>
         {openRounds.map((round) => (
           <Card key={round.slot.id}>
             <View style={styles.roundHeader}>
@@ -102,7 +101,7 @@ export default function PredictScreen() {
             />
           </Card>
         ))}
-      </View>
+      </TourTarget>
     </Screen>
   );
 }
@@ -110,32 +109,40 @@ export default function PredictScreen() {
 function AutoPlaySection() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { enabled, mode, amountPerSlot, configured, saving, error, configure, setEnabled, clearError } = useAutoPlayStore();
+  const { enabled, mode, configured, saving, error, configure, setEnabled, clearError } = useAutoPlayStore();
+  // Per the same fixed-amount product decision as manual predictions —
+  // Auto Play plays with the account's real SlotAmount (from G24), not a
+  // user-typed value. The old free-text field defaulted to a meaningless
+  // hardcoded MIN_SLOT_AMOUNT (100) that had nothing to do with this
+  // account's actual configured amount (300).
+  const slotAmount = useAuthStore((s) => s.user?.slotAmount);
 
-  // Local drafts, seeded from the last-saved store values — nothing is sent
-  // to the server just from tapping a mode or typing an amount. Saving
-  // (or turning Auto Play on for the first time) is what actually commits
-  // a draft via configure() (G26).
+  // Local draft, seeded from the last-saved store value — nothing is sent
+  // to the server just from tapping a mode. Saving (or turning Auto Play on
+  // for the first time) is what actually commits a draft via configure() (G26).
   const [draftMode, setDraftMode] = useState<AutoPlayMode>(mode);
-  const [amountText, setAmountText] = useState(String(amountPerSlot));
-  const [amountError, setAmountError] = useState('');
 
-  const isDirty = draftMode !== mode || Number(amountText) !== amountPerSlot;
+  // useAutoPlayStore persists via AsyncStorage, which hydrates
+  // asynchronously — this screen can mount and seed draftMode from `mode`
+  // BEFORE that hydration finishes (unlike authStore, this store has no
+  // hasHydrated flag to gate on). Without this, draftMode would freeze at
+  // the pre-hydration default ('full') forever, permanently disagreeing
+  // with the real saved mode once it loads — showing a spurious "Save
+  // Changes" button even though Auto Play was already configured
+  // correctly. Re-syncing whenever `mode` changes (hydration, or any
+  // actual successful save) keeps draftMode honest without needing a
+  // separate hydration guard.
+  useEffect(() => {
+    setDraftMode(mode);
+  }, [mode]);
 
-  function handleAmountChange(raw: string) {
-    setAmountText(raw.replace(/[^0-9]/g, ''));
-  }
+  const isDirty = draftMode !== mode;
 
   async function handleSave(nextEnabled: boolean) {
     clearError();
-    setAmountError('');
-    const validationError = validateSlotAmount(amountText);
-    if (validationError) {
-      setAmountError(validationError);
-      return;
-    }
+    if (!slotAmount) return;
     try {
-      await configure(draftMode, Number(amountText), nextEnabled);
+      await configure(draftMode, slotAmount, nextEnabled);
     } catch {
       // error already captured in the store; nothing else to do here
     }
@@ -157,6 +164,7 @@ function AutoPlaySection() {
   }
 
   return (
+    <TourTarget id="predict-autoplay">
     <Card style={styles.autoPlayCard}>
       <View style={styles.autoPlayHeaderRow}>
         <View style={{ flex: 1, marginRight: spacing.md }}>
@@ -189,7 +197,12 @@ function AutoPlaySection() {
             style={[styles.modeBtn, draftMode === m && styles.modeBtnSelected]}
             onPress={() => setDraftMode(m)}
           >
-            <Text style={[styles.modeBtnText, draftMode === m && styles.modeBtnTextSelected]}>
+            <Text
+              style={[styles.modeBtnText, draftMode === m && styles.modeBtnTextSelected]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {m === 'half' ? 'Half · 12 rounds' : 'Full · 24 rounds'}
             </Text>
           </TouchableOpacity>
@@ -198,28 +211,21 @@ function AutoPlaySection() {
 
       <Text style={styles.autoPlayLabel}>Amount per round</Text>
       <View style={styles.amountRow}>
-        <Text style={styles.amountPrefix}>₦</Text>
-        <TextInput
-          style={styles.amountInput}
-          value={amountText}
-          onChangeText={handleAmountChange}
-          keyboardType="number-pad"
-          placeholder={String(MIN_SLOT_AMOUNT)}
-          placeholderTextColor={colors.textDim}
-        />
+        <Text style={styles.amountValue}>{slotAmount != null ? formatMoney(slotAmount) : 'Loading…'}</Text>
       </View>
-      {!!amountError && <FormError message={amountError} />}
 
       {(isDirty || !configured) && (
         <Button
           title={enabled ? 'Save Changes' : 'Turn On Auto Play'}
           size="sm"
           loading={saving}
+          disabled={slotAmount == null}
           onPress={() => handleSave(true)}
           style={{ marginTop: spacing.md }}
         />
       )}
     </Card>
+    </TourTarget>
   );
 }
 
@@ -249,8 +255,7 @@ function createStyles(colors: Colors) {
       paddingHorizontal: spacing.md,
       height: 48,
     },
-    amountPrefix: { ...typography.h3, color: colors.textMuted },
-    amountInput: { ...typography.h3, color: colors.text, flex: 1, padding: 0 },
+    amountValue: { ...typography.h3, color: colors.text },
     infoCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
     infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
     infoTitle: { ...typography.h3, color: colors.text },

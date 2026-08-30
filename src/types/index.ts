@@ -71,7 +71,7 @@ export interface ResolvedBankAccount {
   accountName: string;
 }
 
-/** The user's existing on-file payout account — the withdrawal page shows this, it doesn't let the user pick a new one. */
+/** The user's on-file payout account, set via the verify+OTP flow on the withdrawal page. */
 export interface LinkedBankAccount {
   bankName: string;
   accountNumber: string;
@@ -101,6 +101,7 @@ export interface WithdrawalHistoryEntry {
   dateCredited?: string;
 }
 
+
 export type UserRole = 'admin' | 'user';
 
 export interface User {
@@ -123,4 +124,8 @@ export interface User {
   totalDeposited?: number;
   /** From G22/G24's nested Profile.AmountWithdrawn — lifetime withdrawals. */
   totalWithdrawn?: number;
+  /** From G22/G24's nested Profile.alert — a single current alert message, not a list. */
+  alertMessage?: string;
+  /** From G22/G24's nested Profile.news — a single current news message, not a list. */
+  newsMessage?: string;
 }

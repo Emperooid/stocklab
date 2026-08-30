@@ -3,12 +3,17 @@ import { ActivityIndicator, AppState, AppStateStatus, Linking, StyleSheet, Text,
 import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from '@react-navigation/native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainStack } from './MainStack';
+import { TourOverlay } from '../components/TourOverlay';
+import { AlertPopup } from '../components/AlertPopup';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useWalletStore } from '../store/walletStore';
 import { useRoundsStore } from '../store/roundsStore';
+import { useTourStore } from '../store/tourStore';
+import { useAlertPopupStore } from '../store/alertPopupStore';
 import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { isBackendConfigured } from '../config/backend';
+import { navigationRef } from '../lib/navigationRef';
 
 /**
  * Actively requeries the deposit (GR — nudges the gateway->PayHook
@@ -57,6 +62,24 @@ export function RootNavigator() {
       refreshUser().catch(() => {});
     }
   }, [hasHydrated]);
+
+  // Auto-start the guided tour once, for a user who's never seen it —
+  // guarded by a ref (not just hasCompletedTour) so a later refreshUser()
+  // re-render can't retrigger it while it's already running.
+  const pendingPopupsCount = useAlertPopupStore((s) => s.pendingPopups.length);
+  const tourAutoStarted = useRef(false);
+  useEffect(() => {
+    if (!hasHydrated || !user || tourAutoStarted.current) return;
+    if (useTourStore.getState().hasCompletedTour) return;
+    // Let any alert/news popup from this login get seen and dismissed first
+    // — stacking the tour's own full-screen overlay on top of it would bury it.
+    if (pendingPopupsCount > 0) return;
+    tourAutoStarted.current = true;
+    // Give MainTabs/Home a moment to actually mount before the first step
+    // tries to measure its target.
+    const timer = setTimeout(() => useTourStore.getState().startTour(), 600);
+    return () => clearTimeout(timer);
+  }, [hasHydrated, user, pendingPopupsCount]);
 
   // Deposits/withdrawals complete on an external page opened via
   // Linking.openURL (a hosted checkout, not an in-app WebView), so
@@ -131,8 +154,10 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       {user ? <MainStack /> : <AuthNavigator />}
+      {user && <AlertPopup />}
+      {user && <TourOverlay />}
     </NavigationContainer>
   );
 }

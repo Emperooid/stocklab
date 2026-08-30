@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Bank, LinkedBankAccount, ResolvedBankAccount, WalletTransaction, WithdrawalHistoryEntry } from '../types';
 import { api } from '../api';
 import { useAuthStore } from './authStore';
+import { NIGERIAN_BANKS } from '../lib/banks';
 
 interface PendingDeposit {
   amount: number;
@@ -29,8 +30,22 @@ interface WalletState {
   dismissPendingDeposit: () => void;
   /** Best-effort — nudges the gateway->PayHook crediting flow instead of only passively waiting for G25 to reflect it. Never throws. */
   requeryPendingDeposit: () => Promise<void>;
+  /**
+   * Manual fallback for a deposit that never reflected — the user pastes a
+   * reference (from the confirmation email the gateway sends) and this
+   * requeries it directly, independent of whatever this session happens to
+   * be tracking in pendingDeposit (the app may have been closed/reopened
+   * since the deposit was made). Compares balance before/after to report
+   * whether it actually credited, rather than just relaying GR's own
+   * message, which doesn't clearly say "credited" vs "not yet" in plain terms.
+   */
+  verifyDepositByReference: (reference: string) => Promise<{ credited: boolean; message?: string }>;
   fetchBanks: () => Promise<void>;
   resolveBankAccount: (accountNumber: string, bankCode: string) => Promise<ResolvedBankAccount>;
+  /** Step 1 of linking/changing a payout account — sends a one-time code to confirm the resolved account belongs to the user. */
+  sendBankVerificationOtp: (account: ResolvedBankAccount & { bankName: string }) => Promise<void>;
+  /** Step 2 — submits the code; on success, saves and reflects the new account in linkedBankAccount. */
+  confirmBankVerificationOtp: (otp: string, account: ResolvedBankAccount & { bankName: string }) => Promise<void>;
   linkedBankAccount: LinkedBankAccount | null;
   fetchLinkedBankAccount: () => Promise<void>;
   withdrawalHistory: WithdrawalHistoryEntry[];
@@ -87,14 +102,41 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     await api.wallet.requeryDeposit(reference).catch(() => {});
   },
 
+  verifyDepositByReference: async (reference) => {
+    const balanceBefore = get().balance;
+    const result = await api.wallet.requeryDeposit(reference);
+    await get().refresh().catch(() => {});
+    const credited = get().balance !== balanceBefore;
+    return { credited, message: result.message };
+  },
+
+  /**
+   * Tries the backend first (in case a live "list banks" endpoint ever
+   * ships), but there's no real need to block the bank picker on that —
+   * NIBSS bank codes are effectively static, so a bundled client-side list
+   * (see lib/banks.ts) is a perfectly good fallback, not just a placeholder.
+   */
   fetchBanks: async () => {
     if (get().banks.length > 0) return;
-    const banks = await api.wallet.getBanks();
-    set({ banks });
+    try {
+      const banks = await api.wallet.getBanks();
+      set({ banks });
+    } catch {
+      set({ banks: NIGERIAN_BANKS });
+    }
   },
 
   resolveBankAccount: async (accountNumber, bankCode) => {
     return api.wallet.resolveBankAccount(accountNumber, bankCode);
+  },
+
+  sendBankVerificationOtp: async (account) => {
+    await api.wallet.sendBankVerificationOtp(account);
+  },
+
+  confirmBankVerificationOtp: async (otp, account) => {
+    const linkedBankAccount = await api.wallet.confirmBankVerificationOtp(otp, account);
+    set({ linkedBankAccount });
   },
 
   fetchLinkedBankAccount: async () => {

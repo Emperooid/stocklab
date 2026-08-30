@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 import { api } from '../api';
 import { getSession, onSessionInvalidated, setSession, Session } from '../api/backendClient';
+import { useAlertPopupStore } from './alertPopupStore';
 
 /**
  * Thrown by registerComplete when registration itself succeeded but the
@@ -14,18 +15,26 @@ import { getSession, onSessionInvalidated, setSession, Session } from '../api/ba
 export class RegisteredButLoginFailedError extends Error {}
 
 /**
- * Neither login (G22) nor profile (G24) echoes email back — it's only ever
- * known locally, from what the client itself sent to G11 at registration.
- * Without this, every login/refreshUser() call would silently overwrite
- * `user` with a fresh object that has no email, wiping it out. Keeps the
- * previous email only when it's for the same phone number, so switching
- * accounts on a shared device can't leak one user's email onto another's.
+ * Merges in fields that only ONE of the two profile endpoints ever carries,
+ * so calling the other one doesn't wipe them back out:
+ *   - email: neither G22 nor G24 echoes it back — it's only ever known
+ *     locally, from what the client sent to G11 at registration.
+ *   - alertMessage/newsMessage: CONFIRMED live only G22 (login) sends
+ *     these — G24 (used by refreshUser(), called right after login as a
+ *     best-effort follow-up, and again on every Profile/News focus) never
+ *     includes them at all. Without this, the G24 follow-up immediately
+ *     overwrote a real alert/news from login back to undefined.
+ * Only preserves for the same phone number, so switching accounts on a
+ * shared device can't leak one user's data onto another's.
  */
-function preserveEmail(prev: User | null, next: User): User {
-  if (!next.email && prev?.phone === next.phone && prev?.email) {
-    return { ...next, email: prev.email };
-  }
-  return next;
+function preserveLoginOnlyFields(prev: User | null, next: User): User {
+  if (prev?.phone !== next.phone) return next;
+  return {
+    ...next,
+    email: next.email || prev.email,
+    alertMessage: next.alertMessage ?? prev.alertMessage,
+    newsMessage: next.newsMessage ?? prev.newsMessage,
+  };
 }
 
 interface AuthState {
@@ -68,7 +77,11 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const user = await api.auth.login(phone, pin);
-          set({ user: preserveEmail(get().user, user), session: getSession(), isLoading: false });
+          set({ user: preserveLoginOnlyFields(get().user, user), session: getSession(), isLoading: false });
+          // Only G22 (login) ever carries alert/news — queue a popup here,
+          // right where a fresh value can actually exist, not on every
+          // refreshUser() (G24 never has these fields at all).
+          useAlertPopupStore.getState().checkForUpdates(user);
           // G22's own response may not carry every profile field (SlotAmount
           // confirmed only on G24 so far) — best-effort follow-up so a
           // fresh login has the fixed stake amount without waiting on some
@@ -117,6 +130,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await api.auth.login(phone, pin);
           set({ user: { ...user, email: registeredEmail }, session: getSession(), isLoading: false });
+          useAlertPopupStore.getState().checkForUpdates(user);
           get().refreshUser().catch(() => {});
         } catch {
           set({ isLoading: false });
@@ -136,7 +150,7 @@ export const useAuthStore = create<AuthState>()(
       refreshUser: async () => {
         if (!get().user) return;
         const user = await api.auth.me();
-        set({ user: preserveEmail(get().user, user) });
+        set({ user: preserveLoginOnlyFields(get().user, user) });
       },
 
       requestPasswordReset: async (phone) => {

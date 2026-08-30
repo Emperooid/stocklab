@@ -7,7 +7,8 @@ import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Badge, BadgeTone } from '../../components/Badge';
 import { PredictionControl } from '../../components/PredictionControl';
-import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
+import { TourTarget } from '../../components/TourTarget';
+import { Colors, layout, radius, spacing, typography, useColors } from '../../theme/theme';
 import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
 import { useWalletStore } from '../../store/walletStore';
 import { useAuthStore } from '../../store/authStore';
@@ -50,7 +51,9 @@ export default function RoundsScreen() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.headerLabel}>Your Balance</Text>
-          <Text style={styles.balance}>{formatMoney(balance)}</Text>
+          <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {formatMoney(balance)}
+          </Text>
           <View style={styles.profitPill}>
             <Ionicons
               name={isProfitPositive ? 'trending-up' : 'trending-down'}
@@ -82,11 +85,13 @@ export default function RoundsScreen() {
         <Text style={styles.sectionTitle}>Today's Rounds</Text>
       </View>
 
-      <View style={{ gap: spacing.md }}>
-        {rounds.map((round) => (
-          <RoundCard key={round.slot.id} round={round} now={now} />
-        ))}
-      </View>
+      <TourTarget id="rounds-list">
+        <View style={{ gap: spacing.md }}>
+          {rounds.map((round) => (
+            <RoundCard key={round.slot.id} round={round} now={now} />
+          ))}
+        </View>
+      </TourTarget>
 
       <Card style={styles.noteCard}>
         <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
@@ -193,9 +198,11 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
 function MiniStat({ label, value, colors }: { label: string; value: string; colors: Colors }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={{ alignItems: 'flex-start' }}>
+    <View style={{ alignItems: 'flex-start', flexShrink: 1 }}>
       <Text style={styles.miniStatLabel}>{label}</Text>
-      <Text style={styles.miniStatValue}>{value}</Text>
+      <Text style={styles.miniStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -204,8 +211,12 @@ function SummaryStat({ label, value, color, colors }: { label: string; value: st
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={[styles.summaryValue, color ? { color } : null]}>{value}</Text>
+      <Text style={styles.summaryLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[styles.summaryValue, color ? { color } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -232,7 +243,16 @@ function createStyles(colors: Colors) {
     profitPillText: { ...typography.small, fontWeight: '700' },
     historyLink: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: spacing.xs },
     historyLinkText: { ...typography.small, color: colors.primary, fontWeight: '700' },
-    summaryCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
+    summaryCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.lg,
+      backgroundColor: colors.surfaceAlt,
+      // Four columns + three dividers is tight on narrow phones (<360px) —
+      // tighter horizontal padding buys the stat values more room before
+      // adjustsFontSizeToFit has to kick in.
+      paddingHorizontal: layout.isSmallDevice ? spacing.sm : spacing.lg,
+    },
     summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
     summaryLabel: { ...typography.tiny, color: colors.textMuted },
     summaryValue: { ...typography.h3, color: colors.text, marginTop: 2 },

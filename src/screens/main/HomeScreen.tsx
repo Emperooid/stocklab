@@ -1,12 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { CountdownBadge } from '../../components/CountdownBadge';
+import { TourTarget } from '../../components/TourTarget';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
@@ -15,12 +17,13 @@ import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
 import { formatMoney, formatPercent, formatSigned } from '../../lib/format';
 import { DailyRound } from '../../types';
-import { MainTabParamList } from '../../navigation/types';
+import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 
 export default function HomeScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
+  const stackNavigation = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const user = useAuthStore((s) => s.user);
   const { balance, refresh } = useWalletStore();
   const { rounds, fetchRounds } = useRoundsStore();
@@ -41,6 +44,7 @@ export default function HomeScreen() {
     setRefreshing(false);
   }
 
+  const hasNews = !!user?.alertMessage || !!user?.newsMessage;
   const openRound = rounds.find((r) => getSlotStatus(r.slot, now) === 'open' && !r.prediction);
   const settledToday = rounds.filter((r) => r.result).length;
   const latestResult = [...rounds].reverse().find((r) => r.result);
@@ -53,30 +57,42 @@ export default function HomeScreen() {
           <Text style={styles.eyebrow}>WELCOME BACK</Text>
           <Text style={styles.greeting}>{user?.name?.split(' ')[0] ?? 'Trader'}</Text>
         </View>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? '?'}</Text>
+        <View style={styles.headerActions}>
+          <TourTarget id="home-bell">
+            <Pressable style={styles.bellButton} onPress={() => stackNavigation?.navigate('News')}>
+              <Ionicons name="notifications-outline" size={20} color={colors.text} />
+              {hasNews && <View style={styles.bellDot} />}
+            </Pressable>
+          </TourTarget>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? '?'}</Text>
+          </View>
         </View>
       </View>
 
-      <Card style={styles.balanceCard}>
-        <View style={styles.balanceTopRow}>
-          <Text style={styles.balanceLabel}>Your Balance</Text>
-          <View style={[styles.profitPill, { backgroundColor: isProfitPositive ? colors.successTint : colors.dangerTint }]}>
-            <Ionicons
-              name={isProfitPositive ? 'trending-up' : 'trending-down'}
-              size={12}
-              color={isProfitPositive ? colors.success : colors.danger}
-            />
-            <Text style={[styles.profitPillText, { color: isProfitPositive ? colors.success : colors.danger }]}>
-              {formatPercent(totalProfitPercent)}
-            </Text>
+      <TourTarget id="home-balance">
+        <Card style={styles.balanceCard}>
+          <View style={styles.balanceTopRow}>
+            <Text style={styles.balanceLabel}>Your Balance</Text>
+            <View style={[styles.profitPill, { backgroundColor: isProfitPositive ? colors.successTint : colors.dangerTint }]}>
+              <Ionicons
+                name={isProfitPositive ? 'trending-up' : 'trending-down'}
+                size={12}
+                color={isProfitPositive ? colors.success : colors.danger}
+              />
+              <Text style={[styles.profitPillText, { color: isProfitPositive ? colors.success : colors.danger }]}>
+                {formatPercent(totalProfitPercent)}
+              </Text>
+            </View>
           </View>
-        </View>
-        <Text style={styles.balance}>{formatMoney(balance)}</Text>
-        <Text style={[styles.profit, { color: isProfitPositive ? colors.success : colors.danger }]}>
-          {formatSigned(totalProfit)} today
+          <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {formatMoney(balance)}
         </Text>
-      </Card>
+          <Text style={[styles.profit, { color: isProfitPositive ? colors.success : colors.danger }]}>
+            {formatSigned(totalProfit)} today
+          </Text>
+        </Card>
+      </TourTarget>
 
       <View style={styles.countdownWrap}>
         <CountdownBadge />
@@ -157,6 +173,26 @@ function createStyles(colors: Colors) {
       justifyContent: 'center',
     },
     avatarText: { ...typography.h3, color: colors.onPrimary },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    bellButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bellDot: {
+      position: 'absolute',
+      top: 8,
+      right: 9,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.danger,
+      borderWidth: 1.5,
+      borderColor: colors.surfaceAlt,
+    },
     balanceCard: { alignItems: 'flex-start' },
     balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
     balanceLabel: { ...typography.small, color: colors.textMuted },

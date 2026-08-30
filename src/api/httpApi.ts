@@ -90,13 +90,28 @@ function parseCommaNumber(value: unknown): number | undefined {
  * ₦1,080,100 loss — clearly not computed yet — so totalProfitPercent is
  * derived here from the (reliable) amount fields instead of trusting them.
  */
-function parseProfitSummary(raw: any): { totalProfit: number; totalProfitPercent: number; totalDeposited?: number; totalWithdrawn?: number } {
+function parseProfitSummary(raw: any): {
+  totalProfit: number;
+  totalProfitPercent: number;
+  totalDeposited?: number;
+  totalWithdrawn?: number;
+  alertMessage?: string;
+  newsMessage?: string;
+} {
   const summary = raw?.Profile ?? raw?.profile ?? {};
   const totalDeposited = parseCommaNumber(summary.AmountDeposited);
   const totalProfit = parseCommaNumber(summary.AmountGained) ?? 0;
   const totalWithdrawn = parseCommaNumber(summary.AmountWithdrawn);
   const totalProfitPercent = totalDeposited ? (totalProfit / totalDeposited) * 100 : 0;
-  return { totalProfit, totalProfitPercent, totalDeposited, totalWithdrawn };
+  // Single current message strings, not a list — example shape (not yet
+  // live-confirmed): Profile.alert / Profile.news, each just one string at a
+  // time. This backend has been inconsistent with casing elsewhere (Profile
+  // vs profile, WBalance vs balance), so checked defensively both ways —
+  // but as of 2026-08-30 neither casing has actually appeared in a live G24
+  // response, so this may just be a genuine backend gap, not a parsing miss.
+  const alertMessage = summary.alert || summary.Alert || raw?.alert || raw?.Alert || undefined;
+  const newsMessage = summary.news || summary.News || raw?.news || raw?.News || undefined;
+  return { totalProfit, totalProfitPercent, totalDeposited, totalWithdrawn, alertMessage, newsMessage };
 }
 
 export const httpApi = {
@@ -151,9 +166,9 @@ export const httpApi = {
         phone,
         // CONFIRMED live: Profile.email is now present (added alongside the
         // G11 email field) — empty string for accounts that registered
-        // before it existed. `|| undefined` lets authStore's preserveEmail
-        // fall back to a locally-remembered email instead of overwriting it
-        // with a known-blank one.
+        // before it existed. `|| undefined` lets authStore's
+        // preserveLoginOnlyFields fall back to a locally-remembered email
+        // instead of overwriting it with a known-blank one.
         email: profile.email || undefined,
         role: 'user',
         balance: 0, // WBalance IS present in this response (confirmed), but G25 is the dedicated/canonical balance lookup — see wallet.getBalance()
@@ -522,13 +537,30 @@ export const httpApi = {
     async resolveBankAccount(_accountNumber: string, _bankCode: string): Promise<ResolvedBankAccount> {
       notSupported('Resolving a bank account name');
     },
+    /**
+     * Step 1 of linking (or changing) a payout account: after the account
+     * number resolves to a real name, this sends a one-time code so the
+     * user can confirm the account actually belongs to them before it gets
+     * saved as their withdrawal destination. No confirmed endpoint yet.
+     */
+    async sendBankVerificationOtp(_account: ResolvedBankAccount & { bankName: string }): Promise<void> {
+      notSupported('Sending a bank account verification code');
+    },
+    /**
+     * Step 2: submits the code the user received along with the account
+     * details, confirming and saving it as the on-file payout account. No
+     * confirmed endpoint yet.
+     */
+    async confirmBankVerificationOtp(_otp: string, _account: ResolvedBankAccount & { bankName: string }): Promise<LinkedBankAccount> {
+      notSupported('Confirming a bank account verification code');
+    },
     /** No confirmed endpoint yet for the on-file payout account the withdrawal page displays. */
     async getLinkedBankAccount(): Promise<LinkedBankAccount | null> {
       notSupported('Looking up your payout bank account');
     },
     /**
-     * Per the confirmed payout page design, withdrawal uses whatever bank
-     * account is already on file — no bank/account picking here. No
+     * Withdrawal uses whatever bank account is on file (linked via the
+     * verify+OTP flow above) — no bank/account picking at request time. No
      * confirmed endpoint yet for actually creating a withdrawal request.
      */
     async requestWithdrawal(_amount: number): Promise<void> {
