@@ -8,7 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stockgod.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.stockgod.app",
@@ -28,7 +32,9 @@
         "expo-notifications",
         {
           "color": "#22C55E",
-          "sounds": ["./assets/stocklab_notification.wav"]
+          "sounds": [
+            "./assets/stocklab_notification.wav"
+          ]
         }
       ],
       "expo-font",
