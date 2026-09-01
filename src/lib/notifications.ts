@@ -8,7 +8,7 @@ import { slotSettleAt, slotSubmitAt } from './schedule';
 // install, so a real sound swap needs a new channel id, not new options on
 // the old one. v2 shipped with the system default sound (no build ever went
 // out with it); v3 is the real bundled StockLab sound.
-const CHANNEL_ID = 'stockgod-rounds-v3';
+const CHANNEL_ID = 'stocklab-rounds-v3';
 
 // Base filename only (no path) — must match an entry in app.json's
 // expo-notifications plugin `sounds` array (which takes the actual path,

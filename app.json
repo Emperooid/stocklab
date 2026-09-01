@@ -9,13 +9,13 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stockgod.app",
+      "bundleIdentifier": "com.streetfriendly.stocklab",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.stockgod.app",
+      "package": "com.streetfriendly.stocklab",
       "adaptiveIcon": {
         "backgroundColor": "#080D15",
         "foregroundImage": "./assets/android-icon-foreground.png",

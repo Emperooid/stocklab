@@ -32,7 +32,7 @@ export const useTourStore = create<TourState>()(
       skipTour: () => set({ activeStepIndex: null, hasCompletedTour: true }),
     }),
     {
-      name: 'stockgod-tour',
+      name: 'stocklab-tour',
       storage: createJSONStorage(() => AsyncStorage),
       // activeStepIndex is deliberately NOT persisted — a mid-tour app
       // restart shouldn't resume on some arbitrary screen; only whether the
