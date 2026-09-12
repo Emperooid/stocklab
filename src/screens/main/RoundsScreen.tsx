@@ -7,7 +7,7 @@ import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Badge, BadgeTone } from '../../components/Badge';
 import { PredictionControl } from '../../components/PredictionControl';
-import { TourTarget } from '../../components/TourTarget';
+import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
 import { Colors, layout, radius, spacing, typography, useColors } from '../../theme/theme';
 import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
 import { useWalletStore } from '../../store/walletStore';
@@ -85,13 +85,11 @@ export default function RoundsScreen() {
         <Text style={styles.sectionTitle}>Today's Rounds</Text>
       </View>
 
-      <TourTarget id="rounds-list">
-        <View style={{ gap: spacing.md }}>
-          {rounds.map((round) => (
-            <RoundCard key={round.slot.id} round={round} now={now} />
-          ))}
-        </View>
-      </TourTarget>
+      <View style={{ gap: spacing.md }}>
+        {rounds.map((round) => (
+          <RoundCard key={round.slot.id} round={round} now={now} />
+        ))}
+      </View>
 
       <Card style={styles.noteCard}>
         <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
@@ -183,6 +181,7 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
 
       {isOpen && (
         <View style={styles.predictBox}>
+          <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
           <PredictionControl
             roundId={round.slot.id}
             currentValue={round.prediction?.value}

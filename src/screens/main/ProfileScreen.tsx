@@ -5,7 +5,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
-import { TourTarget } from '../../components/TourTarget';
 import { Colors, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -114,7 +113,7 @@ export default function ProfileScreen() {
           <View style={styles.rowIconCircle}>
             <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={18} color={colors.primary} />
           </View>
-          <View style={{ flex: 1, marginRight: spacing.md }}>
+          <View style={styles.rowText}>
             <Text style={styles.rowLabel}>{isDark ? 'Dark mode' : 'Light mode'}</Text>
             <Text style={styles.rowHint}>Switch between a dark and light color theme.</Text>
           </View>
@@ -130,7 +129,7 @@ export default function ProfileScreen() {
           <View style={styles.rowIconCircle}>
             <Ionicons name="notifications-outline" size={18} color={colors.primary} />
           </View>
-          <View style={{ flex: 1, marginRight: spacing.md }}>
+          <View style={styles.rowText}>
             <Text style={styles.rowLabel}>Round reminders</Text>
             <Text style={styles.rowHint}>
               Alerts when a round opens, when it's about to close, when your result is ready, and a nudge if you
@@ -150,7 +149,7 @@ export default function ProfileScreen() {
           <View style={styles.rowIconCircle}>
             <Ionicons name="compass-outline" size={18} color={colors.primary} />
           </View>
-          <View style={{ flex: 1, marginRight: spacing.md }}>
+          <View style={styles.rowText}>
             <Text style={styles.rowLabel}>Take the guided tour</Text>
             <Text style={styles.rowHint}>Replay the walkthrough of the app's main screens.</Text>
           </View>
@@ -159,7 +158,6 @@ export default function ProfileScreen() {
       </Card>
 
       <Text style={styles.sectionTitle}>Support</Text>
-      <TourTarget id="profile-support">
       <Card style={styles.section}>
         {loadingSupport ? (
           <Text style={styles.rowHint}>Loading…</Text>
@@ -195,11 +193,10 @@ export default function ProfileScreen() {
           <Text style={styles.rowHint}>Support contact isn't available yet — check back soon.</Text>
         )}
       </Card>
-      </TourTarget>
 
       <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
 
-      <Text style={styles.footer}>StockLab · v1.0.0</Text>
+      <Text style={styles.footer}>CrowdStock · v1.0.0</Text>
       {!!deviceId && (
         <Text style={styles.deviceId} selectable>
           Device ID: {deviceId}
@@ -259,6 +256,7 @@ function createStyles(colors: Colors) {
     sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md },
     section: {},
     row: { flexDirection: 'row', alignItems: 'center' },
+    rowText: { flex: 1, minWidth: 0, marginRight: spacing.md },
     rowDivider: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
     supportRow: { marginTop: spacing.sm },
     rowIconCircle: {

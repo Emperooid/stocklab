@@ -17,4 +17,5 @@ export type MainStackParamList = {
   RoundHistory: undefined;
   Withdrawal: undefined;
   News: undefined;
+  Invite: undefined;
 };

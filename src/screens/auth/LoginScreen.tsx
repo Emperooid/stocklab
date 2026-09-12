@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
@@ -69,7 +69,7 @@ export default function LoginScreen({ navigation, route }: Props) {
     setInfoMessage('');
     setBiometricLoading(true);
     try {
-      const ok = await authenticateWithBiometric('Log in to StockLab');
+      const ok = await authenticateWithBiometric('Log in to CrowdStock');
       if (!ok) return;
       const saved = await getSavedCredentials();
       if (!saved) {
@@ -87,13 +87,9 @@ export default function LoginScreen({ navigation, route }: Props) {
   return (
     <Screen>
       <View style={styles.header}>
-        <View style={styles.logoMark}>
-          <Ionicons name="trending-up" size={30} color={colors.onPrimary} />
-        </View>
-        <Text style={styles.logo}>
-          STOCK<Text style={{ color: colors.primary }}>LAB</Text>
-        </Text>
-        <Text style={styles.tagline}>STOCK · PLAY · PROSPER</Text>
+        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
+        <Text style={styles.logo}>CrowdStock</Text>
+        <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
       </View>
 
       <Text style={styles.title}>Welcome back</Text>
@@ -168,15 +164,12 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     header: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.xxl },
     logoMark: {
-      width: 60,
-      height: 60,
+      width: 72,
+      height: 72,
       borderRadius: 18,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
       marginBottom: spacing.md,
     },
-    logo: { ...typography.h1, color: colors.text, letterSpacing: 1 },
+    logo: { ...typography.h1, color: colors.text, letterSpacing: 0.2 },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },

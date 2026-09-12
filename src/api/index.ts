@@ -11,14 +11,17 @@ import { httpApi } from './httpApi';
 // endpoint for those yet — but predicting and viewing results should work.
 //
 // WALLET: cut over too, per explicit instruction to drop demo data and only
-// show real backend data. getBalance now calls G24 for the real WBalance;
-// getTransactions still returns empty (no transaction-list endpoint exists
-// yet — see httpApi.ts). createDepositReference (PAY) is real. Everything
-// else (withdrawals, bank listing/resolution, deposit verification) still
-// throws "not available yet" — there is genuinely no backend support for
-// those.
+// show real backend data. getBalance now calls G24 for the real WBalance.
+// Deposits are virtual-account only (getBankProfile/BB, generateVirtualAccount/VV)
+// — the old PAY/GR card-checkout path was removed per product decision, not
+// kept as a fallback. setPayoutBankDetails (PP) is real. requestWithdrawal
+// still throws "not available yet" — BB/PP/VV only cover bank details, not
+// an actual payout-trigger endpoint.
+// INVITE: new referral program (B1_LogInvite, B2_IsRegisteredUser,
+// B3_GetCountInvited) — all real, all used by the Invite screen.
 export const api = {
   auth: httpApi.auth,
   rounds: httpApi.rounds,
   wallet: httpApi.wallet,
+  invite: httpApi.invite,
 };

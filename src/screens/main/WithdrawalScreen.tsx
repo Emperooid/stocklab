@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
@@ -13,28 +13,33 @@ import { BankPickerModal } from '../../components/BankPickerModal';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
 import { useAuthStore } from '../../store/authStore';
-import { Bank, ResolvedBankAccount, WithdrawalHistoryEntry } from '../../types';
-import { getErrorMessage, isValidBankAccountNumber, isValidOtp, validateDepositAmount } from '../../lib/validation';
+import { WithdrawalHistoryEntry } from '../../types';
+import { getErrorMessage, isValidBankAccountNumber, validateDepositAmount } from '../../lib/validation';
 import { formatMoney } from '../../lib/format';
 
 /**
- * Payout page. The linked bank account is set (or changed) through a
- * verify-then-OTP flow — resolve the account name from the number, confirm
- * it's really theirs with a one-time code, then it's saved as the on-file
- * payout destination. None of the backing endpoints are confirmed yet
- * (bank list, account resolve, OTP send/confirm, the withdrawal request
- * itself, or history) — every action surfaces a real "not available yet"
- * error via the existing notSupported() pattern in httpApi.ts rather than
- * faking success, so the whole flow is real and ready the moment those
- * endpoints exist.
+ * Payout page. First-time setup uses PP (setPayoutBankDetails) — no OTP,
+ * no bank-code resolution, per Mr Yemi's original BB/PP/VV doc. Changing an
+ * already-set account goes through the newer RBP (resetPayoutBankDetails)
+ * instead, which requires a verification code (sent via G20, reused purely
+ * as an OTP-delivery mechanism — see the httpApi.ts comment on that
+ * assumption) plus the user's real login password, both checked
+ * server-side. The withdrawal request itself and its history still have no
+ * confirmed endpoint — those actions surface a real "not available yet"
+ * error via the existing notSupported() pattern in httpApi.ts.
  */
 export default function WithdrawalScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { withdrawalHistory, fetchWithdrawalHistory, requestWithdrawal, linkedBankAccount, balance } = useWalletStore();
+  const { withdrawalHistory, fetchWithdrawalHistory, requestWithdrawal, sendWalletSecurityOtp, linkedBankAccount, balance } =
+    useWalletStore();
   const totalWithdrawn = useAuthStore((s) => s.user?.totalWithdrawn) ?? 0;
 
   const [amount, setAmount] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -48,25 +53,54 @@ export default function WithdrawalScreen() {
     }, [])
   );
 
-  async function handleSubmit() {
-    setError('');
-    if (!linkedBankAccount) {
-      setError('Add and verify a payout account above before requesting a withdrawal.');
-      return;
-    }
+  function validateAmount(): string | null {
+    if (!linkedBankAccount) return 'Add a payout account above before requesting a withdrawal.';
     const validationError = validateDepositAmount(amount);
+    if (validationError) return validationError;
+    if (Number(amount) > balance) return `You can't withdraw more than your available balance of ${formatMoney(balance)}.`;
+    return null;
+  }
+
+  async function handleSendOtp() {
+    setError('');
+    const validationError = validateAmount();
     if (validationError) {
       setError(validationError);
       return;
     }
-    if (Number(amount) > balance) {
-      setError(`You can't withdraw more than your available balance of ${formatMoney(balance)}.`);
+    setSendingOtp(true);
+    try {
+      await sendWalletSecurityOtp();
+      setOtpSent(true);
+    } catch (e) {
+      setError(getErrorMessage(e, 'Could not send a verification code.'));
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function handleSubmit() {
+    setError('');
+    if (!otp.trim()) {
+      setError('Enter the code we sent you.');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Enter your login password to confirm this withdrawal.');
+      return;
+    }
+    const validationError = validateAmount();
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setSubmitting(true);
     try {
-      await requestWithdrawal(Number(amount));
+      await requestWithdrawal(Number(amount), otp.trim(), password);
       setAmount('');
+      setOtp('');
+      setPassword('');
+      setOtpSent(false);
     } catch (e) {
       setError(getErrorMessage(e, 'Could not make a withdrawal request.'));
     } finally {
@@ -99,9 +133,13 @@ export default function WithdrawalScreen() {
         <Text style={styles.sectionTitle}>Withdraw</Text>
         <Input
           value={amount}
-          onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
+          onChangeText={(t) => {
+            setAmount(t.replace(/[^0-9]/g, ''));
+            setOtpSent(false);
+          }}
           keyboardType="number-pad"
           placeholder="Amount to withdraw (₦)"
+          editable={!otpSent}
           style={{ marginTop: spacing.sm }}
         />
         <View style={styles.availableRow}>
@@ -110,14 +148,42 @@ export default function WithdrawalScreen() {
             Use Max
           </Text>
         </View>
+
+        {otpSent && (
+          <>
+            <Input
+              value={otp}
+              onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              placeholder="Verification code"
+              style={{ marginTop: spacing.sm }}
+            />
+            <Input
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Your login password"
+              secureTextEntry
+              style={{ marginTop: spacing.sm }}
+            />
+            <Text style={styles.resendLink} onPress={handleSendOtp}>
+              Resend code
+            </Text>
+          </>
+        )}
+
         {!!error && <FormError message={error} />}
-        <Button
-          title="Make a Withdrawal Request"
-          onPress={handleSubmit}
-          loading={submitting}
-          disabled={!linkedBankAccount}
-          style={{ marginTop: spacing.md }}
-        />
+
+        {!otpSent ? (
+          <Button
+            title="Send Code"
+            onPress={handleSendOtp}
+            loading={sendingOtp}
+            disabled={!linkedBankAccount}
+            style={{ marginTop: spacing.md }}
+          />
+        ) : (
+          <Button title="Confirm Withdrawal" onPress={handleSubmit} loading={submitting} style={{ marginTop: spacing.md }} />
+        )}
       </Card>
 
       <Text style={[styles.sectionTitle, styles.historyTitle]}>Withdrawal History</Text>
@@ -138,7 +204,7 @@ export default function WithdrawalScreen() {
   );
 }
 
-type BankStep = 'view' | 'entry' | 'confirm' | 'otp';
+type BankCardStep = 'view' | 'add' | 'reset';
 
 function BankAccountCard() {
   const colors = useColors();
@@ -146,41 +212,30 @@ function BankAccountCard() {
   const {
     linkedBankAccount,
     fetchLinkedBankAccount,
-    banks,
-    fetchBanks,
-    resolveBankAccount,
-    sendBankVerificationOtp,
-    confirmBankVerificationOtp,
+    verifyBankAccount,
+    setPayoutBankDetails,
+    sendWalletSecurityOtp,
+    resetPayoutBankDetails,
   } = useWalletStore();
 
   const [loadingBank, setLoadingBank] = useState(false);
-  const [step, setStep] = useState<BankStep>('view');
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
-  // Fallback for a bank that isn't in the bundled list — since we have no
-  // code for it, it can't go through resolveBankAccount (NUBAN lookups
-  // always need a bank code, not just a name).
-  const [manualBank, setManualBank] = useState(false);
-  const [manualBankName, setManualBankName] = useState('');
+  const [step, setStep] = useState<BankCardStep>('view');
+  const [bankName, setBankName] = useState('');
+  const [bankCode, setBankCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
-  // Asked for upfront for BOTH paths — resolveBankAccount isn't backed by a
-  // real endpoint yet, so waiting on it before letting someone type their
-  // own name would block the flow entirely. If resolution DOES succeed for
-  // a listed bank, it overrides this with the bank's own record; otherwise
-  // this is what's used, same as the manual-bank path, and the confirm step
-  // flags it as self-declared either way.
-  const [accountName, setAccountName] = useState('');
-  const [resolvedAccount, setResolvedAccount] = useState<ResolvedBankAccount | null>(null);
-  // True only when resolveBankAccount actually returned a bank-confirmed
-  // name — drives the verified/unverified styling on the confirm step.
-  const [verifiedByBackend, setVerifiedByBackend] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [resolving, setResolving] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [confirmingOtp, setConfirmingOtp] = useState(false);
+  const [verifiedAccountName, setVerifiedAccountName] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  const verifyRequestId = useRef(0);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bankPickerOpen, setBankPickerOpen] = useState(false);
 
-  const bankName = manualBank ? manualBankName.trim() : selectedBank?.name ?? '';
+  // Reset-flow-only state
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -191,108 +246,88 @@ function BankAccountCard() {
     }, [])
   );
 
-  function resetFlow() {
-    setStep('view');
-    setSelectedBank(null);
-    setManualBank(false);
-    setManualBankName('');
-    setAccountName('');
-    setAccountNumber('');
-    setResolvedAccount(null);
-    setVerifiedByBackend(false);
-    setOtp('');
-    setError('');
-  }
+  // Auto-verifies (AA) the moment a bank + valid 10-digit account number are
+  // both present, instead of letting the user type their own account name —
+  // a free-typed name could silently not match the real account holder,
+  // which is exactly the mistake this closes off. Re-runs (and clears the
+  // stale result first) whenever either input changes, so editing after a
+  // successful verify can't leave a mismatched name behind.
+  useEffect(() => {
+    setVerifiedAccountName('');
+    setVerifyError('');
+    if (!bankCode || !isValidBankAccountNumber(accountNumber)) return;
+    const requestId = ++verifyRequestId.current;
+    setVerifying(true);
+    verifyBankAccount(bankCode, accountNumber)
+      .then(({ accountName }) => {
+        if (verifyRequestId.current !== requestId) return; // superseded by a newer edit
+        setVerifiedAccountName(accountName);
+      })
+      .catch((e) => {
+        if (verifyRequestId.current !== requestId) return;
+        setVerifyError(getErrorMessage(e, 'Could not verify that account.'));
+      })
+      .finally(() => {
+        if (verifyRequestId.current === requestId) setVerifying(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bankCode, accountNumber]);
 
   function startAdd() {
     setError('');
-    setSelectedBank(null);
-    setManualBank(false);
-    setManualBankName('');
-    setAccountName('');
+    setBankName('');
+    setBankCode('');
     setAccountNumber('');
-    setResolvedAccount(null);
-    setVerifiedByBackend(false);
-    setOtp('');
-    setStep('entry');
-    if (banks.length === 0) {
-      fetchBanks().catch((e) => setError(getErrorMessage(e, 'Could not load the bank list.')));
-    }
+    setVerifiedAccountName('');
+    setVerifyError('');
+    setStep('add');
   }
 
-  function handleManualEntry() {
-    setPickerVisible(false);
-    setSelectedBank(null);
-    setManualBank(true);
-  }
-
-  function handleSelectFromList() {
-    setManualBank(false);
-    setManualBankName('');
-  }
-
-  async function handleVerify() {
+  function startReset() {
     setError('');
-    if (!isValidBankAccountNumber(accountNumber)) {
-      setError('Enter a valid 10-digit account number.');
-      return;
-    }
-    if (!accountName.trim()) {
-      setError('Enter the name on the account.');
-      return;
-    }
+    setBankName('');
+    setBankCode('');
+    setAccountNumber('');
+    setVerifiedAccountName('');
+    setVerifyError('');
+    setOtp('');
+    setPassword('');
+    setOtpSent(false);
+    setStep('reset');
+  }
 
-    if (manualBank) {
-      if (!manualBankName.trim()) {
-        setError('Enter your bank name.');
-        return;
-      }
-      // No bank code to resolve against — this is the self-declared
-      // account, taken as-is straight into the confirm step.
-      setResolvedAccount({ accountNumber, bankCode: '', accountName: accountName.trim() });
-      setVerifiedByBackend(false);
-      setStep('confirm');
-      return;
-    }
+  function validateBankFields(): string | null {
+    if (!bankName.trim() || !bankCode.trim()) return 'Select your bank from the list.';
+    if (!isValidBankAccountNumber(accountNumber)) return 'Enter a valid 10-digit account number.';
+    if (verifying) return 'Please wait — verifying the account.';
+    if (!verifiedAccountName) return 'Could not verify this account. Check the bank and account number.';
+    return null;
+  }
 
-    if (!selectedBank) {
-      setError('Choose your bank.');
+  async function handleSave() {
+    setError('');
+    const validationError = validateBankFields();
+    if (validationError) {
+      setError(validationError);
       return;
     }
-    setResolving(true);
+    setSaving(true);
     try {
-      // If this ever succeeds, the bank's own record wins over what was typed.
-      const resolved = await resolveBankAccount(accountNumber, selectedBank.code);
-      setResolvedAccount(resolved);
-      setVerifiedByBackend(true);
-      setStep('confirm');
+      await setPayoutBankDetails(bankName.trim(), bankCode.trim(), accountNumber, verifiedAccountName);
+      setStep('view');
     } catch (e) {
-      // Right now this endpoint doesn't exist at all — that's not a real
-      // validation failure worth blocking on, so fall back to the typed
-      // name, same as the manual-bank path. A genuine future error (e.g. a
-      // real "invalid account number" once the endpoint exists) still stops
-      // here and shows normally, rather than silently getting bypassed.
-      const message = getErrorMessage(e, '');
-      if (message.includes("isn't available yet")) {
-        setResolvedAccount({ accountNumber, bankCode: selectedBank.code, accountName: accountName.trim() });
-        setVerifiedByBackend(false);
-        setStep('confirm');
-      } else {
-        setError(message || 'Could not verify that account.');
-      }
+      setError(getErrorMessage(e, 'Could not save your payout account.'));
     } finally {
-      setResolving(false);
+      setSaving(false);
     }
   }
 
   async function handleSendOtp() {
-    if (!resolvedAccount || !bankName) return;
     setError('');
     setSendingOtp(true);
     try {
-      await sendBankVerificationOtp({ ...resolvedAccount, bankName });
-      setOtp('');
-      setStep('otp');
+      await sendWalletSecurityOtp();
+      setOtpSent(true);
     } catch (e) {
       setError(getErrorMessage(e, 'Could not send a verification code.'));
     } finally {
@@ -300,21 +335,29 @@ function BankAccountCard() {
     }
   }
 
-  async function handleConfirmOtp() {
-    if (!resolvedAccount || !bankName) return;
+  async function handleConfirmReset() {
     setError('');
-    if (!isValidOtp(otp)) {
-      setError('Enter the code you received.');
+    if (!otp.trim()) {
+      setError('Enter the code we sent you.');
       return;
     }
-    setConfirmingOtp(true);
+    if (!password.trim()) {
+      setError('Enter your login password to confirm this change.');
+      return;
+    }
+    const validationError = validateBankFields();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setSaving(true);
     try {
-      await confirmBankVerificationOtp(otp, { ...resolvedAccount, bankName });
-      resetFlow();
+      await resetPayoutBankDetails(otp.trim(), password, bankName.trim(), bankCode.trim(), accountNumber, verifiedAccountName);
+      setStep('view');
     } catch (e) {
-      setError(getErrorMessage(e, 'Could not confirm that code.'));
+      setError(getErrorMessage(e, 'Could not update your payout account.'));
     } finally {
-      setConfirmingOtp(false);
+      setSaving(false);
     }
   }
 
@@ -323,7 +366,7 @@ function BankAccountCard() {
       <View style={styles.bankCardHeader}>
         <Text style={styles.sectionTitle}>Payout account</Text>
         {step === 'view' && !!linkedBankAccount && (
-          <Text style={styles.changeLink} onPress={startAdd}>
+          <Text style={styles.changeLink} onPress={startReset}>
             Change
           </Text>
         )}
@@ -340,38 +383,14 @@ function BankAccountCard() {
           </>
         ) : (
           <>
-            <Text style={styles.bankPlaceholder}>
-              Add a bank account to withdraw to — we'll verify it belongs to you with a one-time code before saving it.
-            </Text>
+            <Text style={styles.bankPlaceholder}>Add a bank account to withdraw to.</Text>
             <Button title="Add Bank Account" size="sm" onPress={startAdd} style={{ marginTop: spacing.md }} />
           </>
         ))}
 
-      {step === 'entry' && (
+      {step === 'add' && (
         <View>
-          <Text style={styles.stepHint}>Step 1 of 3 · Enter your account details</Text>
-
-          {manualBank ? (
-            <>
-              <Input
-                value={manualBankName}
-                onChangeText={setManualBankName}
-                placeholder="Bank name"
-                autoCapitalize="words"
-              />
-              <Text style={styles.manualLink} onPress={handleSelectFromList}>
-                Select from list instead
-              </Text>
-            </>
-          ) : (
-            <TouchableOpacity style={styles.bankSelect} onPress={() => setPickerVisible(true)}>
-              <Text style={selectedBank ? styles.bankSelectText : styles.bankSelectPlaceholder}>
-                {selectedBank ? selectedBank.name : 'Select your bank'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-
+          <BankSelectField value={bankName} onPress={() => setBankPickerOpen(true)} />
           <Input
             value={accountNumber}
             onChangeText={(t) => setAccountNumber(t.replace(/[^0-9]/g, '').slice(0, 10))}
@@ -379,88 +398,146 @@ function BankAccountCard() {
             placeholder="10-digit account number"
             style={{ marginTop: spacing.sm }}
           />
-
-          <Input
-            value={accountName}
-            onChangeText={setAccountName}
-            placeholder="Name on the account"
-            autoCapitalize="words"
-            style={{ marginTop: spacing.sm }}
-          />
-
+          <AccountVerificationStatus verifying={verifying} verifiedName={verifiedAccountName} error={verifyError} />
           {!!error && <FormError message={error} />}
           <View style={styles.stepActions}>
-            <Button title="Cancel" variant="ghost" size="sm" onPress={resetFlow} />
-            <Button title="Verify Account" size="sm" loading={resolving} onPress={handleVerify} />
+            <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
+            <Button
+              title="Save Payout Details"
+              size="sm"
+              loading={saving}
+              disabled={!verifiedAccountName}
+              onPress={handleSave}
+            />
           </View>
         </View>
       )}
 
-      {step === 'confirm' && resolvedAccount && (
+      {step === 'reset' && !otpSent && (
         <View>
-          <Text style={styles.stepHint}>Step 2 of 3 · Confirm this is your account</Text>
-          <View style={[styles.resolvedBox, { backgroundColor: verifiedByBackend ? colors.successTint : colors.warningTint }]}>
-            <Ionicons
-              name={verifiedByBackend ? 'checkmark-circle' : 'alert-circle'}
-              size={20}
-              color={verifiedByBackend ? colors.success : colors.warning}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.resolvedName}>{resolvedAccount.accountName}</Text>
-              <Text style={styles.resolvedMeta}>
-                {bankName} · {resolvedAccount.accountNumber}
-              </Text>
-            </View>
-          </View>
-          {!verifiedByBackend && (
-            <Text style={styles.manualWarning}>
-              We couldn't automatically verify this account — double-check the details are correct before continuing.
-            </Text>
-          )}
+          <Text style={styles.bankPlaceholder}>
+            Changing your payout account needs a verification code sent to your phone, plus your login password.
+          </Text>
           {!!error && <FormError message={error} />}
           <View style={styles.stepActions}>
-            <Button title="Not me — Start over" variant="ghost" size="sm" onPress={resetFlow} />
+            <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
             <Button title="Send Code" size="sm" loading={sendingOtp} onPress={handleSendOtp} />
           </View>
         </View>
       )}
 
-      {step === 'otp' && resolvedAccount && (
+      {step === 'reset' && otpSent && (
         <View>
-          <Text style={styles.stepHint}>Step 3 of 3 · Enter the code we sent you</Text>
-          <Text style={styles.bankPlaceholder}>
-            We sent a one-time code to confirm {resolvedAccount.accountName} is your account.
-          </Text>
           <Input
             value={otp}
             onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
             keyboardType="number-pad"
-            placeholder="Enter code"
+            placeholder="Verification code"
+          />
+          <Input
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Your login password"
+            secureTextEntry
             style={{ marginTop: spacing.sm }}
           />
+          <BankSelectField value={bankName} onPress={() => setBankPickerOpen(true)} placeholder="New bank" style={{ marginTop: spacing.sm }} />
+          <Input
+            value={accountNumber}
+            onChangeText={(t) => setAccountNumber(t.replace(/[^0-9]/g, '').slice(0, 10))}
+            keyboardType="number-pad"
+            placeholder="New 10-digit account number"
+            style={{ marginTop: spacing.sm }}
+          />
+          <AccountVerificationStatus verifying={verifying} verifiedName={verifiedAccountName} error={verifyError} />
           {!!error && <FormError message={error} />}
           <Text style={styles.resendLink} onPress={handleSendOtp}>
             Resend code
           </Text>
           <View style={styles.stepActions}>
-            <Button title="Cancel" variant="ghost" size="sm" onPress={resetFlow} />
-            <Button title="Confirm" size="sm" loading={confirmingOtp} onPress={handleConfirmOtp} />
+            <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
+            <Button
+              title="Confirm Change"
+              size="sm"
+              loading={saving}
+              disabled={!verifiedAccountName}
+              onPress={handleConfirmReset}
+            />
           </View>
         </View>
       )}
 
       <BankPickerModal
-        visible={pickerVisible}
-        banks={banks}
+        visible={bankPickerOpen}
+        onClose={() => setBankPickerOpen(false)}
         onSelect={(bank) => {
-          setSelectedBank(bank);
-          setPickerVisible(false);
+          setBankName(bank.name);
+          setBankCode(bank.code);
+          setBankPickerOpen(false);
         }}
-        onClose={() => setPickerVisible(false)}
-        onManualEntry={handleManualEntry}
       />
     </Card>
   );
+}
+
+function BankSelectField({
+  value,
+  onPress,
+  placeholder = 'Bank name',
+  style,
+}: {
+  value: string;
+  onPress: () => void;
+  placeholder?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={[styles.bankSelectField, style]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={value ? styles.bankSelectValue : styles.bankSelectPlaceholder}>{value || placeholder}</Text>
+      <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * Shows the live result of the AA account-name lookup below the account
+ * number field — verifying spinner, the resolved (read-only) name once
+ * found, or an error. Nothing is shown until a bank + valid account number
+ * are both entered, since that's when the lookup actually fires.
+ */
+function AccountVerificationStatus({ verifying, verifiedName, error }: { verifying: boolean; verifiedName: string; error: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  if (verifying) {
+    return (
+      <View style={[styles.verifyBox, { marginTop: spacing.sm }]}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={styles.verifyingText}>Verifying account…</Text>
+      </View>
+    );
+  }
+  if (verifiedName) {
+    return (
+      <View style={[styles.verifyBox, styles.verifyBoxSuccess, { marginTop: spacing.sm }]}>
+        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+        <Text style={styles.verifiedNameText} numberOfLines={1}>
+          {verifiedName}
+        </Text>
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <View style={[styles.verifyBox, styles.verifyBoxError, { marginTop: spacing.sm }]}>
+        <Ionicons name="alert-circle" size={16} color={colors.danger} />
+        <Text style={styles.verifyErrorText}>{error}</Text>
+      </View>
+    );
+  }
+  return null;
 }
 
 function BankDetailRow({ label, value }: { label: string; value: string }) {
@@ -516,6 +593,7 @@ function createStyles(colors: Colors) {
     bankCard: { marginTop: spacing.lg },
     bankCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     changeLink: { ...typography.small, color: colors.primary, fontWeight: '700' },
+    resendLink: { ...typography.small, color: colors.primary, fontWeight: '700', marginTop: spacing.sm, alignSelf: 'flex-end' },
     bankPlaceholder: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
     bankRow: {
       flexDirection: 'row',
@@ -527,32 +605,33 @@ function createStyles(colors: Colors) {
     },
     bankRowLabel: { ...typography.small, color: colors.textMuted },
     bankRowValue: { ...typography.small, color: colors.text, fontWeight: '600' },
-    stepHint: { ...typography.tiny, color: colors.textDim, fontWeight: '700', letterSpacing: 0.3, marginBottom: spacing.sm },
-    bankSelect: {
+    bankSelectField: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      borderRadius: radius.md,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceAlt,
       borderWidth: 1.5,
       borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
       paddingHorizontal: spacing.md,
       height: 50,
     },
-    bankSelectText: { ...typography.body, color: colors.text },
+    bankSelectValue: { ...typography.body, color: colors.text },
     bankSelectPlaceholder: { ...typography.body, color: colors.textDim },
-    resolvedBox: {
+    verifyBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      gap: spacing.xs,
       borderRadius: radius.md,
-      padding: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.surfaceAlt,
     },
-    resolvedName: { ...typography.body, color: colors.text, fontWeight: '700' },
-    resolvedMeta: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-    manualLink: { ...typography.small, color: colors.primary, fontWeight: '700', marginTop: spacing.sm },
-    manualWarning: { ...typography.tiny, color: colors.warning, lineHeight: 15, marginTop: spacing.sm },
-    resendLink: { ...typography.small, color: colors.primary, fontWeight: '700', marginTop: spacing.sm, alignSelf: 'flex-end' },
+    verifyingText: { ...typography.small, color: colors.textMuted },
+    verifyBoxSuccess: { backgroundColor: colors.successTint },
+    verifiedNameText: { ...typography.small, color: colors.success, fontWeight: '700', flex: 1, flexShrink: 1 },
+    verifyBoxError: { backgroundColor: colors.dangerTint },
+    verifyErrorText: { ...typography.small, color: colors.danger, flex: 1, flexShrink: 1 },
     stepActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
     formCard: { marginTop: spacing.lg },
     availableRow: {

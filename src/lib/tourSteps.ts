@@ -1,54 +1,50 @@
-import { MainTabParamList } from '../navigation/types';
+import { Ionicons } from '@expo/vector-icons';
 
 export interface TourStep {
-  /** Must match a <TourTarget id="..."> mounted somewhere on `tab`. */
-  id: string;
-  tab: keyof MainTabParamList;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   body: string;
 }
 
 export const TOUR_STEPS: TourStep[] = [
   {
-    id: 'home-balance',
-    tab: 'Home',
+    icon: 'wallet-outline',
     title: 'Your balance',
-    body: "This card shows your wallet balance and today's profit at a glance.",
+    body: "Your wallet balance and today's profit are always right there on the Home tab.",
   },
   {
-    id: 'home-bell',
-    tab: 'Home',
+    icon: 'notifications-outline',
     title: 'News & alerts',
-    body: 'Tap here anytime to see the latest news and alerts on your account.',
+    body: 'Tap the bell on Home anytime to see the latest news and alerts on your account.',
   },
   {
-    id: 'rounds-list',
-    tab: 'Rounds',
+    icon: 'calendar-outline',
     title: "Today's rounds",
-    body: "Every round for today lives here — see what's open, settled, or still waiting on a result.",
+    body: "Every round for today lives on the Rounds tab — see what's open, settled, or still waiting on a result.",
   },
   {
-    id: 'predict-autoplay',
-    tab: 'Predict',
-    title: 'Auto Play',
-    body: 'Turn this on and the server plays every round for you automatically — even while the app is closed.',
-  },
-  {
-    id: 'predict-rounds',
-    tab: 'Predict',
+    icon: 'stats-chart-outline',
     title: 'Pick a stock',
     body: 'Pick a number 1-5 for any round still open today. The closer your pick is to the average when it settles, the bigger the gain.',
   },
   {
-    id: 'wallet-actions',
-    tab: 'Wallet',
-    title: 'Deposit & withdraw',
-    body: 'Add funds or request a withdrawal here — your full transaction history is right below.',
+    icon: 'flash-outline',
+    title: 'Auto Play',
+    body: "Set a figure and flip on Auto Play in a round's corner to have it submit for you automatically, right before that round closes — just keep the app open so it can fire.",
   },
   {
-    id: 'profile-support',
-    tab: 'Profile',
+    icon: 'swap-horizontal-outline',
+    title: 'Deposit & withdraw',
+    body: 'Add funds or request a withdrawal from the Wallet tab — your full transaction history is right below.',
+  },
+  {
+    icon: 'people-outline',
+    title: 'Invite & earn',
+    body: 'Invite friends from your contacts and earn reward credits when they join and play.',
+  },
+  {
+    icon: 'help-circle-outline',
     title: 'Need help?',
-    body: 'Reach out to us directly from here anytime you have a question.',
+    body: 'Reach out to us directly from your Profile tab anytime you have a question.',
   },
 ];

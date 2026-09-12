@@ -1,31 +1,34 @@
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
-import { Bank } from '../types';
+import { Bank, NIGERIA_BANKS } from '../lib/banks';
 
-interface BankPickerModalProps {
+export function BankPickerModal({
+  visible,
+  onClose,
+  onSelect,
+}: {
   visible: boolean;
-  banks: Bank[];
-  onSelect: (bank: Bank) => void;
   onClose: () => void;
-  /** Bundled list can't cover every microfinance/fintech bank — lets the caller fall back to manual entry. */
-  onManualEntry: () => void;
-}
-
-// Nigeria has dozens of NIP-enabled banks (commercial + microfinance/
-// fintech) — a plain scrollable list gets unwieldy fast, so this filters
-// as you type instead.
-export function BankPickerModal({ visible, banks, onSelect, onClose, onManualEntry }: BankPickerModalProps) {
+  onSelect: (bank: Bank) => void;
+}) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
-  const filtered = useMemo(() => {
+  const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return banks;
-    return banks.filter((b) => b.name.toLowerCase().includes(q));
-  }, [banks, query]);
+    if (!q) return NIGERIA_BANKS;
+    return NIGERIA_BANKS.filter((b) => b.name.toLowerCase().includes(q));
+  }, [query]);
+
+  function handleSelect(bank: Bank) {
+    setQuery('');
+    onSelect(bank);
+  }
 
   function handleClose() {
     setQuery('');
@@ -33,55 +36,41 @@ export function BankPickerModal({ visible, banks, onSelect, onClose, onManualEnt
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={handleClose}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Select your bank</Text>
-            <TouchableOpacity onPress={handleClose} hitSlop={12}>
-              <Ionicons name="close" size={22} color={colors.text} />
+        <View style={[styles.sheet, { paddingBottom: spacing.lg + insets.bottom }]}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Select Your Bank</Text>
+            <TouchableOpacity onPress={handleClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
+
           <View style={styles.searchRow}>
-            <Ionicons name="search-outline" size={16} color={colors.textDim} />
+            <Ionicons name="search" size={18} color={colors.textMuted} />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search banks"
+              placeholder="Search banks…"
               placeholderTextColor={colors.textDim}
               style={styles.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
             />
           </View>
+
           <FlatList
-            data={filtered}
+            data={results}
             keyExtractor={(b) => b.code}
             keyboardShouldPersistTaps="handled"
+            style={styles.list}
+            ListEmptyComponent={<Text style={styles.emptyText}>No banks match "{query}".</Text>}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => {
-                  setQuery('');
-                  onSelect(item);
-                }}
-              >
+              <TouchableOpacity style={styles.row} onPress={() => handleSelect(item)}>
                 <Text style={styles.rowText}>{item.name}</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
               </TouchableOpacity>
             )}
-            ListEmptyComponent={<Text style={styles.emptyText}>No banks match "{query}".</Text>}
-            ListFooterComponent={
-              <TouchableOpacity
-                style={styles.manualRow}
-                onPress={() => {
-                  setQuery('');
-                  onManualEntry();
-                }}
-              >
-                <Ionicons name="create-outline" size={18} color={colors.primary} />
-                <Text style={styles.manualRowText}>My bank isn't listed — enter it manually</Text>
-              </TouchableOpacity>
-            }
           />
         </View>
       </View>
@@ -96,44 +85,34 @@ function createStyles(colors: Colors) {
       backgroundColor: colors.surface,
       borderTopLeftRadius: radius.xl,
       borderTopRightRadius: radius.xl,
-      maxHeight: '70%',
-      paddingBottom: spacing.xl,
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
       padding: spacing.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      height: '80%',
     },
-    title: { ...typography.h3, color: colors.text },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    title: { ...typography.h2, color: colors.text },
     searchRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      marginHorizontal: spacing.lg,
-      marginTop: spacing.md,
-      marginBottom: spacing.xs,
-      paddingHorizontal: spacing.md,
-      height: 44,
-      borderRadius: radius.md,
+      backgroundColor: colors.surfaceAlt,
       borderWidth: 1.5,
       borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      height: 46,
+      marginTop: spacing.md,
     },
-    searchInput: { ...typography.body, color: colors.text, flex: 1, height: '100%' },
-    row: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-    rowText: { ...typography.body, color: colors.text },
-    emptyText: { ...typography.small, color: colors.textMuted, textAlign: 'center', padding: spacing.xl },
-    manualRow: {
+    searchInput: { flex: 1, color: colors.text, fontSize: typography.body.fontSize },
+    list: { marginTop: spacing.sm },
+    row: {
       flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      gap: spacing.sm,
       paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      marginTop: spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
-    manualRowText: { ...typography.small, color: colors.primary, fontWeight: '700', flex: 1 },
+    rowText: { ...typography.body, color: colors.text },
+    emptyText: { ...typography.small, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
   });
 }

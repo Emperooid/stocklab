@@ -1,56 +1,47 @@
 import { create } from 'zustand';
-import { Bank, LinkedBankAccount, ResolvedBankAccount, WalletTransaction, WithdrawalHistoryEntry } from '../types';
+import { LinkedBankAccount, VirtualAccount, WalletPeriodTotals, WalletTransaction, WithdrawalHistoryEntry } from '../types';
 import { api } from '../api';
-import { useAuthStore } from './authStore';
-import { NIGERIAN_BANKS } from '../lib/banks';
 
-interface PendingDeposit {
-  amount: number;
-  balanceBefore: number;
-  startedAt: number;
-  /** The gateway's own transactionReference (not our client-generated cref) — needed to requery this specific deposit. */
-  reference: string;
-}
+const EMPTY_TOTALS: WalletPeriodTotals = { deposits: 0, withdrawals: 0, gains: 0, plays: 0 };
 
 interface WalletState {
   balance: number;
   totalProfit: number;
   totalProfitPercent: number;
   transactions: WalletTransaction[];
-  banks: Bank[];
   isLoading: boolean;
-  // Deposits are credited by a server-side webhook with no client-side
-  // confirm/verify call available (see createDepositReference) — this is
-  // purely a UI cue so "why hasn't my balance changed yet" doesn't look like
-  // the app silently ate the deposit while the webhook is still catching up.
-  pendingDeposit: PendingDeposit | null;
   refresh: () => Promise<void>;
-  createDepositReference: (amount: number) => Promise<{ redirectUrl: string; reference: string }>;
-  startPendingDeposit: (amount: number, reference: string) => void;
-  dismissPendingDeposit: () => void;
-  /** Best-effort — nudges the gateway->PayHook crediting flow instead of only passively waiting for G25 to reflect it. Never throws. */
-  requeryPendingDeposit: () => Promise<void>;
-  /**
-   * Manual fallback for a deposit that never reflected — the user pastes a
-   * reference (from the confirmation email the gateway sends) and this
-   * requeries it directly, independent of whatever this session happens to
-   * be tracking in pendingDeposit (the app may have been closed/reopened
-   * since the deposit was made). Compares balance before/after to report
-   * whether it actually credited, rather than just relaying GR's own
-   * message, which doesn't clearly say "credited" vs "not yet" in plain terms.
-   */
-  verifyDepositByReference: (reference: string) => Promise<{ credited: boolean; message?: string }>;
-  fetchBanks: () => Promise<void>;
-  resolveBankAccount: (accountNumber: string, bankCode: string) => Promise<ResolvedBankAccount>;
-  /** Step 1 of linking/changing a payout account — sends a one-time code to confirm the resolved account belongs to the user. */
-  sendBankVerificationOtp: (account: ResolvedBankAccount & { bankName: string }) => Promise<void>;
-  /** Step 2 — submits the code; on success, saves and reflects the new account in linkedBankAccount. */
-  confirmBankVerificationOtp: (otp: string, account: ResolvedBankAccount & { bankName: string }) => Promise<void>;
+  /** Today's exact D/W/G/P totals (G15C) — replaces the backend's dead PercentGained/PercentLoss fields per Mr Yemi's direction. */
+  dailyTotals: WalletPeriodTotals;
+  /** This month's exact D/W/G/P totals (G15B). */
+  monthlyTotals: WalletPeriodTotals;
+  totalsLoading: boolean;
+  fetchTotals: () => Promise<void>;
   linkedBankAccount: LinkedBankAccount | null;
   fetchLinkedBankAccount: () => Promise<void>;
+  /** Resolves the real account holder's name (AAA) from a bank + account number — replaces letting the user type their own account name. */
+  verifyBankAccount: (bankCode: string, accountNumber: string) => Promise<{ accountName: string; bankName: string }>;
+  /** Sets the on-file payout account (PP) — can only succeed once per account; a rejected second call surfaces the server's own error message. */
+  setPayoutBankDetails: (bankName: string, bankCode: string, accountNumber: string, accountName: string) => Promise<void>;
+  /** Sends the OTP consumed by resetPayoutBankDetails and requestWithdrawal below (via G20 — see the httpApi.ts comment on the assumption this rests on). */
+  sendWalletSecurityOtp: () => Promise<void>;
+  /** Changes an already-set payout account (RBP) — requires the OTP just sent plus the user's real login password, both verified server-side. */
+  resetPayoutBankDetails: (
+    otp: string,
+    pinCode: string,
+    bankName: string,
+    bankCode: string,
+    accountNumber: string,
+    accountName: string
+  ) => Promise<void>;
+  virtualAccount: VirtualAccount | null;
+  virtualAccountLoading: boolean;
+  /** Reads the deposit virtual account (BB); generates one (VV) if the user doesn't have one yet. */
+  fetchVirtualAccount: () => Promise<void>;
   withdrawalHistory: WithdrawalHistoryEntry[];
   fetchWithdrawalHistory: () => Promise<void>;
-  requestWithdrawal: (amount: number) => Promise<void>;
+  /** Triggers an actual payout (IP) — requires the OTP just sent plus the user's real login password, same as resetPayoutBankDetails. */
+  requestWithdrawal: (amount: number, otp: string, pinCode: string) => Promise<void>;
 }
 
 export const useWalletStore = create<WalletState>((set, get) => ({
@@ -58,11 +49,25 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   totalProfit: 0,
   totalProfitPercent: 0,
   transactions: [],
-  banks: [],
   isLoading: false,
-  pendingDeposit: null,
   linkedBankAccount: null,
+  virtualAccount: null,
+  virtualAccountLoading: false,
   withdrawalHistory: [],
+  dailyTotals: EMPTY_TOTALS,
+  monthlyTotals: EMPTY_TOTALS,
+  totalsLoading: false,
+
+  fetchTotals: async () => {
+    set({ totalsLoading: true });
+    try {
+      const [dailyTotals, monthlyTotals] = await Promise.all([api.wallet.getDailyTotals(), api.wallet.getMonthlyTotals()]);
+      set({ dailyTotals, monthlyTotals, totalsLoading: false });
+    } catch (e) {
+      set({ totalsLoading: false });
+      throw e;
+    }
+  },
 
   refresh: async () => {
     set({ isLoading: true });
@@ -71,12 +76,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         api.wallet.getBalance(),
         api.wallet.getTransactions(),
       ]);
-      const pending = get().pendingDeposit;
-      // The webhook credit is the only signal we have that a pending deposit
-      // resolved — once the balance actually moves off what it was when the
-      // deposit started, treat it as settled and drop the banner.
-      const stillPending = pending && balance === pending.balanceBefore ? pending : null;
-      set({ balance, totalProfit, totalProfitPercent, transactions, isLoading: false, pendingDeposit: stillPending });
+      set({ balance, totalProfit, totalProfitPercent, transactions, isLoading: false });
     } catch (e) {
       // Keep the last known balance/transactions on a failed refresh rather
       // than wiping them to zero — a transient failure here used to look
@@ -86,62 +86,39 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
-  createDepositReference: async (amount) => {
-    return api.wallet.createDepositReference(amount, useAuthStore.getState().user?.email);
-  },
-
-  startPendingDeposit: (amount, reference) => {
-    set({ pendingDeposit: { amount, balanceBefore: get().balance, startedAt: Date.now(), reference } });
-  },
-
-  dismissPendingDeposit: () => set({ pendingDeposit: null }),
-
-  requeryPendingDeposit: async () => {
-    const reference = get().pendingDeposit?.reference;
-    if (!reference) return;
-    await api.wallet.requeryDeposit(reference).catch(() => {});
-  },
-
-  verifyDepositByReference: async (reference) => {
-    const balanceBefore = get().balance;
-    const result = await api.wallet.requeryDeposit(reference);
-    await get().refresh().catch(() => {});
-    const credited = get().balance !== balanceBefore;
-    return { credited, message: result.message };
-  },
-
-  /**
-   * Tries the backend first (in case a live "list banks" endpoint ever
-   * ships), but there's no real need to block the bank picker on that —
-   * NIBSS bank codes are effectively static, so a bundled client-side list
-   * (see lib/banks.ts) is a perfectly good fallback, not just a placeholder.
-   */
-  fetchBanks: async () => {
-    if (get().banks.length > 0) return;
-    try {
-      const banks = await api.wallet.getBanks();
-      set({ banks });
-    } catch {
-      set({ banks: NIGERIAN_BANKS });
-    }
-  },
-
-  resolveBankAccount: async (accountNumber, bankCode) => {
-    return api.wallet.resolveBankAccount(accountNumber, bankCode);
-  },
-
-  sendBankVerificationOtp: async (account) => {
-    await api.wallet.sendBankVerificationOtp(account);
-  },
-
-  confirmBankVerificationOtp: async (otp, account) => {
-    const linkedBankAccount = await api.wallet.confirmBankVerificationOtp(otp, account);
-    set({ linkedBankAccount });
-  },
-
   fetchLinkedBankAccount: async () => {
-    const linkedBankAccount = await api.wallet.getLinkedBankAccount();
+    const { payout } = await api.wallet.getBankProfile();
+    set({ linkedBankAccount: payout });
+  },
+
+  verifyBankAccount: async (bankCode, accountNumber) => {
+    return api.wallet.verifyBankAccount(bankCode, accountNumber);
+  },
+
+  setPayoutBankDetails: async (bankName, bankCode, accountNumber, accountName) => {
+    const linkedBankAccount = await api.wallet.setPayoutBankDetails(bankName, bankCode, accountNumber, accountName);
     set({ linkedBankAccount });
+  },
+
+  sendWalletSecurityOtp: async () => {
+    await api.wallet.sendWalletSecurityOtp();
+  },
+
+  resetPayoutBankDetails: async (otp, pinCode, bankName, bankCode, accountNumber, accountName) => {
+    const linkedBankAccount = await api.wallet.resetPayoutBankDetails(otp, pinCode, bankName, bankCode, accountNumber, accountName);
+    set({ linkedBankAccount });
+  },
+
+  fetchVirtualAccount: async () => {
+    set({ virtualAccountLoading: true });
+    try {
+      const { deposit } = await api.wallet.getBankProfile();
+      const virtualAccount = deposit ?? (await api.wallet.generateVirtualAccount());
+      set({ virtualAccount, virtualAccountLoading: false });
+    } catch (e) {
+      set({ virtualAccountLoading: false });
+      throw e;
+    }
   },
 
   fetchWithdrawalHistory: async () => {
@@ -149,8 +126,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     set({ withdrawalHistory });
   },
 
-  requestWithdrawal: async (amount) => {
-    await api.wallet.requestWithdrawal(amount);
+  requestWithdrawal: async (amount, otp, pinCode) => {
+    await api.wallet.requestWithdrawal(amount, otp, pinCode);
     await get().refresh();
     await get().fetchWithdrawalHistory();
   },

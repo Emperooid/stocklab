@@ -37,7 +37,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
     }),
     {
-      name: 'stocklab-settings',
+      name: 'crowdstock-settings',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

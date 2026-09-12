@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Linking, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Image, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from '@react-navigation/native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainStack } from './MainStack';
-import { TourOverlay } from '../components/TourOverlay';
+import { OnboardingCarousel } from '../components/OnboardingCarousel';
 import { AlertPopup } from '../components/AlertPopup';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
@@ -14,24 +14,7 @@ import { useAlertPopupStore } from '../store/alertPopupStore';
 import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { isBackendConfigured } from '../config/backend';
 import { navigationRef } from '../lib/navigationRef';
-
-/**
- * Actively requeries the deposit (GR — nudges the gateway->PayHook
- * crediting flow) then polls the balance a few times after returning from
- * checkout, rather than only passively waiting for the webhook to land on
- * its own (confirmed live: a completed deposit sometimes never reflects
- * without a requery — see requeryDeposit in httpApi.ts). Stops early once
- * walletStore's pendingDeposit clears, which it already does the moment
- * refresh() sees the balance actually move.
- */
-async function verifyDepositReturn() {
-  await useWalletStore.getState().requeryPendingDeposit();
-  for (let attempt = 0; attempt < 5; attempt++) {
-    await useWalletStore.getState().refresh().catch(() => {});
-    if (!useWalletStore.getState().pendingDeposit) return;
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-  }
-}
+import { useAutoPlayStore } from '../store/autoPlayStore';
 
 function buildNavTheme(colors: Colors, mode: 'light' | 'dark'): Theme {
   const base = mode === 'dark' ? DarkTheme : DefaultTheme;
@@ -60,35 +43,38 @@ export function RootNavigator() {
   useEffect(() => {
     if (hasHydrated && user) {
       refreshUser().catch(() => {});
+      // Loaded here (not just on Predict's own focus) so Home's Auto Play
+      // summary card has real data the moment the app opens, regardless of
+      // which tab the user lands on first. The backend now fully owns
+      // submitting/settling Auto Play rounds after A1 — the client no longer
+      // runs its own close-time engine, this is purely for display.
+      useAutoPlayStore.getState().loadFromServer().catch(() => {});
     }
   }, [hasHydrated]);
 
-  // Auto-start the guided tour once, for a user who's never seen it —
-  // guarded by a ref (not just hasCompletedTour) so a later refreshUser()
-  // re-render can't retrigger it while it's already running.
+  // Auto-start onboarding once, for a user who's never seen it — guarded by
+  // a ref (not just hasCompletedTour) so a later refreshUser() re-render
+  // can't retrigger it while it's already showing.
   const pendingPopupsCount = useAlertPopupStore((s) => s.pendingPopups.length);
   const tourAutoStarted = useRef(false);
   useEffect(() => {
     if (!hasHydrated || !user || tourAutoStarted.current) return;
     if (useTourStore.getState().hasCompletedTour) return;
     // Let any alert/news popup from this login get seen and dismissed first
-    // — stacking the tour's own full-screen overlay on top of it would bury it.
+    // — stacking the carousel's own full-screen modal on top of it would bury it.
     if (pendingPopupsCount > 0) return;
     tourAutoStarted.current = true;
-    // Give MainTabs/Home a moment to actually mount before the first step
-    // tries to measure its target.
     const timer = setTimeout(() => useTourStore.getState().startTour(), 600);
     return () => clearTimeout(timer);
   }, [hasHydrated, user, pendingPopupsCount]);
 
-  // Deposits/withdrawals complete on an external page opened via
-  // Linking.openURL (a hosted checkout, not an in-app WebView), so
-  // returning to the app is an app-foreground event, not a screen-focus
-  // event — whichever tab happened to be showing when the app was
-  // backgrounded never re-fires its own useFocusEffect refresh. CONFIRMED
-  // live: balance genuinely didn't update after a completed deposit until
-  // manually pulling to refresh. Refreshing on every foreground (not just
-  // right after a deposit) also covers a round settling while away.
+  // A virtual-account deposit lands via a bank transfer, not an in-app
+  // action, so the balance can change while the app is merely backgrounded
+  // — no screen-focus event fires for that. Refreshing on every foreground
+  // (not just after a specific action) covers both that and a round
+  // settling while away. CONFIRMED live (from the old checkout-based
+  // deposit flow, same underlying gap): balance genuinely didn't update
+  // until manually pulling to refresh without this.
   const appState = useRef(AppState.currentState);
   useEffect(() => {
     if (!user) return;
@@ -102,29 +88,10 @@ export function RootNavigator() {
     return () => subscription.remove();
   }, [user]);
 
-  // The deposit checkout's returnUrl points back here (stocklab://deposit-return)
-  // instead of stranding the user on the gateway's own page — see
-  // wallet.createDepositReference(). This fires more precisely than the
-  // AppState listener above (which only knows "the app came back", not why),
-  // so it can poll specifically for this deposit landing instead of relying
-  // on a single generic foreground check.
-  useEffect(() => {
-    if (!user) return;
-    function handleUrl({ url }: { url: string }) {
-      if (url.startsWith('stocklab://deposit-return')) {
-        verifyDepositReturn();
-      }
-    }
-    Linking.getInitialURL().then((url) => {
-      if (url) handleUrl({ url });
-    });
-    const subscription = Linking.addEventListener('url', handleUrl);
-    return () => subscription.remove();
-  }, [user]);
-
   if (!hasHydrated) {
     return (
       <View style={styles.splash}>
+        <Image source={require('../../assets/icon.png')} style={styles.splashLogo} resizeMode="contain" />
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -157,7 +124,7 @@ export function RootNavigator() {
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       {user ? <MainStack /> : <AuthNavigator />}
       {user && <AlertPopup />}
-      {user && <TourOverlay />}
+      {user && <OnboardingCarousel />}
     </NavigationContainer>
   );
 }
@@ -165,6 +132,7 @@ export function RootNavigator() {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     splash: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    splashLogo: { width: 96, height: 96, borderRadius: 22, marginBottom: spacing.xl },
     configTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
     configBody: { ...typography.small, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
   });

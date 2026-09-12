@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "StockLab",
+    "name": "CrowdStock",
     "slug": "stock",
     "version": "1.0.0",
-    "scheme": "stocklab",
+    "scheme": "crowdstock",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.streetfriendly.stocklab",
+      "bundleIdentifier": "com.streetfriendly.crowdstock",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.streetfriendly.stocklab",
+      "package": "com.streetfriendly.crowdstock",
       "adaptiveIcon": {
         "backgroundColor": "#080D15",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -33,12 +33,18 @@
         {
           "color": "#22C55E",
           "sounds": [
-            "./assets/stocklab_notification.wav"
+            "./assets/crowdstock_notification.wav"
           ]
         }
       ],
       "expo-font",
       "expo-secure-store",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow CrowdStock to access your contacts so you can invite them to join."
+        }
+      ],
       [
         "expo-splash-screen",
         {

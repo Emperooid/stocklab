@@ -6,14 +6,14 @@ import { slotSettleAt, slotSubmitAt } from './schedule';
 // Bumped each time the channel's sound/importance changes — Android locks
 // those in at creation and never lets an app change them for an existing
 // install, so a real sound swap needs a new channel id, not new options on
-// the old one. v2 shipped with the system default sound (no build ever went
-// out with it); v3 is the real bundled StockLab sound.
-const CHANNEL_ID = 'stocklab-rounds-v3';
+// the old one. v1 here is a fresh channel identity for the CrowdStock
+// rebrand (the prior stocklab-rounds-v3 channel is abandoned, not renamed).
+const CHANNEL_ID = 'crowdstock-rounds-v1';
 
 // Base filename only (no path) — must match an entry in app.json's
 // expo-notifications plugin `sounds` array (which takes the actual path,
-// ./assets/stocklab_notification.wav) for it to get bundled into the build.
-const NOTIFICATION_SOUND = 'stocklab_notification.wav';
+// ./assets/crowdstock_notification.wav) for it to get bundled into the build.
+const NOTIFICATION_SOUND = 'crowdstock_notification.wav';
 
 // How long before a round closes to nudge someone who hasn't played it yet.
 const CLOSING_SOON_LEAD_MS = 15 * 60 * 1000;

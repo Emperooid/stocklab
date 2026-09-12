@@ -8,6 +8,28 @@ export function isValidPhone(phone: string): boolean {
   return PHONE_RE.test(phone.trim());
 }
 
+/**
+ * Device contacts commonly come back as +234..., 234... (no +), or a bare
+ * 10-digit number missing the leading 0 — none of which match this app's
+ * canonical local format (isValidPhone above). Converts any of those into
+ * that canonical format, or returns null if the result still isn't a
+ * recognizable Nigerian mobile number (e.g. a landline, or a non-Nigerian
+ * contact) — callers should skip contacts this returns null for rather
+ * than sending an unnormalized number to the backend.
+ */
+export function normalizeLocalPhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  let local: string | null = null;
+  if (digits.length === 11 && digits.startsWith('0')) {
+    local = digits;
+  } else if (digits.length === 13 && digits.startsWith('234')) {
+    local = `0${digits.slice(3)}`;
+  } else if (digits.length === 10 && /^[789]/.test(digits)) {
+    local = `0${digits}`;
+  }
+  return local && isValidPhone(local) ? local : null;
+}
+
 // Not RFC 5322 — just enough to catch obvious mistakes and satisfy the
 // payment gateway's own format check (CONFIRMED live: it rejected a plain
 // phone number as femail with "The CustomerEmail field is not a valid

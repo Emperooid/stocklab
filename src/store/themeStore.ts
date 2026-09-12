@@ -18,7 +18,7 @@ export const useThemeStore = create<ThemeState>()(
       toggleMode: () => set({ mode: get().mode === 'dark' ? 'light' : 'dark' }),
     }),
     {
-      name: 'stocklab-theme',
+      name: 'crowdstock-theme',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

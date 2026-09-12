@@ -1,4 +1,4 @@
-import { Bank, DailyHistoryEntry, DailyRound, LinkedBankAccount, ResolvedBankAccount, SupportContact, User, WalletTransaction, WithdrawalHistoryEntry } from '../types';
+import { DailyHistoryEntry, DailyRound, InviteStats, LinkedBankAccount, SupportContact, User, VirtualAccount, WalletPeriodTotals, WalletTransaction, WithdrawalHistoryEntry } from '../types';
 import { ROUND_SLOTS, getSlotStatus, localDateKey } from '../lib/schedule';
 import { getDeviceId } from '../lib/deviceId';
 import { callGateway, getSession, setSession } from './backendClient';
@@ -22,15 +22,10 @@ import { callGateway, getSession, setSession } from './backendClient';
  *     re-login. Used by `auth.me()` below.
  *   - G25 (balance-only lookup): same request shape, lighter response
  *     {success, phone, balance}. Used by `wallet.getBalance()` below.
- *   - PAY (Pay_CreatePayment, key is literally "PAY"): takes
- *     cref/amount/description/cname/femail/cmobile. This is the deposit
- *     creation endpoint — "Pay" in the exemption list refers to this. Both
- *     request AND response CONFIRMED live (new payment gateway, not
- *     Paystack) — the response's `response` field is a JSON-encoded
- *     *string* containing `responseData.redirectUrl`, a hosted checkout
- *     page to open. Balance is credited server-side via webhook once
- *     payment completes — no client-side verify/confirm call exists or is
- *     needed. See createDepositReference() below.
+ *   - PAY (Pay_CreatePayment)/GR (deposit requery): the old card-checkout
+ *     deposit path — confirmed working while it existed, but deliberately
+ *     removed per product decision in favor of the virtual-account model
+ *     (VV/BB) being the only deposit method now. Not a gap, a removal.
  *   - G13/G14 (results/history): CONFIRMED field names from the API docs —
  *     {Id, Slot, Phone, StartBalance, PredValue, Average, StockValue,
  *     Datein, Timein, PValueGL, TotalFinalGain, TotalFinalLoss,
@@ -47,9 +42,12 @@ import { callGateway, getSession, setSession } from './backendClient';
  *
  * NOT SAFE TO SWITCH ON YET (see src/api/index.ts) — still open:
  *
- *   - Creating a *withdrawal*. PAY covers deposits; nothing documented
- *     covers paying a user out. G16 only ever shows withdrawal history.
- *   - Resolving a bank account name before a withdrawal, or listing banks.
+ *   - The OTP delivered via G20 (reused for RBP/IP below, since neither
+ *     came with its own matching "send OTP" endpoint) is UNCONFIRMED to
+ *     actually be what RBP/IP validate — needs a real live test.
+ *   - How a VV-generated virtual account's incoming transfer actually
+ *     credits the wallet balance — no webhook/requery equivalent to PAY's
+ *     is documented for it yet.
  *   - Real response shape for G11 (register) — still only known from the
  *     request side, not tested live yet.
  *   - TodayRound: per Mr Yemi, this is a computed/read-only stat (total of
@@ -69,6 +67,20 @@ function findSlot(roundId: string) {
 
 function notSupported(feature: string): never {
   throw new Error(`${feature} isn't available yet — no backend endpoint exists for it.`);
+}
+
+/**
+ * A real Nigerian bank account number (NUBAN) is always 10 digits. CONFIRMED
+ * live: when the backend's virtual-account provider call times out, BB/VV
+ * still return success:true but put literal error text ("ERROR", "TOKEN
+ * TIMEOUT", even a raw exception message) into these exact fields instead —
+ * this rejects anything that isn't a plausible account number before it's
+ * ever treated as real data, so that failure mode shows "not set up yet" in
+ * the UI instead of a crash dump.
+ */
+function isLikelyAccountNumber(value: unknown): boolean {
+  if (typeof value !== 'string' && typeof value !== 'number') return false;
+  return /^\d{10}$/.test(String(value));
 }
 
 /**
@@ -97,6 +109,8 @@ function parseProfitSummary(raw: any): {
   totalWithdrawn?: number;
   alertMessage?: string;
   newsMessage?: string;
+  appStoreUrl?: string;
+  playStoreUrl?: string;
 } {
   const summary = raw?.Profile ?? raw?.profile ?? {};
   const totalDeposited = parseCommaNumber(summary.AmountDeposited);
@@ -111,7 +125,15 @@ function parseProfitSummary(raw: any): {
   // response, so this may just be a genuine backend gap, not a parsing miss.
   const alertMessage = summary.alert || summary.Alert || raw?.alert || raw?.Alert || undefined;
   const newsMessage = summary.news || summary.News || raw?.news || raw?.News || undefined;
-  return { totalProfit, totalProfitPercent, totalDeposited, totalWithdrawn, alertMessage, newsMessage };
+  // CONFIRMED live on G22's top level (sibling to Profile, same place as
+  // alert/news): {appstore, playstore}. Currently just Mr Yemi's test
+  // placeholders (google.com/yahoo.com), not real store listings yet — the
+  // Invite screen uses these for its WhatsApp download link, so they'll
+  // start working for real the moment he sets the actual URLs, no client
+  // change needed.
+  const appStoreUrl = raw?.appstore || raw?.AppStore || undefined;
+  const playStoreUrl = raw?.playstore || raw?.PlayStore || undefined;
+  return { totalProfit, totalProfitPercent, totalDeposited, totalWithdrawn, alertMessage, newsMessage, appStoreUrl, playStoreUrl };
 }
 
 export const httpApi = {
@@ -354,6 +376,12 @@ export const httpApi = {
      * the likely names defensively and returns whatever's found; roundsStore
      * uses this to update the wallet balance immediately without waiting on
      * a separate G25 call, when it's present.
+     *
+     * This is a manual (user-tapped) submission only. Auto Play rounds no
+     * longer call G12 from the client at all — CONFIRMED per Mr Yemi
+     * (2026-09-08), calling A1 to enable Auto Play on a round is now the
+     * only client action needed; the backend sets a figure and settles the
+     * round itself on its own schedule. See autoPlayStore.ts.
      */
     async submitPrediction(roundId: string, value: number, amount: number): Promise<number | undefined> {
       const { phone } = requireSession();
@@ -369,32 +397,60 @@ export const httpApi = {
     },
 
     /**
-     * CONFIRMED with the backend dev: G26 (SetProfileAutoPlay) configures
-     * *and* enables/disables server-side Auto Play in one call — the server
-     * plays every round itself from then on (works even with the app
-     * closed), no client-side loop needed. `half_full` is "half" (12
-     * rounds/day) or "full" (24 rounds/day); there's no predfigure field —
-     * the server picks the number itself, matching how the Stock Value is
-     * also drawn automatically with no operator involved.
+     * CONFIRMED per Mr Yemi's A1/A2/UU doc: A2_GetAutoPlaybyPhone returns
+     * every round's Auto Play record in one call — {autoplay: [{Round,
+     * Status, Figure, ...}]}. Used to hydrate all 24 rounds' state at once
+     * (on Predict screen focus and once at app startup) rather than calling
+     * A3 (single-round lookup) 24 times.
+     *
+     * CONFIRMED live: this key requires PascalCase `Phone` — lowercase
+     * `phone` (which A1/UU already sent correctly, but this didn't) gets
+     * rejected with {"message":"Phone is required","success":false}. Same
+     * per-endpoint casing inconsistency already documented elsewhere in
+     * this file (e.g. G12 vs G26/A1) — the response field casing inside
+     * `records` below is still unconfirmed pending a real successful call.
      */
-    async setAutoPlayProfile(mode: 'half' | 'full', amountPerSlot: number, enabled: boolean): Promise<void> {
+    async getAutoPlayConfigs(): Promise<Record<number, { enabled: boolean; figure: number }>> {
       const { phone } = requireSession();
-      await callGateway('G26', {
+      const res = await callGateway<any>('A2', { Phone: phone });
+      const records = res?.autoplay ?? res?.Autoplay ?? [];
+      const configs: Record<number, { enabled: boolean; figure: number }> = {};
+      for (const record of records) {
+        const round = Number(record?.round ?? record?.Round);
+        if (Number.isNaN(round)) continue;
+        configs[round] = {
+          enabled: Number(record?.status ?? record?.Status) === 1,
+          figure: Number(record?.figure ?? record?.Figure ?? 3),
+        };
+      }
+      return configs;
+    },
+
+    /**
+     * CONFIRMED per the same doc: A1_SetAutoPlay sets one round's Auto Play
+     * config. Figure is only sent when enabling — per the documented rule,
+     * "When Status = 0 (OFF), Figure is not required and the existing
+     * Figure is not changed", so omitting it when disabling is correct, not
+     * an oversight.
+     */
+    async setAutoPlayConfig(round: number, enabled: boolean, figure?: number): Promise<void> {
+      const { phone } = requireSession();
+      await callGateway('A1', {
         Phone: phone,
-        half_full: mode,
-        amountperslot: amountPerSlot,
-        istatus: enabled ? 1 : 0,
+        Round: round,
+        Status: enabled ? 1 : 0,
+        ...(enabled ? { Figure: figure } : {}),
       });
     },
 
     /**
-     * CONFIRMED with the backend dev: G27 (SetAutoPlay) is a lighter-weight
-     * on/off toggle — flips Auto Play without resending mode/amount. Use
-     * this once a profile has already been set up via setAutoPlayProfile.
+     * CONFIRMED per the same doc: UU_Universal is a bulk on/off for every
+     * round belonging to this phone in one call — the master toggle above
+     * the per-round list. Doesn't touch each round's individual Figure.
      */
-    async setAutoPlayStatus(enabled: boolean): Promise<void> {
+    async setAllAutoPlay(enabled: boolean): Promise<void> {
       const { phone } = requireSession();
-      await callGateway('G27', { Phone: phone, istatus: enabled ? 1 : 0 });
+      await callGateway('UU', { Phone: phone, Status: enabled ? 1 : 0 });
     },
 
     /**
@@ -448,123 +504,222 @@ export const httpApi = {
       return { balance: Number(res?.balance ?? 0), totalProfit: 0, totalProfitPercent: 0 };
     },
     /**
-     * CONFIRMED live (full round-trip, per Mr Yemi) — the new payment
-     * gateway (not Paystack) works like this:
-     *   1. We call PAY with cref/amount/description/cname/femail/cmobile.
-     *      `cref` must be unique per attempt — we generate it client-side.
-     *   2. The response's `response` field is itself a JSON-encoded
-     *      *string* (not a nested object) — has to be JSON.parse()'d again.
-     *      Real example:
-     *        { status: true, httpStatus: 200,
-     *          response: '{"status":true,"responseData":{"transactionReference":"...","charge":780,"redirectUrl":"https://...","message":null,"responseCode":"00"}}',
-     *          request: '...' }
-     *   3. Open `responseData.redirectUrl` (a hosted checkout page) — no
-     *      WebView/SDK integration needed, a plain browser open is enough.
-     *   4. The backend verifies and credits the balance itself via a
-     *      webhook once payment completes — there's nothing for the client
-     *      to call afterward. The existing G25 balance refresh (on screen
-     *      focus) picks up the new balance once the webhook has landed.
+     * CONFIRMED per Mr Yemi's BB/PP/VV doc (BB_getBankAccountProfile):
+     * reads back both the inbound (deposit, i.e. virtual account) and
+     * outbound (payout) bank details in one call from gtblusers. Response
+     * field casing hasn't been confirmed live yet — probes the documented
+     * lowercase names with a PascalCase fallback, same defensive approach
+     * used everywhere else in this file for this backend's inconsistent casing.
+     *
+     * CONFIRMED live (via a manual Postman probe, not the app itself): when
+     * the backend's own call to its third-party virtual-account provider
+     * times out, it still returns success:true, but stuffs the failure
+     * itself into the data fields instead of a real account — a real
+     * response looked like {"inbankname":"TOKEN TIMEOUT",
+     * "inbankaccountno":"ERROR", "inaccountname":"System.Threading.Tasks.
+     * TaskCanceledException: ..."} (a raw .NET stack trace, no less). Never
+     * trust these fields at face value — isLikelyAccountNumber() below
+     * rejects anything that isn't a plausible 10-digit NUBAN before this
+     * is treated as a real account, so a future recurrence of this backend
+     * bug shows "not set up yet" instead of a crash dump in the deposit UI.
      */
-    async createDepositReference(amount: number, email?: string): Promise<{ redirectUrl: string; reference: string }> {
+    async getBankProfile(): Promise<{ deposit: VirtualAccount | null; payout: LinkedBankAccount | null }> {
       const { phone } = requireSession();
-      const cref = `dep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      // CONFIRMED live: the gateway validates femail as a real email address
-      // and rejects a plain phone number with "The CustomerEmail field is
-      // not a valid e-mail address." Registration now collects a real email
-      // (G11's `email` field) — use it when known. Accounts that registered
-      // before this (or a session that hasn't got it locally — see
-      // User.email) fall back to a synthesized address that at least
-      // passes format validation.
-      const femail = email?.trim() || `${phone.replace(/\D/g, '')}@stocklab.app`;
-
-      // CONFIRMED live: the gateway expects `amount` in kobo, not naira —
-      // a ₦10,000 deposit showed as "101.30" on the checkout page (₦100.00
-      // from 10000 kobo, plus the gateway's ₦1.30 fee), because we were
-      // sending the raw naira value unconverted. The old Paystack
-      // integration handled this correctly (`amount * 100`); that
-      // conversion was dropped when switching gateways.
-      //
-      // CONFIRMED live: the backend's own outgoing request to the gateway
-      // hardcodes `returnUrl: "https://www.shopy.com"` — after completing
-      // payment, the user gets stranded on that page with no way back into
-      // the app. We didn't send a returnUrl at all before, so there was
-      // nothing for the backend to use instead. Sending our app's own deep
-      // link here — NEEDS Mr Yemi to actually relay this value to the
-      // gateway's returnUrl instead of the hardcoded one for this to work;
-      // sending it alone doesn't guarantee he's reading it yet.
-      const returnUrl = `stocklab://deposit-return?ref=${encodeURIComponent(cref)}`;
-      const res = await callGateway<any>('PAY', {
-        cref,
-        amount: Math.round(amount * 100),
-        description: 'Wallet deposit',
-        cname: phone,
-        femail,
-        cmobile: phone,
-        returnUrl,
+      const res = await callGateway<any>('BB', { phone });
+      const inBank = res?.inbankname ?? res?.InBankName;
+      const inAcct = res?.inbankaccountno ?? res?.InBankAccountNo;
+      const inName = res?.inaccountname ?? res?.InAccountName;
+      const outBank = res?.outbankname ?? res?.OutBankName;
+      const outAcct = res?.outbankaccountno ?? res?.OutBankAccountNo;
+      const outName = res?.outaccountname ?? res?.OutAccountName;
+      return {
+        deposit: isLikelyAccountNumber(inAcct) ? { bankName: inBank ?? '', accountNumber: String(inAcct), accountName: inName ?? '' } : null,
+        payout: isLikelyAccountNumber(outAcct) ? { bankName: outBank ?? '', accountNumber: String(outAcct), fullName: outName ?? '' } : null,
+      };
+    },
+    /**
+     * CONFIRMED per the same doc (VV_generateVirtualAccount): idempotent —
+     * checks whether the user already has a virtual account, generates one
+     * only if missing. Safe to call every time the deposit UI needs it.
+     *
+     * Same third-party-timeout failure mode as getBankProfile above applies
+     * here too (this is the call that actually hit it live) — this is the
+     * primary creation path, so rather than silently returning garbage
+     * (which the deposit screen would then display as-is), an implausible
+     * account number throws a clean error instead, matching how every
+     * other real failure surfaces here.
+     */
+    async generateVirtualAccount(): Promise<VirtualAccount> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('VV', { phone });
+      const accountNumber = res?.inbankaccountno ?? res?.InBankAccountNo;
+      if (!isLikelyAccountNumber(accountNumber)) {
+        throw new Error('Could not create your deposit account right now. Please try again shortly.');
+      }
+      return {
+        bankName: res?.inbankname ?? res?.InBankName ?? '',
+        accountNumber: String(accountNumber),
+        accountName: res?.inaccountname ?? res?.InAccountName ?? '',
+      };
+    },
+    /**
+     * CONFIRMED shape per Mr Yemi's doc (theKey "AAA") — resolves the real
+     * account holder's name from just a bank + account number, third-party
+     * (VigiPay-style) name-enquiry underneath. Request: {bankCode,
+     * accNumber}. Response: {status, responseData: {accountName,
+     * accountNumber, bankName, bankCode}, message, responseCode}.
+     *
+     * Per the new product decision, this REPLACES letting the user type
+     * their own "name on the account" for PP/RBP — free-typed names could
+     * silently mismatch the real account holder, which is exactly the kind
+     * of mistake that sends a payout to the wrong place. Now the name is
+     * always the one the bank itself returns for that account number.
+     *
+     * Session requirement isn't stated in the doc. NOT defaulting to exempt
+     * this time — assuming exempt was wrong for both IP and RBP earlier this
+     * session (both came back with the generic "Login Again!" session
+     * rejection until real session headers were sent), so this leaves
+     * requiresSession at its default (true) instead of repeating that guess.
+     * callGateway's existing status===false handling already surfaces a
+     * failed lookup's message (e.g. wrong account/bank combination) as a
+     * clean BackendError, so no extra handling needed for that case here.
+     */
+    async verifyBankAccount(bankCode: string, accountNumber: string): Promise<{ accountName: string; bankName: string }> {
+      requireSession();
+      const res = await callGateway<any>('AAA', { bankCode, accNumber: accountNumber });
+      const data = res?.responseData;
+      if (!data?.accountName) {
+        throw new Error('Could not verify that account. Check the account number and bank.');
+      }
+      return {
+        accountName: data.accountName,
+        bankName: data.bankName ?? '',
+      };
+    },
+    /**
+     * CONFIRMED per the same doc (PP_SetPayOutBankDetails): can only be set
+     * once per account — exact rejection shape on a second call isn't
+     * confirmed live yet, but callGateway's existing success===false
+     * handling already surfaces the server's own message as a BackendError,
+     * so no extra handling is needed here.
+     *
+     * `bankCode` (the NIBSS institution code, from the bank picker) is
+     * CONFIRMED required — not by Mr Yemi's original doc, but live: RBP
+     * below rejected a call with the same outbank-name/OTP/PinCode shape with
+     * {"message": "BankCode is required", "success": false}.
+     *
+     * Sends BOTH `BankCode` and `outbankcode`, deliberately — CONFIRMED live
+     * that `BankCode` alone reaches PP correctly (visible verbatim in the
+     * request body in every device log) but PP silently never persists it
+     * (`outbankcode` always comes back null in its response, even on a
+     * success), while the exact same `BankCode` field DOES get saved
+     * correctly by RBP. That split strongly suggests PP's own handler reads
+     * a different field name than RBP's does — most likely `outbankcode`,
+     * matching the lowercase "out"-prefixed naming its three sibling fields
+     * already use here (outbankname/outbankaccountno/outaccountname), unlike
+     * RBP which happens to check `BankCode`. Sending both costs nothing and
+     * covers whichever one each endpoint's code actually reads.
+     */
+    async setPayoutBankDetails(bankName: string, bankCode: string, accountNumber: string, accountName: string): Promise<LinkedBankAccount> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('PP', {
+        phone,
+        outbankname: bankName,
+        BankCode: bankCode,
+        outbankcode: bankCode,
+        outbankaccountno: accountNumber,
+        outaccountname: accountName,
       });
-
-      let inner = res?.response;
-      if (typeof inner === 'string') {
-        try {
-          inner = JSON.parse(inner);
-        } catch {
-          throw new Error('PAY succeeded but its response could not be parsed. Please try again.');
-        }
-      }
-      const redirectUrl = inner?.responseData?.redirectUrl;
-      if (!redirectUrl) {
-        throw new Error('PAY succeeded but returned no checkout link. Please try again.');
-      }
-      return { redirectUrl, reference: inner?.responseData?.transactionReference ?? cref };
+      return {
+        bankName: res?.outbankname ?? res?.OutBankName ?? bankName,
+        accountNumber: String(res?.outbankaccountno ?? res?.OutBankAccountNo ?? accountNumber),
+        fullName: res?.outaccountname ?? res?.OutAccountName ?? accountName,
+      };
     },
     /**
-     * CONFIRMED live (via manual testing with Mr Yemi): GR re-triggers the
-     * gateway->PayHook crediting flow for a given transaction reference —
-     * takes {phone, refNo}. Useful because passively waiting for the
-     * balance to change (G25 polling) depends entirely on the webhook
-     * having already landed; actively requerying nudges it instead of just
-     * hoping. `reference` must be the gateway's own transactionReference
-     * from createDepositReference()'s return value, not our own `cref`.
+     * UNCONFIRMED assumption, not a documented endpoint for this purpose:
+     * neither RBP (reset payout bank details) nor IP (trigger a withdrawal)
+     * came with a matching "send the OTP these consume" endpoint. Reusing
+     * G20 (password-reset OTP) purely as a delivery mechanism for both —
+     * we never call G21 afterward, so no password actually changes; RBP/IP
+     * are what's expected to consume this code for their own, different
+     * purposes. If either validates against a separate OTP store than what
+     * G20 writes to, this fails cleanly with an "invalid OTP" error rather
+     * than doing anything wrong — but this genuinely needs confirming with
+     * him, not just trusting it works, for both call sites.
      */
-    async requeryDeposit(reference: string): Promise<{ success: boolean; message?: string }> {
+    async sendWalletSecurityOtp(): Promise<void> {
       const { phone } = requireSession();
-      const res = await callGateway<any>('GR', { phone, refNo: reference });
-      return { success: !!res?.success, message: res?.message };
-    },
-    async getBanks(): Promise<Bank[]> {
-      notSupported('Listing banks');
-    },
-    async resolveBankAccount(_accountNumber: string, _bankCode: string): Promise<ResolvedBankAccount> {
-      notSupported('Resolving a bank account name');
+      await callGateway('G20', { Phone: phone }, { requiresSession: false });
     },
     /**
-     * Step 1 of linking (or changing) a payout account: after the account
-     * number resolves to a real name, this sends a one-time code so the
-     * user can confirm the account actually belongs to them before it gets
-     * saved as their withdrawal destination. No confirmed endpoint yet.
+     * CONFIRMED shape per Mr Yemi (theKey "RBP"), for resetting/changing
+     * payout bank details already set once via PP — {Phone, OTP, PinCode,
+     * outbankname, outbankaccountno, outaccountname}.
+     *
+     * NOT session-exempt — CONFIRMED live the hard way: IP (below) was built
+     * with the same "PinCode is its own proof, trans_token is redundant"
+     * assumption and, called without session headers, came back
+     * {"IsValid": false, "Message": "Login Again!"} — this backend's generic
+     * central-auth-pipeline rejection, which callGateway treats as "the
+     * whole session is dead" and force-logs-out. So the assumption was
+     * simply wrong: OTP+PinCode is extra proof layered on top of the normal
+     * trans_token/refID/phone/deviceid session, not a replacement for it.
+     * Fixed here too on the same reasoning, even though this one hadn't
+     * been hit live yet — no reason to wait for it to fail the same way.
+     *
+     * CONFIRMED live: also requires `BankCode` (the NIBSS institution code)
+     * alongside outbankname — rejected with {"message": "BankCode is
+     * required", "success": false} without it, and CONFIRMED `BankCode` is
+     * what RBP actually persists (comes back correctly in its response,
+     * unlike PP — see setPayoutBankDetails' comment for that mismatch).
+     * Also sending `outbankcode` alongside it here anyway, purely as cheap
+     * insurance in case that ever changes; doesn't affect the confirmed-
+     * working `BankCode` behavior either way.
      */
-    async sendBankVerificationOtp(_account: ResolvedBankAccount & { bankName: string }): Promise<void> {
-      notSupported('Sending a bank account verification code');
+    async resetPayoutBankDetails(
+      otp: string,
+      pinCode: string,
+      bankName: string,
+      bankCode: string,
+      accountNumber: string,
+      accountName: string
+    ): Promise<LinkedBankAccount> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('RBP', {
+        Phone: phone,
+        OTP: otp,
+        PinCode: pinCode,
+        outbankname: bankName,
+        BankCode: bankCode,
+        outbankcode: bankCode,
+        outbankaccountno: accountNumber,
+        outaccountname: accountName,
+      });
+      return {
+        bankName: res?.outbankname ?? res?.OutBankName ?? bankName,
+        accountNumber: String(res?.outbankaccountno ?? res?.OutBankAccountNo ?? accountNumber),
+        fullName: res?.outaccountname ?? res?.OutAccountName ?? accountName,
+      };
     },
     /**
-     * Step 2: submits the code the user received along with the account
-     * details, confirming and saving it as the on-file payout account. No
-     * confirmed endpoint yet.
+     * CONFIRMED shape per Mr Yemi (theKey "IP"): {Phone, Amount, OTP,
+     * PinCode}. Withdrawal uses whatever bank account is already on file
+     * (set via PP/RBP above) — no bank/account picking at request time,
+     * "IP" only takes an amount plus the same OTP+password proof RBP uses.
+     *
+     * NOT session-exempt — CONFIRMED live: calling this without the normal
+     * trans_token/refID/phone/deviceid session headers returns
+     * {"IsValid": false, "Message": "Login Again!"}, which callGateway reads
+     * as "the login session is dead" and force-logs-out the whole app back
+     * to the sign-in screen. That's what was actually happening — not a real
+     * session expiry, just this call never sending the session proof it
+     * turns out to need. OTP+PinCode is on top of the normal session, not
+     * instead of it.
      */
-    async confirmBankVerificationOtp(_otp: string, _account: ResolvedBankAccount & { bankName: string }): Promise<LinkedBankAccount> {
-      notSupported('Confirming a bank account verification code');
-    },
-    /** No confirmed endpoint yet for the on-file payout account the withdrawal page displays. */
-    async getLinkedBankAccount(): Promise<LinkedBankAccount | null> {
-      notSupported('Looking up your payout bank account');
-    },
-    /**
-     * Withdrawal uses whatever bank account is on file (linked via the
-     * verify+OTP flow above) — no bank/account picking at request time. No
-     * confirmed endpoint yet for actually creating a withdrawal request.
-     */
-    async requestWithdrawal(_amount: number): Promise<void> {
-      notSupported('Requesting a withdrawal');
+    async requestWithdrawal(amount: number, otp: string, pinCode: string): Promise<void> {
+      const { phone } = requireSession();
+      await callGateway('IP', { Phone: phone, Amount: amount, OTP: otp, PinCode: pinCode });
     },
     /** No confirmed endpoint yet for the withdrawal history table (Date Requested/Balance Before/After/Open-Closed/Date Credited). */
     async getWithdrawalHistory(): Promise<WithdrawalHistoryEntry[]> {
@@ -573,14 +728,16 @@ export const httpApi = {
     /**
      * CONFIRMED shape (G15_ShowDepositsAND_Others, per Mr Yemi's docs):
      * request {Year, Month, Phone, Code}, Code one of D(eposit)/W(ithdrawal)/
-     * G(ain)/P(lay); response {success, Code, Balance, TotalAmountWithinMonth,
-     * Records}.
+     * G(ame)/P(lay); response {success, Code, Balance, TotalAmountWithinMonth,
+     * Records}. CONFIRMED per Mr Yemi (2026-09-08): Code "G" actually means
+     * `LabelID IN ('G','L','N')` — every game outcome (gain/loss/neutral),
+     * not gains only, despite the "G" letter suggesting otherwise.
      *
      * CONFIRMED live record shape (Records was empty until a server-side fix
      * — this is real data, not a guess):
      *   Deposit: {Id, Phone, Label:"DEPOSIT", LabelID:"D", Bank, Amount, Datein, Timein}
      *   Play:    {Id, Phone, Label:"<slot index>", LabelID:"P", Bank, Amount (negative), Datein, Timein}
-     * Withdrawal/Gain records not seen populated yet (no withdrawals exist;
+     * Withdrawal/Game records not seen populated yet (no withdrawals exist;
      * settlement math isn't computing real gains yet) — mapped the same way
      * defensively, on the assumption they share this shape.
      */
@@ -596,6 +753,123 @@ export const httpApi = {
       const allRecords = responses.flatMap((res) => (Array.isArray(res?.Records) ? res.Records : []));
       const transactions = allRecords.map(mapTransaction).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return transactions;
+    },
+    /**
+     * CONFIRMED shape (G15B_ShowTotalsByMonth, per Mr Yemi 2026-09-08):
+     * request {Year, Month, Phone} -> {success, Year, Month, Phone, D, W, G, P}
+     * — pre-summed monthly totals per category, sparing a client-side sum
+     * over getTransactions()'s full record list. D/W/G mean the same thing
+     * as G15's codes (G = every game outcome, not gains only); P (Play) is
+     * returned as an absolute value per his doc, even though individual G15
+     * play records are negative amounts.
+     *
+     * Replaces the backend's PercentGained/PercentLoss fields (G22/G24),
+     * which are confirmed-dead placeholders (always "0.00%") — per Mr
+     * Yemi's new direction, show these as exact totals instead, with any
+     * percentage derived client-side from Plays vs. Gains (see
+     * computeGainPercent below), not trusted from the backend.
+     */
+    async getMonthlyTotals(year?: number, month?: number): Promise<WalletPeriodTotals> {
+      const { phone } = requireSession();
+      const now = new Date();
+      const yearStr = String(year ?? now.getFullYear());
+      const monthStr = String((month ?? now.getMonth()) + 1).padStart(2, '0');
+      const res = await callGateway<any>('G15B', { Year: yearStr, Month: monthStr, Phone: phone });
+      return {
+        deposits: parseCommaNumber(res?.D) ?? 0,
+        withdrawals: parseCommaNumber(res?.W) ?? 0,
+        gains: parseCommaNumber(res?.G) ?? 0,
+        plays: parseCommaNumber(res?.P) ?? 0,
+      };
+    },
+    /**
+     * CONFIRMED shape (G15C_ShowTotalsByToday, per Mr Yemi 2026-09-08):
+     * request {Phone} -> {success, Date, Phone, D, W, G, P} — same fields as
+     * G15B, scoped to today instead of a calendar month.
+     */
+    async getDailyTotals(): Promise<WalletPeriodTotals> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('G15C', { Phone: phone });
+      return {
+        deposits: parseCommaNumber(res?.D) ?? 0,
+        withdrawals: parseCommaNumber(res?.W) ?? 0,
+        gains: parseCommaNumber(res?.G) ?? 0,
+        plays: parseCommaNumber(res?.P) ?? 0,
+      };
+    },
+  },
+
+  invite: {
+    /**
+     * CONFIRMED per Mr Yemi's B1/B2/B3 doc (B3_GetCountInvited): returns
+     * this user's referral stats in one call. Response field casing not
+     * confirmed live yet — probes the documented PascalCase with a
+     * lowercase fallback, same defensive approach as every other endpoint
+     * here.
+     *
+     * CONFIRMED live: the request param requires PascalCase `Phone` —
+     * lowercase `phone` gets rejected with {"message":"Phone is
+     * required","success":false}, same as A2 (see getAutoPlayConfigs).
+     */
+    async getStats(): Promise<InviteStats> {
+      const { phone } = requireSession();
+      const res = await callGateway<any>('B3', { Phone: phone });
+      return {
+        numberInvited: Number(res?.NumberInvited ?? res?.numberinvited ?? 0),
+        successfulConversions: Number(res?.SuccessfulConversions ?? res?.successfulconversions ?? 0),
+        credits: Number(res?.Credits ?? res?.credits ?? 0),
+        payout: Number(res?.Payout ?? res?.payout ?? 0),
+      };
+    },
+    /**
+     * CONFIRMED per the same doc (B2_IsRegisteredUser): `Phone` here is the
+     * number being checked (a contact), not the caller's own — used to
+     * decide whether a contact shows a "already joined" badge or an invite
+     * button. Return field name isn't given in the doc beyond "whether the
+     * phone is a registered user" — probes likely names defensively.
+     * Deliberately does NOT fall back to `success`: that only reflects
+     * whether the call itself worked, not the registration result, and
+     * using it here would read as "everyone is registered."
+     *
+     * CORRECTED (an earlier version of this comment claimed lowercase
+     * `phone` worked here — that was wrong, confirmed live by directly
+     * comparing both casings side by side): lowercase `phone` gets B2 to
+     * fail with the generic {"IsValid":false,"Message":"Login Again!"}
+     * central-auth-pipeline rejection for EVERY number, registered or not
+     * — the backend never sees a phone to check at all. `Phone` (PascalCase,
+     * matching B1/B3) is required. That earlier claim was itself built on a
+     * coincidence, same as the bare-boolean fix below's own history.
+     *
+     * The response isn't always an object — it can be a bare boolean
+     * (`<- B2 false`) for a real, previously-seen number. For a number the
+     * system has never seen at all, it instead returns
+     * {"IsValid":false,"Message":"Incoherent Data : Unauthorized Access -2"}
+     * — the SAME shape used for actual session death elsewhere, but this has
+     * nothing to do with the caller's own session (checking a contact's
+     * number is a normal, frequent Invite-screen action, not an auth event).
+     * `ignoreIsValidFalse` stops that from force-logging out anyone who
+     * opens Invite; the catch below then treats "couldn't confirm" the same
+     * as "not registered" — both get the same UI treatment (show Invite,
+     * not a joined badge), so there's nothing meaningful to distinguish here.
+     */
+    async isRegistered(phoneToCheck: string): Promise<boolean> {
+      try {
+        const res = await callGateway<any>('B2', { Phone: phoneToCheck }, { ignoreIsValidFalse: true });
+        if (typeof res === 'boolean') return res;
+        return !!(res?.isRegistered ?? res?.IsRegistered ?? res?.registered ?? res?.Registered ?? res?.exists ?? res?.Exists);
+      } catch {
+        return false;
+      }
+    },
+    /**
+     * CONFIRMED per the same doc (B1_LogInvite): logs that this user
+     * invited `receiverPhone` — the backend already knows who invited whom
+     * from this call alone, so no separate referral code is needed for the
+     * per-contact WhatsApp invite flow.
+     */
+    async logInvite(receiverPhone: string): Promise<void> {
+      const { phone } = requireSession();
+      await callGateway('B1', { Phone: phone, Receiver: receiverPhone });
     },
   },
 };

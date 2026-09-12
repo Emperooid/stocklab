@@ -1,5 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Deliberately NOT renamed as part of the CrowdStock rebrand, unlike every
+// other persisted key in this app: this value is sent to and validated
+// server-side (ValidateDeviceId(), see below) — renaming it generates a
+// fresh, unrecognized device id for every existing account, which the
+// backend then rejects at login ("Unable to process login request") rather
+// than just requiring a harmless re-login. CONFIRMED live: this broke login
+// for an already-registered test account immediately after the rename.
+// There's also no branding reason to touch it — the stored value is an
+// opaque random id, never shown to anyone.
 const KEY = 'stocklab-device-id';
 
 // Cached in-memory once resolved, and single-flighted while resolving —

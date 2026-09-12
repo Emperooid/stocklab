@@ -2,7 +2,7 @@ import { BACKEND_AUTH_SECRET_KEY, BACKEND_AUTH_USER_ID, BACKEND_BASE_URL } from 
 import { getDeviceId } from '../lib/deviceId';
 
 /**
- * Client for the StockLab backend gateway.
+ * Client for the CrowdStock backend gateway.
  *
  * Two endpoints, confirmed working directly against the live server:
  *   POST {BASE_URL}/st/AuthSP     { userId, secretKey } -> { status, message, token }
@@ -113,7 +113,21 @@ async function fetchBearerToken(): Promise<string> {
         : 'Could not reach the server. Check your internet connection and try again.'
     );
   }
-  const data = await res.json();
+  let data: any;
+  const rawText = await res.text();
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    // A non-JSON body (typically an HTML error page starting with "<",
+    // e.g. a 502/503 from a gateway in front of a crashed/unreachable
+    // backend) throws here uncaught otherwise, surfacing a raw "JSON parse
+    // error: unexpected character: <" straight to the user — CONFIRMED
+    // live during a real backend outage. This is never something the
+    // client can recover from; just give a clean, honest message instead
+    // of the parser's own cryptic one.
+    devLog('[backend] <- AuthSP NON-JSON RESPONSE', { status: res.status, body: rawText.slice(0, 500) });
+    throw new BackendError('The server is temporarily unavailable. Please try again shortly.');
+  }
   devLog('[backend] <- AuthSP', { status: data?.status, message: data?.message, hasToken: !!data?.token });
   if (data?.status !== 'success' || !data?.token) {
     throw new BackendError(data?.message || 'Could not connect to the server. Please try again.');
@@ -174,7 +188,14 @@ async function mintTransToken(phone: string, sessionId: string, deviceId: string
     );
   }
 
-  const data = await res.json();
+  let data: any;
+  const rawText = await res.text();
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    devLog('[backend] <- G1001 (fresh token) NON-JSON RESPONSE', { status: res.status, body: rawText.slice(0, 500) });
+    throw new BackendError('The server is temporarily unavailable. Please try again shortly.');
+  }
   devLog('[backend] <- G1001 (fresh token)', data);
   if (!data?.success || !data?.trans_token) {
     // CONFIRMED live: this happens whenever the stored SessionID is dead —
@@ -206,6 +227,21 @@ async function mintTransToken(phone: string, sessionId: string, deviceId: string
  * @param opts.requiresSession  Whether this call needs a freshly-minted
  *                      refID/phone/deviceid (true for anything not in the
  *                      exempt list — G1001, G10, G11, G20, G21, "PAY").
+ * @param opts.ignoreIsValidFalse  CONFIRMED live: B2 (checking whether some
+ *                      OTHER phone number — not the caller's own session —
+ *                      is registered) returns the same {IsValid:false}
+ *                      shape the central auth pipeline uses for a genuinely
+ *                      dead session, but for an entirely unrelated reason
+ *                      (the number being checked has never been seen by the
+ *                      system at all). Checking an arbitrary contact's
+ *                      number is a normal, frequent occurrence on the
+ *                      Invite screen — most of a user's contacts won't be
+ *                      registered — so treating every one of those as "the
+ *                      CURRENT user's session died" force-logs-out anyone
+ *                      who opens Invite. Set true to skip that global
+ *                      handling for calls where IsValid:false is known to
+ *                      mean something other than session death; the caller
+ *                      gets a plain BackendError instead.
  */
 const SENSITIVE_FIELDS = ['pincode', 'PinCode', 'password', 'NewPassword', 'otp', 'OTP', 'secretKey'];
 
@@ -221,9 +257,9 @@ function redact(params: Record<string, unknown> | undefined): Record<string, unk
 export async function callGateway<T = any>(
   theKey: string,
   params?: Record<string, unknown>,
-  opts: { paramsField?: string; requiresSession?: boolean } = {}
+  opts: { paramsField?: string; requiresSession?: boolean; ignoreIsValidFalse?: boolean } = {}
 ): Promise<T> {
-  const { paramsField, requiresSession = true } = opts;
+  const { paramsField, requiresSession = true, ignoreIsValidFalse = false } = opts;
 
   const body: Record<string, unknown> = { theKey };
   if (params) {
@@ -272,10 +308,15 @@ export async function callGateway<T = any>(
     }
 
     let data: any;
+    const rawText = await res.text();
     try {
-      data = await res.json();
+      data = JSON.parse(rawText);
     } catch {
-      devLog(`[backend] <- ${theKey} non-JSON response, status ${res.status}`);
+      // Log the actual body, not just "non-JSON" — this is the only way to
+      // tell a genuine outage page apart from e.g. a truncated/garbled body
+      // for a specific call. Capped so a large HTML error page doesn't flood
+      // the console.
+      devLog(`[backend] <- ${theKey} non-JSON response, status ${res.status}:`, rawText.slice(0, 500));
       throw new BackendError('The server sent back an unexpected response. Please try again.');
     }
 
@@ -288,7 +329,7 @@ export async function callGateway<T = any>(
     // real response that the old `status === 'error'` check missed
     // entirely, which would have silently treated a rejected prediction as
     // a success). Check every shape we've actually seen fail.
-    if (data?.IsValid === false) {
+    if (data?.IsValid === false && !ignoreIsValidFalse) {
       // Per the validation-flow doc, IsValid:false only ever comes from the
       // central auth pipeline (IsUserLoggedIn/device/trans-token checks) —
       // never a business-logic rejection, those use lowercase success/status
@@ -296,9 +337,16 @@ export async function callGateway<T = any>(
       // out from under a still-working device/token pairing ("Login Again!"
       // while G1001 kept minting tokens fine) — no amount of retrying fixes
       // that from the client, so force a logout instead of failing forever.
+      //
+      // CONFIRMED this doesn't hold for every key though — see B2's
+      // ignoreIsValidFalse usage in httpApi.ts for a call where this exact
+      // shape means something unrelated to the caller's own session.
       session = null;
       sessionInvalidatedHandler?.();
       throw new BackendError(data?.Message || 'Your session has expired. Please log in again.');
+    }
+    if (data?.IsValid === false) {
+      throw new BackendError(data?.Message || 'That didn\'t work. Please try again.');
     }
     if (data?.success === false || data?.status === false || data?.status === 'error') {
       throw new BackendError(data?.message || 'That didn\'t work. Please try again.');

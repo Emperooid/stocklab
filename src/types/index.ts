@@ -13,6 +13,12 @@ export interface UserPrediction {
   submittedAt: string;
 }
 
+/** Per-round Auto Play setting — one of these per slot.id, kept in autoPlayStore. */
+export interface AutoPlaySlotConfig {
+  enabled: boolean;
+  figure: number; // 1-5
+}
+
 export interface RoundResult {
   roundId: string;
   // CONFIRMED live: G13/G14's `StockValue` isn't a 1-5 "drawn value" — it
@@ -60,6 +66,14 @@ export interface WalletTransaction {
   status?: TransactionStatus; // deposits/withdrawals only; round entries are always final
 }
 
+/** Pre-summed period totals (G15B monthly / G15C daily) — see httpApi.ts. */
+export interface WalletPeriodTotals {
+  deposits: number;
+  withdrawals: number;
+  gains: number;
+  plays: number;
+}
+
 export interface Bank {
   code: string;
   name: string;
@@ -71,11 +85,26 @@ export interface ResolvedBankAccount {
   accountName: string;
 }
 
-/** The user's on-file payout account, set via the verify+OTP flow on the withdrawal page. */
+/** The user's on-file payout account, set once via PP_SetPayOutBankDetails on the withdrawal page. */
 export interface LinkedBankAccount {
   bankName: string;
   accountNumber: string;
   fullName: string;
+}
+
+/** The user's dedicated deposit account, from VV_generateVirtualAccount/BB_getBankAccountProfile — transfer here to fund the wallet. */
+export interface VirtualAccount {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+}
+
+/** From B3_GetCountInvited — this user's referral program stats. */
+export interface InviteStats {
+  numberInvited: number;
+  successfulConversions: number;
+  credits: number;
+  payout: number;
 }
 
 /**
@@ -128,4 +157,8 @@ export interface User {
   alertMessage?: string;
   /** From G22/G24's nested Profile.news — a single current news message, not a list. */
   newsMessage?: string;
+  /** From G22/G24's top-level `appstore` field — used as the download link in Invite screen WhatsApp messages. */
+  appStoreUrl?: string;
+  /** From G22/G24's top-level `playstore` field — used as the download link in Invite screen WhatsApp messages. */
+  playStoreUrl?: string;
 }

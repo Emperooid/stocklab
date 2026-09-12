@@ -58,7 +58,7 @@ export const useAlertPopupStore = create<AlertPopupState>()(
       },
     }),
     {
-      name: 'stocklab-alert-popups',
+      name: 'crowdstock-alert-popups',
       storage: createJSONStorage(() => AsyncStorage),
       // pendingPopups is deliberately NOT persisted — a queued-but-unseen
       // popup shouldn't survive an app restart mid-session; it'll just get

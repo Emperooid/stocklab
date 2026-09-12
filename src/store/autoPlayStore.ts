@@ -1,92 +1,111 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AutoPlaySlotConfig } from '../types';
 import { api } from '../api';
-import { getErrorMessage, MIN_SLOT_AMOUNT } from '../lib/validation';
+import { ROUND_SLOTS } from '../lib/schedule';
 
-export type AutoPlayMode = 'half' | 'full'; // half = 12 rounds/day, full = 24 rounds/day
+const DEFAULT_SLOT_CONFIG: AutoPlaySlotConfig = { enabled: false, figure: 3 };
+
+function indexFromRoundId(roundId: string): number {
+  return ROUND_SLOTS.find((s) => s.id === roundId)?.index ?? Number(roundId.replace(/\D/g, ''));
+}
 
 interface AutoPlayState {
-  enabled: boolean;
-  mode: AutoPlayMode;
-  amountPerSlot: number;
-  // Whether G26 (SetProfileAutoPlay) has ever been called successfully —
-  // once it has, flipping on/off again can use the lighter G27 (SetAutoPlay)
-  // instead of resending mode/amount every time.
-  configured: boolean;
-  saving: boolean;
-  error: string | null;
-  setMode: (mode: AutoPlayMode) => void;
-  setAmountPerSlot: (amount: number) => void;
-  /** Sends mode + amount + on/off together (G26). Use for first setup or when changing mode/amount. */
-  configure: (mode: AutoPlayMode, amountPerSlot: number, enabled: boolean) => Promise<void>;
-  /** Just flips on/off (G27) if already configured once; otherwise falls back to configure(). */
-  setEnabled: (enabled: boolean) => Promise<void>;
-  clearError: () => void;
+  // Whether `slots` has been populated from the server (A2) at least once
+  // this session. Not persisted — the server is the source of truth
+  // (A1/A2/UU), refetched via loadFromServer() rather than cached locally.
+  loaded: boolean;
+  slots: Record<string, AutoPlaySlotConfig>;
+  getSlotConfig: (roundId: string) => AutoPlaySlotConfig;
+  /** Hydrates all 24 rounds' state from A2 in one call. Safe to call repeatedly (screen focus, app start). */
+  loadFromServer: () => Promise<void>;
+  /** Persists via A1. Figure is only sent while enabling, per the documented "OFF doesn't touch Figure" rule. Rolls back optimistic state on failure. */
+  setSlotEnabled: (roundId: string, enabled: boolean) => Promise<void>;
+  /** Updates the local figure; only pushes to A1 immediately if the round is currently enabled (A1 ignores Figure while OFF anyway). */
+  setSlotFigure: (roundId: string, figure: number) => Promise<void>;
+  /** Master toggle via UU — bulk on/off for every round in one call. */
+  setAllEnabled: (enabled: boolean) => Promise<void>;
 }
 
 /**
- * CONFIRMED with the backend dev: Auto Play runs entirely server-side once
- * configured — the server itself submits every round on the user's behalf
- * (works even with the app closed), with no predfigure/number choice from
- * the client at all; the number is picked automatically the same way the
- * Stock Value is, with no operator involved. This replaced an earlier
- * client-driven version that polled and called G12 in a loop from inside
- * the app — that approach only ever worked while the app was open, and
- * needed increasingly careful guarding against races and duplicate
- * submissions along the way. None of that is needed anymore.
+ * Per-round Auto Play, per Mr Yemi's spec: each of the 24 round cards has
+ * its own figure (1-5) + on/off toggle, persisted server-side via A1/A2/UU.
+ *
+ * CONFIRMED per Mr Yemi (2026-09-08): the backend now fully owns Auto Play
+ * end to end — after A1 turns a round's Auto Play on, the backend sets a
+ * figure and settles the round itself on its own schedule, with zero
+ * further client action. This replaced an earlier client-side engine
+ * (useAutoPlayEngine, removed) that watched round close times and fired G12
+ * manually — that approach only worked while the app was open/foregrounded,
+ * which is no longer a limitation now that the server handles it
+ * unconditionally. This store is now purely a thin client for A1/A2/UU plus
+ * whatever local optimistic-update bookkeeping the toggle UI needs — no
+ * submission tracking or "missed" guards to maintain anymore.
  */
-export const useAutoPlayStore = create<AutoPlayState>()(
-  persist(
-    (set, get) => ({
-      enabled: false,
-      mode: 'full',
-      amountPerSlot: MIN_SLOT_AMOUNT,
-      configured: false,
-      saving: false,
-      error: null,
+export const useAutoPlayStore = create<AutoPlayState>((set, get) => ({
+  loaded: false,
+  slots: {},
 
-      setMode: (mode) => set({ mode }),
-      setAmountPerSlot: (amountPerSlot) => set({ amountPerSlot }),
-      clearError: () => set({ error: null }),
+  getSlotConfig: (roundId) => get().slots[roundId] ?? DEFAULT_SLOT_CONFIG,
 
-      configure: async (mode, amountPerSlot, enabled) => {
-        set({ saving: true, error: null });
-        try {
-          await api.rounds.setAutoPlayProfile(mode, amountPerSlot, enabled);
-          set({ mode, amountPerSlot, enabled, configured: true, saving: false });
-        } catch (e) {
-          set({ saving: false, error: getErrorMessage(e, 'Could not update Auto Play.') });
-          throw e;
-        }
-      },
-
-      setEnabled: async (enabled) => {
-        const { configured, mode, amountPerSlot, configure } = get();
-        if (!configured) {
-          await configure(mode, amountPerSlot, enabled);
-          return;
-        }
-        set({ saving: true, error: null });
-        try {
-          await api.rounds.setAutoPlayStatus(enabled);
-          set({ enabled, saving: false });
-        } catch (e) {
-          set({ saving: false, error: getErrorMessage(e, 'Could not update Auto Play.') });
-          throw e;
-        }
-      },
-    }),
-    {
-      name: 'stocklab-autoplay',
-      storage: createJSONStorage(() => AsyncStorage),
-      // saving/error are per-session, not something to resurrect on next launch
-      partialize: (state) => ({
-        enabled: state.enabled,
-        mode: state.mode,
-        amountPerSlot: state.amountPerSlot,
-        configured: state.configured,
-      }),
+  loadFromServer: async () => {
+    try {
+      const configs = await api.rounds.getAutoPlayConfigs();
+      const slots: Record<string, AutoPlaySlotConfig> = {};
+      for (const [indexStr, config] of Object.entries(configs)) {
+        slots[`r${indexStr}`] = config;
+      }
+      set({ slots, loaded: true });
+    } catch (e) {
+      // CONFIRMED live: leaving `loaded` false on failure made
+      // RoundAutoPlayControl/MasterAutoPlayToggle (both gated on it)
+      // render nothing at all during a backend outage — the entire
+      // Auto Play UI silently vanished with no indication why, which
+      // is worse than showing it with default (all-off) values. Mark
+      // loaded anyway so the UI still renders; a later successful
+      // fetch (retry, focus, refresh) overwrites these defaults with
+      // the real server state.
+      set({ loaded: true });
+      throw e;
     }
-  )
-);
+  },
+
+  setSlotEnabled: async (roundId, enabled) => {
+    const previous = get().slots[roundId] ?? DEFAULT_SLOT_CONFIG;
+    const next = { ...previous, enabled };
+    set((state) => ({ slots: { ...state.slots, [roundId]: next } }));
+    try {
+      await api.rounds.setAutoPlayConfig(indexFromRoundId(roundId), enabled, enabled ? next.figure : undefined);
+    } catch (e) {
+      set((state) => ({ slots: { ...state.slots, [roundId]: previous } }));
+      throw e;
+    }
+  },
+
+  setSlotFigure: async (roundId, figure) => {
+    const previous = get().slots[roundId] ?? DEFAULT_SLOT_CONFIG;
+    const next = { ...previous, figure };
+    set((state) => ({ slots: { ...state.slots, [roundId]: next } }));
+    if (!next.enabled) return; // matches A1's own rule: Figure isn't stored while OFF, so nothing to push yet
+    try {
+      await api.rounds.setAutoPlayConfig(indexFromRoundId(roundId), true, figure);
+    } catch (e) {
+      set((state) => ({ slots: { ...state.slots, [roundId]: previous } }));
+      throw e;
+    }
+  },
+
+  setAllEnabled: async (enabled) => {
+    const previous = get().slots;
+    set((state) => ({
+      slots: Object.fromEntries(
+        ROUND_SLOTS.map((slot) => [slot.id, { ...(state.slots[slot.id] ?? DEFAULT_SLOT_CONFIG), enabled }])
+      ),
+    }));
+    try {
+      await api.rounds.setAllAutoPlay(enabled);
+    } catch (e) {
+      set({ slots: previous });
+      throw e;
+    }
+  },
+}));

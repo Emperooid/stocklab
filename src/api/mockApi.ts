@@ -292,7 +292,7 @@ export const mockApi = {
       });
       // Paystack's checkout requires an email; the app no longer collects
       // one (auth is phone-only), so synthesize a placeholder from the phone.
-      return delay({ reference, email: `${currentUser.phone.replace(/\D/g, '')}@stocklab.app` });
+      return delay({ reference, email: `${currentUser.phone.replace(/\D/g, '')}@crowdstock.app` });
     },
 
     /**

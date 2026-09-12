@@ -2,8 +2,8 @@ import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
-const PHONE_KEY = 'stocklab-biometric-phone';
-const PASSWORD_KEY = 'stocklab-biometric-password';
+const PHONE_KEY = 'crowdstock-biometric-phone';
+const PASSWORD_KEY = 'crowdstock-biometric-password';
 
 export interface SavedCredentials {
   phone: string;
@@ -20,7 +20,7 @@ export async function isBiometricAvailable(): Promise<boolean> {
 }
 
 /** Prompts Face ID / fingerprint / device PIN. Resolves true only on success. */
-export async function authenticateWithBiometric(reason = 'Log in to StockLab'): Promise<boolean> {
+export async function authenticateWithBiometric(reason = 'Log in to CrowdStock'): Promise<boolean> {
   const result = await LocalAuthentication.authenticateAsync({
     promptMessage: reason,
     disableDeviceFallback: false,

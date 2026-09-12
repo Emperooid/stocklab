@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
@@ -184,6 +184,11 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <Screen style={styles.centerContent}>
+      <View style={styles.header}>
+        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
+        <Text style={styles.logo}>CrowdStock</Text>
+      </View>
+
       <Text style={styles.title}>Create your account</Text>
       <Text style={styles.subtitle}>Enter your phone number to get started.</Text>
 
@@ -208,11 +213,14 @@ export default function RegisterScreen({ navigation }: Props) {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     centerContent: { flexGrow: 1, justifyContent: 'center' },
+    header: { alignItems: 'center', marginBottom: spacing.xl },
+    logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
+    logo: { ...typography.h2, color: colors.text, letterSpacing: 0.2 },
     title: { ...typography.h2, color: colors.text, textAlign: 'center' },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl, textAlign: 'center' },
     form: { gap: spacing.sm },
-    nameRow: { flexDirection: 'row', gap: spacing.sm },
-    nameInput: { flex: 1 },
+    nameRow: { flexDirection: 'row', gap: spacing.sm, minWidth: 0 },
+    nameInput: { flex: 1, minWidth: 0 },
     verifiedPhoneBox: {
       flexDirection: 'row',
       justifyContent: 'space-between',

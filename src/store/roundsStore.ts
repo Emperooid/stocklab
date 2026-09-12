@@ -31,12 +31,12 @@ function dayKey(now: Date): string {
   return localDateKey(getOperatingDayStart(now));
 }
 
-function roundKey(roundId: string, now: Date): string {
+export function roundKey(roundId: string, now: Date): string {
   return `${dayKey(now)}_${roundId}`;
 }
 
 /** Drops entries from an older operating day than today/yesterday, so this map doesn't grow forever. */
-function pruneOldKeys<T>(map: Record<string, T>, now: Date): Record<string, T> {
+export function pruneOldKeys<T>(map: Record<string, T>, now: Date): Record<string, T> {
   const today = dayKey(now);
   const yesterday = dayKey(new Date(now.getTime() - 24 * 60 * 60 * 1000));
   const next: Record<string, T> = {};
@@ -101,7 +101,7 @@ export const useRoundsStore = create<RoundsState>()(
       },
     }),
     {
-      name: 'stocklab-rounds',
+      name: 'crowdstock-rounds',
       storage: createJSONStorage(() => AsyncStorage),
       // rounds/isLoading are always refetched on launch — only the local
       // prediction overrides need to survive a reload.

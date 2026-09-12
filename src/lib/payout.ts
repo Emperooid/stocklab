@@ -1,5 +1,5 @@
 /**
- * StockLab payout math.
+ * CrowdStock payout math.
  *
  * The Stock Value for each round is set manually by an operator (not
  * computed from user predictions), then every participant's gain/loss is

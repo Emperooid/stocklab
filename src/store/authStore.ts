@@ -19,11 +19,12 @@ export class RegisteredButLoginFailedError extends Error {}
  * so calling the other one doesn't wipe them back out:
  *   - email: neither G22 nor G24 echoes it back — it's only ever known
  *     locally, from what the client sent to G11 at registration.
- *   - alertMessage/newsMessage: CONFIRMED live only G22 (login) sends
- *     these — G24 (used by refreshUser(), called right after login as a
- *     best-effort follow-up, and again on every Profile/News focus) never
- *     includes them at all. Without this, the G24 follow-up immediately
- *     overwrote a real alert/news from login back to undefined.
+ *   - alertMessage/newsMessage/appStoreUrl/playStoreUrl: CONFIRMED live only
+ *     G22 (login) sends these — G24 (used by refreshUser(), called right
+ *     after login as a best-effort follow-up, and again on every
+ *     Profile/News focus) never includes them at all. Without this, the
+ *     G24 follow-up immediately overwrote real values from login back to
+ *     undefined — including the Invite screen's WhatsApp download link.
  * Only preserves for the same phone number, so switching accounts on a
  * shared device can't leak one user's data onto another's.
  */
@@ -34,6 +35,8 @@ function preserveLoginOnlyFields(prev: User | null, next: User): User {
     email: next.email || prev.email,
     alertMessage: next.alertMessage ?? prev.alertMessage,
     newsMessage: next.newsMessage ?? prev.newsMessage,
+    appStoreUrl: next.appStoreUrl ?? prev.appStoreUrl,
+    playStoreUrl: next.playStoreUrl ?? prev.playStoreUrl,
   };
 }
 
@@ -178,7 +181,7 @@ export const useAuthStore = create<AuthState>()(
       setHasHydrated: (value) => set({ hasHydrated: value }),
     }),
     {
-      name: 'stocklab-auth',
+      name: 'crowdstock-auth',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ user: state.user, session: state.session }),
       onRehydrateStorage: () => (state) => {
