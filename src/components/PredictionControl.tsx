@@ -9,8 +9,8 @@ import { formatMoney } from '../lib/format';
 
 const VALUES = [1, 2, 3, 4, 5];
 
-/** One distinct color per value (blue/green/red/amber/purple) instead of a single green for every selection — a real stock dashboard doesn't render every ticker the same color. */
-function valueColor(colors: Colors, value: number): string {
+/** One distinct color per value (blue/green/red/amber/purple) instead of a single green for every selection — a real stock dashboard doesn't render every ticker the same color. Exported so AutoPlaySetupModal's figure chips use the same color language as this control. */
+export function valueColor(colors: Colors, value: number): string {
   const palette = [colors.blue, colors.success, colors.danger, colors.warning, colors.purple];
   return palette[(value - 1) % palette.length];
 }
@@ -33,11 +33,23 @@ function valueColor(colors: Colors, value: number): string {
 export function PredictionControl({
   roundId,
   currentValue,
+  played,
   slotAmount,
   onSubmit,
 }: {
   roundId: string;
   currentValue: number | undefined;
+  /**
+   * Explicit "this round is already played" signal, independent of knowing
+   * the actual figure — set true when a round is confirmed played via G15
+   * (Code "P") but currentValue is unknown (e.g. a fresh install, or a
+   * different device than the one that submitted it). Without this, an
+   * unknown currentValue reads identically to "never played," which would
+   * let someone attempt a second submission on a round the backend already
+   * considers done — it would just get rejected, but confusingly so.
+   * Defaults to `currentValue != null` when omitted.
+   */
+  played?: boolean;
   slotAmount: number | undefined;
   onSubmit: (value: number, amount: number) => Promise<void>;
 }) {
@@ -54,36 +66,49 @@ export function PredictionControl({
       return;
     }
     if (!slotAmount) {
-      setError('Your play amount is still loading. Please try again in a moment.');
+      setError('Your bid amount is still loading. Please try again in a moment.');
       return;
     }
     setSaving(true);
     try {
       await onSubmit(selected, slotAmount);
     } catch (e) {
-      setError(getErrorMessage(e, 'Could not submit your stock pick.'));
+      setError(getErrorMessage(e, 'Could not place your bid.'));
     } finally {
       setSaving(false);
     }
   }
 
-  if (currentValue != null) {
+  const hasPlayed = played ?? currentValue != null;
+  if (hasPlayed) {
     return (
       <View style={styles.submittedRow}>
-        <View style={[styles.submittedIconCircle, { backgroundColor: valueColor(colors, currentValue) }]}>
-          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+        <View
+          style={[
+            styles.submittedIconCircle,
+            { backgroundColor: currentValue != null ? valueColor(colors, currentValue) : colors.textDim },
+          ]}
+        >
+          <Ionicons name="checkmark" size={16} color={colors.onPrimary} />
         </View>
-        <Text style={styles.submittedText}>
-          Stock submitted — you picked <Text style={[styles.submittedValue, { color: valueColor(colors, currentValue) }]}>{currentValue}</Text>. This
-          round is locked in; results land once it settles.
-        </Text>
+        {currentValue != null ? (
+          <Text style={styles.submittedText}>
+            Bid submitted — you bid{' '}
+            <Text style={[styles.submittedValue, { color: valueColor(colors, currentValue) }]}>{currentValue}</Text>. This round is locked in;
+            results land once it settles.
+          </Text>
+        ) : (
+          <Text style={styles.submittedText}>
+          Automatic bidding already placed a bid for this auction. Your bid is locked in until the auction closes.
+          </Text>
+        )}
       </View>
     );
   }
 
   return (
     <View>
-      <Text style={styles.predictLabel}>Pick a stock for this round</Text>
+      <Text style={styles.predictLabel}>Place your bid for this auction</Text>
       <View style={styles.predictValuesRow}>
         {VALUES.map((v) => {
           const isSelected = selected === v;
@@ -98,19 +123,19 @@ export function PredictionControl({
               ]}
               onPress={() => setSelected(v)}
             >
-              <Text style={[styles.predictValueText, { color: isSelected ? '#FFFFFF' : color }]}>{v}</Text>
+              <Text style={[styles.predictValueText, { color: isSelected ? colors.onPrimary : color }]}>{v}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
-      <Text style={styles.amountLabel}>Amount to play with</Text>
+      <Text style={styles.amountLabel}>Bid amount</Text>
       <View style={styles.amountRow}>
         <Text style={styles.amountValue}>{slotAmount != null ? formatMoney(slotAmount) : 'Loading…'}</Text>
       </View>
-      <Text style={styles.onceNote}>You can only play this round once — there's no changing it after you submit.</Text>
+      <Text style={styles.onceNote}>You can’t change your bid after submitting.</Text>
       <Button
         key={roundId}
-        title="Submit Stock"
+        title="Place Bid"
         size="sm"
         onPress={handleSubmit}
         loading={saving}

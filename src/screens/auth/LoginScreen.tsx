@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
+import { Mascot } from '../../components/Mascot';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
-import { getErrorMessage, isValidPhone } from '../../lib/validation';
+import { getErrorMessage, isNewDeviceError, isValidPhone } from '../../lib/validation';
 import { authenticateWithBiometric, getSavedCredentials, isBiometricAvailable, saveCredentials } from '../../lib/biometric';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -20,6 +21,11 @@ export default function LoginScreen({ navigation, route }: Props) {
   const [phone, setPhone] = useState(route.params?.prefillPhone ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // Set instead of just folding into `error` — this case needs its own
+  // banner with a "Reset Password" button, not just red text, since the raw
+  // backend message alone gives no indication that Forgot Password is the
+  // actual fix.
+  const [newDeviceDetected, setNewDeviceDetected] = useState(false);
   const [infoMessage, setInfoMessage] = useState(route.params?.infoMessage ?? '');
   const [biometricReady, setBiometricReady] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
@@ -29,9 +35,25 @@ export default function LoginScreen({ navigation, route }: Props) {
   const clearSessionExpiredMessage = useAuthStore((s) => s.clearSessionExpiredMessage);
 
   useEffect(() => {
+    // Consumes the just-logged-out routing flag the moment this screen is
+    // actually reached — see AuthNavigator's initialRouteName.
+    useAuthStore.getState().clearJustLoggedOut();
     (async () => {
-      const [available, saved] = await Promise.all([isBiometricAvailable(), getSavedCredentials()]);
+      let available = false;
+      let saved = null as Awaited<ReturnType<typeof getSavedCredentials>>;
+      try {
+        [available, saved] = await Promise.all([isBiometricAvailable(), getSavedCredentials()]);
+      } catch {
+        // Best-effort: if the biometric/secure-store probe fails, leave the
+        // button hidden and fall back to password — never block the login
+        // screen on an optional convenience feature.
+        available = false;
+        saved = null;
+      }
       setBiometricReady(available && !!saved);
+      if (__DEV__) {
+        console.log('[biometric] available=', available, '| hasSavedCredentials=', !!saved, '| phone=', saved?.phone ?? null);
+      }
       // Remember the phone number from the last successful login on this
       // device so returning users only need their password (or biometric) —
       // route.params?.prefillPhone (e.g. fresh off registration) still wins.
@@ -48,6 +70,7 @@ export default function LoginScreen({ navigation, route }: Props) {
   async function handleLogin() {
     setError('');
     setInfoMessage('');
+    setNewDeviceDetected(false);
     if (!isValidPhone(phone)) {
       setError('Enter a valid phone number (e.g. 08012345678).');
       return;
@@ -60,7 +83,12 @@ export default function LoginScreen({ navigation, route }: Props) {
       await login(phone, password);
       await saveCredentials(phone, password).catch(() => {}); // best-effort — enables biometric login next time
     } catch (e) {
-      setError(getErrorMessage(e, 'Could not log in. Please try again.'));
+      const message = getErrorMessage(e, 'Could not log in. Please try again.');
+      if (isNewDeviceError(message)) {
+        setNewDeviceDetected(true);
+      } else {
+        setError(message);
+      }
     }
   }
 
@@ -86,16 +114,15 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.logo}>CrowdStock</Text>
-        <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
-      </View>
+      <Mascot
+        message={
+          phone && isValidPhone(phone) ? "Welcome back! Type your password to go in." : "Hello! What's your phone number?"
+        }
+      />
 
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Log in to continue picking stock.</Text>
+      <Text style={styles.title}>Log in</Text>
 
-      <View style={styles.form}>
+      <View style={[styles.form, { marginTop: spacing.lg }]}>
         {!!sessionExpiredMessage && (
           <View style={styles.warnBanner}>
             <Ionicons name="time-outline" size={16} color={colors.warning} />
@@ -129,16 +156,50 @@ export default function LoginScreen({ navigation, route }: Props) {
 
         {!!error && <FormError message={error} />}
 
+        {newDeviceDetected && (
+          <View style={styles.newDeviceBanner}>
+            <View style={styles.newDeviceIconCircle}>
+              <Ionicons name="shield-checkmark" size={18} color={colors.onPrimary} />
+            </View>
+            <Text style={styles.newDeviceTitle}>New device? Reset your password</Text>
+            <Text style={styles.newDeviceBody}>
+              We don't recognize this phone or app install. For your security, reset your password to log in here —
+              it only takes a minute.
+            </Text>
+            <Button
+              title="Reset Password"
+              onPress={() => navigation.navigate('ForgotPassword', { prefillPhone: phone })}
+              style={{ marginTop: spacing.md, width: '100%' }}
+            />
+          </View>
+        )}
+
         <Button title="Log In" onPress={handleLogin} loading={isLoading} style={{ marginTop: spacing.lg }} />
 
         {biometricReady && (
-          <Button
-            title="Log in with Face ID / Fingerprint"
-            variant="outline"
-            onPress={handleBiometricLogin}
-            loading={biometricLoading}
-            style={{ marginTop: spacing.sm }}
-          />
+          <>
+            <View style={styles.orDivider}>
+              <View style={styles.orLine} />
+              <Text style={styles.orText}>or</Text>
+              <View style={styles.orLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.biometricRow}
+              onPress={handleBiometricLogin}
+              disabled={biometricLoading}
+              accessibilityLabel="Log in with Face ID or Fingerprint"
+            >
+              <View style={styles.biometricCircle}>
+                {biometricLoading ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <Ionicons name="finger-print" size={28} color={colors.onPrimary} />
+                )}
+              </View>
+              <Text style={styles.biometricBtnText}>Use Face ID / Fingerprint</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         <Button
@@ -149,31 +210,42 @@ export default function LoginScreen({ navigation, route }: Props) {
         />
       </View>
 
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>New here?</Text>
-        <View style={styles.dividerLine} />
+      <View style={styles.footerRow}>
+        <Text style={styles.footerText}>New here? </Text>
+        <Text style={styles.footerLink} onPress={() => navigation.navigate('Register')}>
+          Create an account
+        </Text>
       </View>
-
-      <Button title="Create an account" variant="outline" onPress={() => navigation.navigate('Register')} />
     </Screen>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    header: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.xxl },
-    logoMark: {
-      width: 72,
-      height: 72,
-      borderRadius: 18,
-      marginBottom: spacing.md,
-    },
-    logo: { ...typography.h1, color: colors.text, letterSpacing: 0.2 },
-    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
-    title: { ...typography.h2, color: colors.text },
-    subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
+    title: { ...typography.h1, color: colors.text, marginTop: spacing.xl },
     form: { gap: spacing.sm },
+    orDivider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg },
+    orLine: { flex: 1, height: 1, backgroundColor: colors.border },
+    orText: { ...typography.small, color: colors.textDim, fontWeight: '600' },
+    biometricRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      alignSelf: 'center',
+      marginTop: spacing.lg,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+    },
+    biometricCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    biometricBtnText: { ...typography.body, color: colors.text, fontWeight: '700' },
     infoBanner: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -196,8 +268,27 @@ function createStyles(colors: Colors) {
       marginBottom: spacing.xs,
     },
     warnBannerText: { ...typography.small, color: colors.warning, flex: 1 },
-    divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.xl, gap: spacing.md },
-    dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-    dividerText: { ...typography.small, color: colors.textDim },
+    newDeviceBanner: {
+      backgroundColor: colors.primaryTint,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      padding: spacing.md,
+      marginTop: spacing.xs,
+    },
+    newDeviceIconCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    newDeviceTitle: { ...typography.body, color: colors.text, fontWeight: '700', marginBottom: spacing.xs },
+    newDeviceBody: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+    footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl },
+    footerText: { ...typography.body, color: colors.textMuted },
+    footerLink: { ...typography.body, color: colors.primary, fontWeight: '700' },
   });
 }

@@ -25,6 +25,13 @@ interface InviteState {
   recordInvite: (phone: string, name: string) => void;
   /** Re-checks B2 for every not-yet-joined invited contact — call on Invite screen focus. */
   refreshInvitedStatuses: () => Promise<void>;
+  /**
+   * Clears `stats`/`invitedContacts`. The latter is persisted but not keyed
+   * by phone/account — a second account on the same device would otherwise
+   * inherit the first account's "who I invited" list. Called from
+   * authStore.logout().
+   */
+  reset: () => void;
 }
 
 export const useInviteStore = create<InviteState>()(
@@ -67,6 +74,8 @@ export const useInviteStore = create<InviteState>()(
           return { invitedContacts };
         });
       },
+
+      reset: () => set({ stats: null, statsLoading: false, invitedContacts: {} }),
     }),
     {
       name: 'crowdstock-invite',

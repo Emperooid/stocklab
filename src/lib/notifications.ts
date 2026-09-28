@@ -69,8 +69,8 @@ export async function scheduleTodaysRoundNotifications(rounds: DailyRound[]) {
     if (openAt.getTime() > now.getTime()) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `Round ${round.slot.index} is open`,
-          body: `Submit your prediction (1-5) before ${round.slot.settleTime}.`,
+          title: `New auction window is open`,
+          body: `Explore today's products and place a bid before the auction closes.`,
           sound: NOTIFICATION_SOUND,
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: openAt, channelId: CHANNEL_ID },
@@ -81,8 +81,8 @@ export async function scheduleTodaysRoundNotifications(rounds: DailyRound[]) {
     if (!hasPlayed && closingSoonAt.getTime() > now.getTime()) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `Round ${round.slot.index} closes soon`,
-          body: `You haven't picked a stock yet — submit before ${round.slot.settleTime}.`,
+          title: `Auction closes soon`,
+          body: `There is still time to place a bid on today's products.`,
           sound: NOTIFICATION_SOUND,
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: closingSoonAt, channelId: CHANNEL_ID },
@@ -92,8 +92,8 @@ export async function scheduleTodaysRoundNotifications(rounds: DailyRound[]) {
     if (hasPlayed && settleAt.getTime() > now.getTime()) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `Round ${round.slot.index} has settled`,
-          body: 'Check your result in the Rounds tab.',
+          title: `Auction update`,
+          body: 'Open CrowdStock to check your bid and auction result.',
           sound: NOTIFICATION_SOUND,
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: settleAt, channelId: CHANNEL_ID },
@@ -108,8 +108,8 @@ export async function scheduleTodaysRoundNotifications(rounds: DailyRound[]) {
     if (reminderAt.getTime() > now.getTime()) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Haven't played today?",
-          body: "You've got rounds still open today — pick a stock before they close.",
+          title: 'Discover today’s auctions',
+          body: 'Explore live products and place a bid before they close.',
           sound: NOTIFICATION_SOUND,
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: reminderAt, channelId: CHANNEL_ID },

@@ -22,8 +22,21 @@ interface AutoPlayState {
   setSlotEnabled: (roundId: string, enabled: boolean) => Promise<void>;
   /** Updates the local figure; only pushes to A1 immediately if the round is currently enabled (A1 ignores Figure while OFF anyway). */
   setSlotFigure: (roundId: string, figure: number) => Promise<void>;
+  /**
+   * Sets a round's enabled + figure together in one A1 call — for when both
+   * need to change at once (e.g. the bulk setup modal turning a
+   * previously-off round on with a freshly-picked figure in the same
+   * action). setSlotEnabled alone would send whatever figure the round
+   * already had, not the new one; setSlotFigure alone is a no-op while the
+   * round is still marked off (by design, matching A1's own "OFF doesn't
+   * touch Figure" rule) — so turning on with a new figure needs both
+   * applied together, not either one alone.
+   */
+  setSlotConfig: (roundId: string, config: AutoPlaySlotConfig) => Promise<void>;
   /** Master toggle via UU — bulk on/off for every round in one call. */
   setAllEnabled: (enabled: boolean) => Promise<void>;
+  /** Clears `slots`/`loaded` — no persist middleware here, so nothing else did. Called from authStore.logout(). */
+  reset: () => void;
 }
 
 /**
@@ -94,6 +107,17 @@ export const useAutoPlayStore = create<AutoPlayState>((set, get) => ({
     }
   },
 
+  setSlotConfig: async (roundId, config) => {
+    const previous = get().slots[roundId] ?? DEFAULT_SLOT_CONFIG;
+    set((state) => ({ slots: { ...state.slots, [roundId]: config } }));
+    try {
+      await api.rounds.setAutoPlayConfig(indexFromRoundId(roundId), config.enabled, config.enabled ? config.figure : undefined);
+    } catch (e) {
+      set((state) => ({ slots: { ...state.slots, [roundId]: previous } }));
+      throw e;
+    }
+  },
+
   setAllEnabled: async (enabled) => {
     const previous = get().slots;
     set((state) => ({
@@ -108,4 +132,6 @@ export const useAutoPlayStore = create<AutoPlayState>((set, get) => ({
       throw e;
     }
   },
+
+  reset: () => set({ loaded: false, slots: {} }),
 }));

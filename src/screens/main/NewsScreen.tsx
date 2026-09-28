@@ -83,7 +83,7 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     placeholder: { ...typography.small, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xxl },
     cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    iconCircle: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
     cardLabel: { ...typography.h3, color: colors.text },
     cardBody: { ...typography.small, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 18 },
   });

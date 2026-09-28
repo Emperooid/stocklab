@@ -9,8 +9,6 @@ import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useWalletStore } from '../store/walletStore';
 import { useRoundsStore } from '../store/roundsStore';
-import { useTourStore } from '../store/tourStore';
-import { useAlertPopupStore } from '../store/alertPopupStore';
 import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { isBackendConfigured } from '../config/backend';
 import { navigationRef } from '../lib/navigationRef';
@@ -52,21 +50,14 @@ export function RootNavigator() {
     }
   }, [hasHydrated]);
 
-  // Auto-start onboarding once, for a user who's never seen it — guarded by
-  // a ref (not just hasCompletedTour) so a later refreshUser() re-render
-  // can't retrigger it while it's already showing.
-  const pendingPopupsCount = useAlertPopupStore((s) => s.pendingPopups.length);
-  const tourAutoStarted = useRef(false);
-  useEffect(() => {
-    if (!hasHydrated || !user || tourAutoStarted.current) return;
-    if (useTourStore.getState().hasCompletedTour) return;
-    // Let any alert/news popup from this login get seen and dismissed first
-    // — stacking the carousel's own full-screen modal on top of it would bury it.
-    if (pendingPopupsCount > 0) return;
-    tourAutoStarted.current = true;
-    const timer = setTimeout(() => useTourStore.getState().startTour(), 600);
-    return () => clearTimeout(timer);
-  }, [hasHydrated, user, pendingPopupsCount]);
+  // Per explicit product decision, the 8-card feature tour no longer
+  // auto-starts after every fresh login — stacked on top of the news/alert
+  // popup, it read as a wall of screens right when someone just wants to
+  // get into the app, which is exactly the "too complicated" friction this
+  // app is trying to remove for a less technical audience. The pre-login
+  // Intro (3 slides) now covers "what is this app" instead. The full tour
+  // is still there for anyone who wants it, via Profile's "replay tour" row
+  // (ProfileScreen.tsx) — this only removes the automatic, forced trigger.
 
   // A virtual-account deposit lands via a bank transfer, not an in-app
   // action, so the balance can change while the app is merely backgrounded

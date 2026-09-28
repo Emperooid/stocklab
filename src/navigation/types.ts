@@ -1,7 +1,9 @@
 export type AuthStackParamList = {
+  Intro: undefined;
+  Welcome: undefined;
   Login: { infoMessage?: string; prefillPhone?: string } | undefined;
   Register: undefined;
-  ForgotPassword: undefined;
+  ForgotPassword: { prefillPhone?: string } | undefined;
 };
 
 export type MainTabParamList = {
@@ -12,10 +14,14 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
+export type LegalDoc = 'privacy' | 'terms' | 'responsible';
+
 export type MainStackParamList = {
   MainTabs: undefined;
-  RoundHistory: undefined;
   Withdrawal: undefined;
   News: undefined;
   Invite: undefined;
+  MyBids: undefined;
+  Winners: undefined;
+  Legal: { doc: LegalDoc };
 };

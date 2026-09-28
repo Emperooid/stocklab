@@ -9,7 +9,12 @@ export interface RoundSlot {
 
 export interface UserPrediction {
   roundId: string;
-  value: number; // 1-5
+  // Undefined specifically means "confirmed played (via G15 Code P) but the
+  // actual figure isn't known" — happens when that confirmation is the only
+  // source for this round (e.g. a fresh install/different device, before
+  // G13 catches up post-settlement) rather than the local record made at
+  // submit time. Still a real prediction — just without the number to show.
+  value?: number; // 1-5
   submittedAt: string;
 }
 
@@ -59,7 +64,7 @@ export type TransactionStatus = 'pending' | 'success' | 'failed';
 
 export interface WalletTransaction {
   id: string;
-  type: 'deposit' | 'withdrawal' | 'round_stake' | 'round_gain' | 'round_loss';
+  type: 'deposit' | 'withdrawal' | 'round_stake' | 'round_gain' | 'round_loss' | 'round_neutral';
   amount: number;
   createdAt: string;
   description: string;
@@ -121,13 +126,18 @@ export interface SupportContact {
   message?: string;
 }
 
+/**
+ * Sourced from G15 (Code "W") rather than a dedicated withdrawal-history
+ * endpoint — none exists yet. That means only what G15's transaction
+ * records actually carry: amount, bank, and when. No balance-before/after
+ * snapshot or open/closed status exists in that data, so those aren't
+ * modeled here rather than being guessed/faked.
+ */
 export interface WithdrawalHistoryEntry {
   id: string;
+  amount: number;
+  bank?: string;
   dateRequested: string;
-  balanceBefore: number;
-  balanceAfter: number;
-  status: 'open' | 'closed';
-  dateCredited?: string;
 }
 
 

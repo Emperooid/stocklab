@@ -20,6 +20,7 @@ const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap>
   round_stake: 'game-controller-outline',
   round_gain: 'trending-up',
   round_loss: 'trending-down',
+  round_neutral: 'remove-outline',
 };
 
 /**
@@ -65,13 +66,16 @@ export default function WalletScreen() {
               </Text>
 
               <View style={styles.quickActions}>
-                <QuickAction icon="arrow-down-circle" label="Deposit" active={false} onPress={() => setDepositModalOpen(true)} />
+                {/* Deposit is the more common first action, so it's the filled/primary
+                    one — previously both buttons were equal-weight outlines, which read
+                    as indecisive rather than guiding toward the more likely next step. */}
+                <QuickAction icon="arrow-down-circle" label="Deposit" active onPress={() => setDepositModalOpen(true)} />
                 <QuickAction icon="arrow-up-circle" label="Withdraw" active={false} onPress={() => navigation.navigate('Withdrawal')} />
               </View>
             </Card>
 
             <View style={styles.totalsHeaderRow}>
-              <Text style={styles.totalsSectionTitle}>Your Totals</Text>
+              <Text style={styles.totalsSectionTitle}>Wallet activity</Text>
               <View style={styles.periodSwitch}>
                 <PeriodTab label="Today" active={totalsPeriod === 'today'} onPress={() => setTotalsPeriod('today')} />
                 <PeriodTab label="This Month" active={totalsPeriod === 'month'} onPress={() => setTotalsPeriod('month')} />
@@ -83,7 +87,7 @@ export default function WalletScreen() {
           </>
         }
         ListEmptyComponent={
-          <EmptyState icon="receipt-outline" title="No transactions yet" message="Deposits, withdrawals, and round results will show up here." />
+          <EmptyState icon="receipt-outline" title="No transactions yet" message="Deposits, bid fees, purchases, refunds, and withdrawals will show up here." />
         }
         renderItem={({ item }) => <TransactionRow tx={item} />}
       />
@@ -142,13 +146,13 @@ function TotalsCard({ totals }: { totals: WalletPeriodTotals }) {
       <View style={styles.totalsGrid}>
         <TotalStat label="Deposits" value={totals.deposits} />
         <TotalStat label="Withdrawals" value={totals.withdrawals} />
-        <TotalStat label="Plays" value={totals.plays} />
-        <TotalStat label="Gains" value={totals.gains} tone={totals.gains >= 0 ? 'positive' : 'negative'} />
+        <TotalStat label="Bids" value={totals.plays} />
+        <TotalStat label="Refunds" value={totals.gains} tone={totals.gains >= 0 ? 'positive' : 'negative'} />
       </View>
       <View style={styles.gainPercentRow}>
         <Ionicons name={isPositive ? 'trending-up' : 'trending-down'} size={14} color={isPositive ? colors.success : colors.danger} />
         <Text style={[styles.gainPercentText, { color: isPositive ? colors.success : colors.danger }]}>
-          {formatPercent(gainPercent)} return on plays
+          {formatPercent(gainPercent)} wallet change
         </Text>
       </View>
     </Card>
@@ -172,11 +176,16 @@ function TotalStat({ label, value, tone }: { label: string; value: number; tone?
 function TransactionRow({ tx }: { tx: WalletTransaction }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const isPositive = tx.amount >= 0;
+  // 'round_neutral' (a round that returned exactly the stake, no more no
+  // less) gets its own muted tone — styling it the same green as a real
+  // gain read as if something was won when nothing was.
+  const tone: 'positive' | 'negative' | 'neutral' = tx.type === 'round_neutral' ? 'neutral' : tx.amount >= 0 ? 'positive' : 'negative';
+  const toneColor = tone === 'positive' ? colors.success : tone === 'negative' ? colors.danger : colors.textMuted;
+  const toneTint = tone === 'positive' ? colors.successTint : tone === 'negative' ? colors.dangerTint : colors.surfaceAlt;
   return (
     <Card style={styles.txCard}>
-      <View style={[styles.txIconCircle, { backgroundColor: isPositive ? colors.successTint : colors.dangerTint }]}>
-        <Ionicons name={TX_ICON[tx.type]} size={18} color={isPositive ? colors.success : colors.danger} />
+      <View style={[styles.txIconCircle, { backgroundColor: toneTint }]}>
+        <Ionicons name={TX_ICON[tx.type]} size={18} color={toneColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.txDescription} numberOfLines={2}>
@@ -188,7 +197,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
           {tx.status === 'failed' && <Badge label="Failed" tone="danger" />}
         </View>
       </View>
-      <Text style={[styles.txAmount, { color: isPositive ? colors.success : colors.danger }]}>{formatSigned(tx.amount)}</Text>
+      <Text style={[styles.txAmount, { color: toneColor }]}>{formatSigned(tx.amount)}</Text>
     </Card>
   );
 }

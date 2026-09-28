@@ -22,6 +22,22 @@ export function computeGainPercent(gains: number, plays: number): number {
   return plays > 0 ? (gains / plays) * 100 : 0;
 }
 
+/**
+ * Whether a settled round's result should render as a gain (green) or loss
+ * (red). Trusts the actual computed number (`valueGained = Gain - Loss`)
+ * over the backend's `GLN`/`finalOutcome` flag — CONFIRMED live (2026-09-20)
+ * that GLN reports 'G' even for rounds where CurrentBalance came in below
+ * SlotAmount (a real net loss), because the backend's `Gain` field is never
+ * populated (always 0) while `Loss` absorbs the whole magnitude regardless
+ * of direction. The flag is only used as a last resort when there's no
+ * number to check at all.
+ */
+export function isGainPositive(valueGained: number | undefined, finalOutcome?: 'gain' | 'loss'): boolean {
+  if (valueGained != null) return valueGained >= 0;
+  if (finalOutcome) return finalOutcome === 'gain';
+  return true;
+}
+
 /** "09:00" -> "9:00 AM" */
 export function formatTime12h(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number);

@@ -36,27 +36,46 @@ interface WalletState {
   ) => Promise<void>;
   virtualAccount: VirtualAccount | null;
   virtualAccountLoading: boolean;
-  /** Reads the deposit virtual account (BB); generates one (VV) if the user doesn't have one yet. */
+  /** Reads the deposit virtual account (BB); generates one (VV) if the user doesn't have one yet. Deprecated by the Flutterwave PAY flow — kept for reference, no longer called by DepositModal. */
   fetchVirtualAccount: () => Promise<void>;
+  /** Step 1 of a Flutterwave deposit: initialize a payment and hand back the hosted checkout URL. */
+  createDeposit: (amount: number, name?: string, email?: string) => Promise<{ redirectUrl: string; reference: string }>;
+  /** Step 2 of a deposit: verify the payment by tx_ref via UPS. Returns true when Flutterwave confirms the transaction settled. */
+  verifyDeposit: (reference: string) => Promise<{ verified: boolean; message: string }>;
   withdrawalHistory: WithdrawalHistoryEntry[];
   fetchWithdrawalHistory: () => Promise<void>;
   /** Triggers an actual payout (IP) — requires the OTP just sent plus the user's real login password, same as resetPayoutBankDetails. */
   requestWithdrawal: (amount: number, otp: string, pinCode: string) => Promise<void>;
+  /**
+   * Restores every field to its just-logged-out default. CONFIRMED live
+   * bug this fixes: this store has no `persist` middleware, so nothing
+   * cleared it on logout — a second account logging in on the same app
+   * session inherited the first account's balance, transactions, and (most
+   * visibly) `virtualAccount`, since DepositModal only fetches a fresh one
+   * when `virtualAccount` is falsy. That showed the PREVIOUS account's bank
+   * details on a brand-new account's Deposit screen. Called from
+   * authStore.logout().
+   */
+  reset: () => void;
 }
 
-export const useWalletStore = create<WalletState>((set, get) => ({
+const INITIAL_STATE = {
   balance: 0,
   totalProfit: 0,
   totalProfitPercent: 0,
-  transactions: [],
+  transactions: [] as WalletTransaction[],
   isLoading: false,
-  linkedBankAccount: null,
-  virtualAccount: null,
+  linkedBankAccount: null as LinkedBankAccount | null,
+  virtualAccount: null as VirtualAccount | null,
   virtualAccountLoading: false,
-  withdrawalHistory: [],
+  withdrawalHistory: [] as WithdrawalHistoryEntry[],
   dailyTotals: EMPTY_TOTALS,
   monthlyTotals: EMPTY_TOTALS,
   totalsLoading: false,
+};
+
+export const useWalletStore = create<WalletState>((set, get) => ({
+  ...INITIAL_STATE,
 
   fetchTotals: async () => {
     set({ totalsLoading: true });
@@ -121,6 +140,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
+  createDeposit: async (amount, name, email) => {
+    return api.wallet.createDepositReference(amount, { name, email });
+  },
+
+  verifyDeposit: async (reference) => {
+    return api.wallet.verifyDeposit(reference);
+  },
+
   fetchWithdrawalHistory: async () => {
     const withdrawalHistory = await api.wallet.getWithdrawalHistory();
     set({ withdrawalHistory });
@@ -131,4 +158,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     await get().refresh();
     await get().fetchWithdrawalHistory();
   },
+
+  reset: () => set(INITIAL_STATE),
 }));

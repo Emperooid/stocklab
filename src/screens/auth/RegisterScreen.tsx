@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
+import { Mascot } from '../../components/Mascot';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { RegisteredButLoginFailedError, useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
@@ -15,6 +16,31 @@ import { saveCredentials } from '../../lib/biometric';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 type Step = 'phone' | 'otp' | 'details';
 type Gender = 'Male' | 'Female';
+
+const STEPS: Step[] = ['phone', 'otp', 'details'];
+const STEP_LABELS: Record<Step, string> = { phone: 'Phone', otp: 'Verify', details: 'Details' };
+
+/** Shared step-progress header for the sign-up flow — a back chevron (when there's a previous step) plus a "Step X of 3" dot row, so the multi-step flow always shows where you are and that it isn't the last step. */
+function StepHeader({ step, onBack }: { step: Step; onBack?: () => void }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const index = STEPS.indexOf(step);
+  return (
+    <View style={styles.stepHeader}>
+      <TouchableOpacity onPress={onBack} disabled={!onBack} hitSlop={10} style={styles.backBtn}>
+        {!!onBack && <Ionicons name="chevron-back" size={22} color={colors.text} />}
+      </TouchableOpacity>
+      <View style={styles.stepDotsRow}>
+        {STEPS.map((s, i) => (
+          <View key={s} style={[styles.stepDot, i === index && styles.stepDotActive, i < index && styles.stepDotDone]} />
+        ))}
+      </View>
+      <Text style={styles.stepCountText} numberOfLines={1}>
+        {STEP_LABELS[step]} ({index + 1}/{STEPS.length})
+      </Text>
+    </View>
+  );
+}
 
 export default function RegisterScreen({ navigation }: Props) {
   const colors = useColors();
@@ -94,10 +120,10 @@ export default function RegisterScreen({ navigation }: Props) {
   if (step === 'otp') {
     return (
       <Screen style={styles.centerContent}>
-        <Text style={styles.title}>Enter the code</Text>
-        <Text style={styles.subtitle}>We sent a 6-digit code to {phone}.</Text>
+        <StepHeader step={step} onBack={() => setStep('phone')} />
+        <Mascot message={`We sent a 6-digit code to ${phone}. Enter it below.`} />
 
-        <View style={styles.form}>
+        <View style={[styles.form, { marginTop: spacing.lg }]}>
           <Input
             label="Verification code"
             value={otp}
@@ -120,10 +146,10 @@ export default function RegisterScreen({ navigation }: Props) {
   if (step === 'details') {
     return (
       <Screen style={styles.centerContent}>
-        <Text style={styles.title}>Tell us about you</Text>
-        <Text style={styles.subtitle}>Almost done — just a few more details.</Text>
+        <StepHeader step={step} onBack={() => setStep('otp')} />
+        <Mascot message="Almost done! Just a few details and you're in." />
 
-        <View style={styles.form}>
+        <View style={[styles.form, { marginTop: spacing.lg }]}>
           <View style={styles.verifiedPhoneBox}>
             <View>
               <Text style={styles.verifiedPhoneLabel}>Phone number</Text>
@@ -184,15 +210,10 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <Screen style={styles.centerContent}>
-      <View style={styles.header}>
-        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.logo}>CrowdStock</Text>
-      </View>
+      <StepHeader step={step} />
+      <Mascot message="Hello! Let's start with your phone number." />
 
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Enter your phone number to get started.</Text>
-
-      <View style={styles.form}>
+      <View style={[styles.form, { marginTop: spacing.lg }]}>
         <Input
           label="Phone number"
           value={phone}
@@ -213,6 +234,24 @@ export default function RegisterScreen({ navigation }: Props) {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     centerContent: { flexGrow: 1, justifyContent: 'center' },
+    stepHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    backBtn: { width: 76, height: 32, alignItems: 'flex-start', justifyContent: 'center' },
+    stepDotsRow: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: spacing.xs },
+    stepDot: { width: 20, height: 4, borderRadius: 2, backgroundColor: colors.border },
+    stepDotActive: { backgroundColor: colors.primary, width: 28 },
+    stepDotDone: { backgroundColor: colors.primaryTint },
+    stepCountText: {
+      ...typography.tiny,
+      color: colors.textMuted,
+      width: 76,
+      textAlign: 'right',
+      flexShrink: 0,
+    },
     header: { alignItems: 'center', marginBottom: spacing.xl },
     logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
     logo: { ...typography.h2, color: colors.text, letterSpacing: 0.2 },

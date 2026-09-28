@@ -9,7 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { api } from '../../api';
 import { DailyHistoryEntry } from '../../types';
-import { formatPercent, formatSigned } from '../../lib/format';
+import { formatPercent, formatSigned, isGainPositive } from '../../lib/format';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -100,8 +100,8 @@ export default function RoundHistoryScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="calendar-outline"
-            title="No rounds this month"
-            message={`No settled rounds in ${MONTH_NAMES[selectedMonth]} ${selectedYear}. Try another month.`}
+            title="No auctions this month"
+            message={`No completed auctions in ${MONTH_NAMES[selectedMonth]} ${selectedYear}. Try another month.`}
           />
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
@@ -173,7 +173,7 @@ function PickerModal<T extends string | number>({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={[styles.modalSheet, { paddingBottom: spacing.xl + insets.bottom }]}>
+        <View style={[styles.modalSheet, { paddingBottom: Math.round(spacing.xl + insets.bottom) }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
@@ -221,7 +221,7 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.dateText}>{formatDate(entry.date)}</Text>
-          <Text style={styles.subText}>{entry.roundsSettled}/{entry.rounds.length} rounds settled</Text>
+          <Text style={styles.subText}>{entry.roundsSettled}/{entry.rounds.length} auctions closed</Text>
         </View>
         <View style={{ alignItems: 'flex-end', marginRight: spacing.xs }}>
           <Text style={[styles.gainText, { color: gainColor }]}>{formatSigned(entry.totalGain)}</Text>
@@ -234,18 +234,16 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
         <View style={styles.detail}>
           {entry.rounds.map((r) => (
             <View key={r.slot.id} style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Round {r.slot.index}</Text>
+              <Text style={styles.detailLabel}>Auction {r.slot.index}</Text>
               <Text style={styles.detailInfo}>
-                {r.prediction ? `picked ${r.prediction.value}` : 'no stock pick'}
-                {r.result?.average != null ? ` · Avg ${r.result.average.toFixed(2)}` : ''}
+                {r.prediction ? `bid ${r.prediction.value}` : 'no bid placed'}
+                {r.result?.average != null ? ` · Final price ${r.result.average.toFixed(2)}` : ''}
               </Text>
               <Text
                 style={[
                   styles.detailGain,
                   {
-                    color: (r.result?.finalOutcome ? r.result.finalOutcome === 'gain' : (r.result?.valueGained ?? 0) >= 0)
-                      ? colors.success
-                      : colors.danger,
+                    color: isGainPositive(r.result?.valueGained, r.result?.finalOutcome) ? colors.success : colors.danger,
                   },
                 ]}
               >

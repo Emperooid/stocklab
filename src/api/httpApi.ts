@@ -1,5 +1,5 @@
 import { DailyHistoryEntry, DailyRound, InviteStats, LinkedBankAccount, SupportContact, User, VirtualAccount, WalletPeriodTotals, WalletTransaction, WithdrawalHistoryEntry } from '../types';
-import { ROUND_SLOTS, getSlotStatus, localDateKey } from '../lib/schedule';
+import { ROUND_SLOTS, getSlotStatus, getOperatingDayStart, localDateKey } from '../lib/schedule';
 import { getDeviceId } from '../lib/deviceId';
 import { callGateway, getSession, setSession } from './backendClient';
 
@@ -63,10 +63,6 @@ import { callGateway, getSession, setSession } from './backendClient';
 
 function findSlot(roundId: string) {
   return ROUND_SLOTS.find((s) => s.id === roundId);
-}
-
-function notSupported(feature: string): never {
-  throw new Error(`${feature} isn't available yet — no backend endpoint exists for it.`);
 }
 
 /**
@@ -397,6 +393,34 @@ export const httpApi = {
     },
 
     /**
+     * Reliable "which rounds have I actually played today" via G15 (Code
+     * "P") — server-confirmed, unlike the two things the app otherwise
+     * relies on for this: G13 (which never reflects a pending prediction
+     * before a round settles, per roundsStore.ts) and the local device-only
+     * record made at submit time (lost on reinstall or a different device).
+     * G15's play records don't carry the actual figure picked, only that a
+     * stake was placed for that round index — so this fills the "is this
+     * round done" gap, not the "what did I pick" one. Filtered to today's
+     * operating day; G15 itself only takes Year/Month, not a specific day.
+     */
+    async getPlayedRoundIndices(): Promise<number[]> {
+      const { phone } = requireSession();
+      const now = new Date();
+      const todayKey = localDateKey(getOperatingDayStart(now));
+      const res = await callGateway<any>('G15', {
+        Year: String(now.getFullYear()),
+        Month: String(now.getMonth() + 1).padStart(2, '0'),
+        Phone: phone,
+        Code: 'P',
+      });
+      const records = Array.isArray(res?.Records) ? res.Records : [];
+      return records
+        .filter((r: any) => r.Datein === todayKey)
+        .map((r: any) => Number(r.Label))
+        .filter((n: number) => Number.isFinite(n));
+    },
+
+    /**
      * CONFIRMED per Mr Yemi's A1/A2/UU doc: A2_GetAutoPlaybyPhone returns
      * every round's Auto Play record in one call — {autoplay: [{Round,
      * Status, Figure, ...}]}. Used to hydrate all 24 rounds' state at once
@@ -504,6 +528,98 @@ export const httpApi = {
       return { balance: Number(res?.balance ?? 0), totalProfit: 0, totalProfitPercent: 0 };
     },
     /**
+     * Step 1 of a deposit: initialize a Flutterwave payment via theKey "PAY"
+     * (the same deposit key the old card-checkout flow used, now re-targeted
+     * at Flutterwave). CONFIRMED live: PAY is session-exempt — it succeeds
+     * with only the bearer header, no refID/phone/deviceid.
+     *
+     * Flow (confirmed live):
+     *   1. Call PAY with the Flutterwave payload below. `cref` must be unique
+     *      per attempt — generated client-side.
+     *   2. The outer response's `response` field is a JSON-encoded *string*
+     *      (not a nested object) — JSON.parse() it, then read
+     *      `responseData.redirectUrl` — a hosted Flutterwave checkout page.
+     *   3. Open that URL (plain browser open is enough — no WebView needed).
+     *   4. The backend credits the wallet via webhook once payment completes;
+     *      nothing for the client to call afterward. The existing balance
+     *      refresh picks up the new balance once the webhook lands.
+     *
+     * `amount` is sent in naira (Flutterwave's native unit) — NOT kobo. The
+     * old pre-Flutterwave gateway wanted kobo (`amount * 100`); Flutterwave
+     * reads `amount` as naira directly, so multiplying by 100 now over-charges
+     * 100x. Confirmed live via the echoed `request.amount` forwarded to
+     * Flutterwave unchanged.
+     * `channel`/`currency` are new Flutterwave fields, fixed to WEB/NGN.
+     */
+    async createDepositReference(
+      amount: number,
+      opts: { name?: string; email?: string } = {}
+    ): Promise<{ redirectUrl: string; reference: string }> {
+      const { phone } = requireSession();
+      const cref = `dep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      // The gateway validates femail as a real email address and rejects a
+      // bare phone number — use the account's real email when known, else a
+      // synthesized address that at least passes format validation.
+      const femail = opts.email?.trim() || `${phone.replace(/\D/g, '')}@crowdstock.app`;
+
+      const res = await callGateway<any>(
+        'PAY',
+        {
+          cref,
+          amount: Math.round(amount),
+          description: 'Wallet deposit',
+          cname: opts.name?.trim() || phone,
+          femail,
+          cmobile: phone,
+          channel: 'WEB',
+          currency: 'NGN',
+        },
+        { requiresSession: false }
+      );
+
+      let inner = res?.response;
+      if (typeof inner === 'string') {
+        try {
+          inner = JSON.parse(inner);
+        } catch {
+          throw new Error('PAY succeeded but its response could not be parsed. Please try again.');
+        }
+      }
+      // Two response shapes seen live across gateway switches:
+      //   - Flutterwave (current): response.data.link — hosted checkout URL
+      //   - old Sling gateway:        responseData.redirectUrl (nested in a
+      //     JSON-encoded `response` string)
+      // Read the current shape first, then fall back defensively.
+      const redirectUrl = inner?.data?.link ?? inner?.responseData?.redirectUrl;
+      if (!redirectUrl) {
+        throw new Error('PAY succeeded but returned no checkout link. Please try again.');
+      }
+      return { redirectUrl, reference: inner?.responseData?.transactionReference ?? res?.tx_ref ?? res?.cref ?? cref };
+    },
+    /**
+     * Step 2 of a deposit: verify a Flutterwave payment by its tx_ref via
+     * theKey "UPS" (Update Payment Status). CONFIRMED live: UPS needs only
+     * {tx_ref} — the backend resolves the Flutterwave transaction_id itself.
+     *
+     * Response when the payment exists and has settled:
+     *   { status: "success", message: "Payment verified successfully",
+     *     data: { status: "successful", amount, ... } }
+     * Response when not found / still pending:
+     *   { status: "error", message: "No Flutterwave transaction was found ...",
+     *     data: {...} }
+     */
+    async verifyDeposit(reference: string): Promise<{ verified: boolean; message: string }> {
+      // CONFIRMED live: UPS is session-exempt (like PAY) — it succeeds with
+      // only the bearer header, no refID/phone/deviceid. Calling it with
+      // requiresSession:true would mint a G1001 token first, which fails and
+      // force-logs-out the user if their session has lapsed while they were
+      // away on the checkout page. Keep it exempt.
+      const res = await callGateway<any>('UPS', { tx_ref: reference }, { requiresSession: false });
+      const dataStatus = res?.data?.status;
+      const verified = res?.status === 'success' && (dataStatus === 'successful' || dataStatus === 'success');
+      return { verified: !!verified, message: res?.message ?? '' };
+    },
+    /**
      * CONFIRMED per Mr Yemi's BB/PP/VV doc (BB_getBankAccountProfile):
      * reads back both the inbound (deposit, i.e. virtual account) and
      * outbound (payout) bank details in one call from gtblusers. Response
@@ -587,13 +703,18 @@ export const httpApi = {
     async verifyBankAccount(bankCode: string, accountNumber: string): Promise<{ accountName: string; bankName: string }> {
       requireSession();
       const res = await callGateway<any>('AAA', { bankCode, accNumber: accountNumber });
-      const data = res?.responseData;
-      if (!data?.accountName) {
+      // CONFIRMED live (Flutterwave-backed name enquiry, current): the name
+      // is at the TOP LEVEL of the response — {success, message, accountName,
+      // accountNumber} — not nested under responseData. The old VigiPay-style
+      // doc shape nested it as responseData.accountName, so read the current
+      // field first and fall back defensively.
+      const accountName = res?.accountName ?? res?.responseData?.accountName;
+      if (!accountName) {
         throw new Error('Could not verify that account. Check the account number and bank.');
       }
       return {
-        accountName: data.accountName,
-        bankName: data.bankName ?? '',
+        accountName,
+        bankName: res?.bankName ?? res?.responseData?.bankName ?? '',
       };
     },
     /**
@@ -721,9 +842,29 @@ export const httpApi = {
       const { phone } = requireSession();
       await callGateway('IP', { Phone: phone, Amount: amount, OTP: otp, PinCode: pinCode });
     },
-    /** No confirmed endpoint yet for the withdrawal history table (Date Requested/Balance Before/After/Open-Closed/Date Credited). */
-    async getWithdrawalHistory(): Promise<WithdrawalHistoryEntry[]> {
-      notSupported('Fetching withdrawal history');
+    /**
+     * No dedicated withdrawal-history endpoint exists — reuses G15 (Code
+     * "W"), the same confirmed-working transaction source getTransactions()
+     * already pulls from, filtered to this month/year like it is there.
+     * Only carries what those records actually have (Id, Amount, Bank,
+     * Datein, Timein) — no balance-before/after or open/closed status, since
+     * that data doesn't exist in this response and isn't worth guessing at.
+     */
+    async getWithdrawalHistory(year?: number, month?: number): Promise<WithdrawalHistoryEntry[]> {
+      const { phone } = requireSession();
+      const now = new Date();
+      const yearStr = String(year ?? now.getFullYear());
+      const monthStr = String((month ?? now.getMonth()) + 1).padStart(2, '0');
+      const res = await callGateway<any>('G15', { Year: yearStr, Month: monthStr, Phone: phone, Code: 'W' });
+      const records = Array.isArray(res?.Records) ? res.Records : [];
+      return records
+        .map((raw: any) => ({
+          id: String(raw.Id),
+          amount: Number(raw.Amount ?? 0),
+          bank: raw.Bank || undefined,
+          dateRequested: `${raw.Datein ?? ''}T${raw.Timein ?? '00:00:00'}`,
+        }))
+        .sort((a: WithdrawalHistoryEntry, b: WithdrawalHistoryEntry) => b.dateRequested.localeCompare(a.dateRequested));
     },
     /**
      * CONFIRMED shape (G15_ShowDepositsAND_Others, per Mr Yemi's docs):
@@ -751,7 +892,7 @@ export const httpApi = {
         codes.map((Code) => callGateway<any>('G15', { Year: yearStr, Month: monthStr, Phone: phone, Code }).catch(() => null))
       );
       const allRecords = responses.flatMap((res) => (Array.isArray(res?.Records) ? res.Records : []));
-      const transactions = allRecords.map(mapTransaction).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const transactions = mergeRoundTransactions(allRecords).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return transactions;
     },
     /**
@@ -974,7 +1115,7 @@ function mapTransaction(raw: any): WalletTransaction {
     description = `Round ${raw.Label} stake`;
   } else {
     // 'G'/'L'/'N' — a settled round's gain/loss outcome, not seen populated yet
-    type = amount >= 0 ? 'round_gain' : 'round_loss';
+    type = amount > 0 ? 'round_gain' : amount < 0 ? 'round_loss' : 'round_neutral';
     description = `Round ${raw.Label} result`;
   }
 
@@ -985,6 +1126,75 @@ function mapTransaction(raw: any): WalletTransaction {
     createdAt,
     description,
   };
+}
+
+/**
+ * Merges each round's stake (LabelID "P", negative) with its settlement
+ * (LabelID "G"/"L"/"N", the gross StockValue paid back — CONFIRMED live
+ * this is gross, not net, so it's always >= 0 regardless of whether the
+ * round actually won or lost) into ONE net transaction per round, matched
+ * by (Datein, Label) since both records share the same date and round
+ * index.
+ *
+ * Without this, the Wallet showed two separate lines per round — e.g.
+ * "Round 17 stake -300" then "Round 17 result +230.91" — which isn't a
+ * double charge (real money only moves once net), but reads as one because
+ * the second line is always styled/labeled as a "gain" even when it's
+ * actually less than the stake. A neutral round (stake fully returned)
+ * showed as literally "+300" then "-300", which is exactly where this was
+ * reported as looking like a credit/debit duplicate. One net line per round
+ * — colored and labeled by the actual net outcome — matches how Home and
+ * Rounds already present a single result number for the same round.
+ *
+ * Deposits/withdrawals pass through unmerged (one real event each).
+ */
+function mergeRoundTransactions(records: any[]): WalletTransaction[] {
+  const passthrough: any[] = [];
+  const stakes = new Map<string, any>();
+  const settlements = new Map<string, any>();
+
+  for (const raw of records) {
+    if (raw.LabelID === 'D' || raw.LabelID === 'W') {
+      passthrough.push(raw);
+    } else if (raw.LabelID === 'P') {
+      stakes.set(`${raw.Datein}-${raw.Label}`, raw);
+    } else {
+      // 'G'/'L'/'N'
+      settlements.set(`${raw.Datein}-${raw.Label}`, raw);
+    }
+  }
+
+  const merged: WalletTransaction[] = passthrough.map(mapTransaction);
+
+  for (const [key, stakeRecord] of stakes) {
+    const settlementRecord = settlements.get(key);
+    if (!settlementRecord) {
+      // Played but not yet settled — nothing to net against yet.
+      merged.push(mapTransaction(stakeRecord));
+      continue;
+    }
+    settlements.delete(key);
+    const net = Number(stakeRecord.Amount ?? 0) + Number(settlementRecord.Amount ?? 0);
+    merged.push({
+      id: `${stakeRecord.Id}-${settlementRecord.Id}`,
+      // Exactly 0 (stake fully returned, no more no less) is genuinely
+      // neither a gain nor a loss — styling it identically to a real win
+      // (green, trending-up) reads as if something was gained when nothing
+      // was, which is exactly the confusion this distinct type avoids.
+      type: net > 0 ? 'round_gain' : net < 0 ? 'round_loss' : 'round_neutral',
+      amount: net,
+      createdAt: `${settlementRecord.Datein ?? ''}T${settlementRecord.Timein ?? '00:00:00'}`,
+      description: `Round ${stakeRecord.Label} result`,
+    });
+  }
+
+  // A settlement with no matching stake record shouldn't normally happen,
+  // but shows up on its own rather than silently vanishing if it does.
+  for (const settlementRecord of settlements.values()) {
+    merged.push(mapTransaction(settlementRecord));
+  }
+
+  return merged;
 }
 
 /** Groups a flat array of round-play records (G14, same shape as G13 — see mapResult) into DailyHistoryEntry[]. */
@@ -1002,10 +1212,27 @@ function groupHistoryByDate(raw: any[]): DailyHistoryEntry[] {
       const rounds: DailyRound[] = entries.map((entry, i) => {
         const slotIndex = Number(entry.Slot ?? entry.slot ?? entry.roundId ?? i + 1);
         const slot = ROUND_SLOTS.find((s) => s.index === slotIndex) ?? ROUND_SLOTS[i % ROUND_SLOTS.length];
+        const result = mapResult(slot.id, entry);
+        // CONFIRMED bug fix: this never set `prediction` at all before —
+        // RoundHistoryScreen reads r.prediction.value to show "picked X",
+        // but that field was always undefined here, so history showed "no
+        // stock pick" for every round regardless of whether one was made.
+        // The actual figure was sitting right there in result.userPrediction
+        // (mapResult's own parse of PredValue/predfigure) the whole time,
+        // just never wired into the field the UI actually reads.
+        const prediction =
+          result.userPrediction != null
+            ? {
+                roundId: slot.id,
+                value: result.userPrediction,
+                submittedAt: `${entry.Datein ?? ''}T${entry.timein ?? entry.Timein ?? '00:00:00'}`,
+              }
+            : undefined;
         return {
           slot,
           status: 'settled' as const,
-          result: mapResult(slot.id, entry),
+          result,
+          prediction,
         };
       });
       const settled = rounds.filter((r) => r.result);

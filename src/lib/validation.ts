@@ -94,3 +94,19 @@ export function getErrorMessage(error: unknown, fallback = 'Something went wrong
   if (error instanceof Error && error.message) return error.message;
   return fallback;
 }
+
+/**
+ * CONFIRMED live: logging in from a device the backend hasn't seen before
+ * for that account gets rejected outright by G22, even with the correct
+ * password — the only way through is resetting the password (G20/G21),
+ * which re-registers the device as a side effect. The raw backend message
+ * for this ("New Device Detected...") read as a dead end rather than an
+ * instruction, since nothing on the login screen connected it to the
+ * Forgot Password flow. Matched loosely on "device" rather than the exact
+ * wording, since this is the only login-failure case that ever mentions a
+ * device at all, and the backend's exact phrasing isn't a documented
+ * contract.
+ */
+export function isNewDeviceError(message: string): boolean {
+  return /device/i.test(message);
+}

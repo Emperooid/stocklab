@@ -13,10 +13,18 @@ export interface SavedCredentials {
 /** Whether this device has biometric hardware set up (Face ID, fingerprint, etc.). */
 export async function isBiometricAvailable(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  if (!hasHardware) return false;
-  const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-  return isEnrolled;
+  try {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    if (!hasHardware) return false;
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    return isEnrolled;
+  } catch {
+    // On simulators / Expo Go / platforms without the native module wired up,
+    // these can throw — treat that as "not available" rather than crashing,
+    // so the login screen just falls back to password instead of hiding the
+    // biometric button behind an unhandled rejection.
+    return false;
+  }
 }
 
 /** Prompts Face ID / fingerprint / device PIN. Resolves true only on success. */

@@ -7,7 +7,6 @@ import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
-import { Badge, BadgeTone } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
 import { BankPickerModal } from '../../components/BankPickerModal';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
@@ -24,9 +23,11 @@ import { formatMoney } from '../../lib/format';
  * instead, which requires a verification code (sent via G20, reused purely
  * as an OTP-delivery mechanism — see the httpApi.ts comment on that
  * assumption) plus the user's real login password, both checked
- * server-side. The withdrawal request itself and its history still have no
- * confirmed endpoint — those actions surface a real "not available yet"
- * error via the existing notSupported() pattern in httpApi.ts.
+ * server-side. The withdrawal request itself goes through IP — currently
+ * confirmed live but failing (PAYOUT_FAILED) regardless of input, most
+ * likely a Sling-sandbox issue on the backend, not a client bug. History
+ * has no dedicated endpoint, so it's read from G15 (Code "W") instead — see
+ * getWithdrawalHistory in httpApi.ts for what that does and doesn't cover.
  */
 export default function WithdrawalScreen() {
   const colors = useColors();
@@ -551,34 +552,21 @@ function BankDetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const STATUS_META: Record<WithdrawalHistoryEntry['status'], { label: string; tone: BadgeTone }> = {
-  open: { label: 'Open', tone: 'warning' },
-  closed: { label: 'Closed', tone: 'info' },
-};
-
 function WithdrawalHistoryRow({ entry }: { entry: WithdrawalHistoryEntry }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { label, tone } = STATUS_META[entry.status];
   return (
     <Card style={styles.historyCard}>
-      <View style={styles.historyHeaderRow}>
-        <Text style={styles.historyDate}>{new Date(entry.dateRequested).toLocaleString()}</Text>
-        <Badge label={label} tone={tone} />
+      <View style={styles.historyIconCircle}>
+        <Ionicons name="arrow-up-circle" size={18} color={colors.danger} />
       </View>
-      <View style={styles.historyStatsRow}>
-        <View>
-          <Text style={styles.historyStatLabel}>Balance Before</Text>
-          <Text style={styles.historyStatValue}>{formatMoney(entry.balanceBefore)}</Text>
-        </View>
-        <View>
-          <Text style={styles.historyStatLabel}>Balance After</Text>
-          <Text style={styles.historyStatValue}>{formatMoney(entry.balanceAfter)}</Text>
-        </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.historyDate} numberOfLines={1}>
+          {entry.bank ? `To ${entry.bank}` : 'Withdrawal'}
+        </Text>
+        <Text style={styles.historyTime}>{new Date(entry.dateRequested).toLocaleString()}</Text>
       </View>
-      {entry.dateCredited && (
-        <Text style={styles.historyCredited}>Credited {new Date(entry.dateCredited).toLocaleString()}</Text>
-      )}
+      <Text style={styles.historyAmount}>{formatMoney(Math.abs(entry.amount))}</Text>
     </Card>
   );
 }
@@ -643,12 +631,17 @@ function createStyles(colors: Colors) {
     availableText: { ...typography.tiny, color: colors.textMuted },
     maxLink: { ...typography.tiny, color: colors.primary, fontWeight: '700' },
     historyTitle: { marginTop: spacing.xl },
-    historyCard: {},
-    historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    historyCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    historyIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.md,
+      backgroundColor: colors.dangerTint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     historyDate: { ...typography.small, color: colors.text, fontWeight: '600' },
-    historyStatsRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.sm },
-    historyStatLabel: { ...typography.tiny, color: colors.textMuted },
-    historyStatValue: { ...typography.small, color: colors.text, fontWeight: '600', marginTop: 2 },
-    historyCredited: { ...typography.tiny, color: colors.success, marginTop: spacing.sm },
+    historyTime: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
+    historyAmount: { ...typography.body, color: colors.danger, fontWeight: '700' },
   });
 }

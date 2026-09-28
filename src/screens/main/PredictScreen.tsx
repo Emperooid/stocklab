@@ -1,133 +1,215 @@
-import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { CountdownBadge } from '../../components/CountdownBadge';
-import { EmptyState } from '../../components/EmptyState';
-import { PredictionControl } from '../../components/PredictionControl';
-import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
-import { MasterAutoPlayToggle } from '../../components/MasterAutoPlayToggle';
-import { Colors, spacing, typography, useColors } from '../../theme/theme';
-import { useRoundsStore } from '../../store/roundsStore';
-import { useAuthStore } from '../../store/authStore';
-import { useAutoPlayStore } from '../../store/autoPlayStore';
-import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
-import { getSlotStatus } from '../../lib/schedule';
-import { formatTime12h } from '../../lib/format';
+import { formatMoney } from '../../lib/format';
+import { AUCTION_ITEMS, AuctionItem } from '../../data/auctions';
+import { useAuctionStore } from '../../store/auctionStore';
+import { MainStackParamList } from '../../navigation/types';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 
 export default function PredictScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { rounds, fetchRounds, submitPrediction } = useRoundsStore();
-  const slotAmount = useAuthStore((s) => s.user?.slotAmount);
-  const loadAutoPlayFromServer = useAutoPlayStore((s) => s.loadFromServer);
-  const [refreshing, setRefreshing] = useState(false);
-  const now = useRoundsLiveRefresh();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const placeAuctionBid = useAuctionStore((state) => state.placeAuctionBid);
+  const [selectedId, setSelectedId] = useState(AUCTION_ITEMS[0].id);
+  const [bid, setBid] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const selected = AUCTION_ITEMS.find((item) => item.id === selectedId) ?? AUCTION_ITEMS[0];
+  const bidNumber = Number(bid);
+  const canBid = bidNumber >= selected.lowestBid;
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchRounds().catch(() => {});
-      loadAutoPlayFromServer().catch(() => {});
-    }, [])
-  );
-
-  async function handleRefresh() {
-    setRefreshing(true);
-    await Promise.all([fetchRounds(), loadAutoPlayFromServer().catch(() => {})]);
-    setRefreshing(false);
+  function selectItem(item: AuctionItem) {
+    setSelectedId(item.id);
+    setBid('');
+    setSubmitted(false);
   }
 
-  // A round accepts a stock pick any time before it settles — not just
-  // during its own hour — so this lists every unsettled round today, not
-  // just whichever one happens to be "open" right now.
-  const openRounds = rounds
-    .filter((r) => getSlotStatus(r.slot, now) !== 'settled')
-    .sort((a, b) => a.slot.index - b.slot.index);
+  function handlePlaceBid() {
+    if (canBid) {
+      placeAuctionBid(selected.id, bidNumber);
+      setSubmitted(true);
+    }
+  }
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Text style={styles.title}>Stock</Text>
+    <Screen>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.eyebrow}>BID CENTER</Text>
+          <Text style={styles.title}>Make your move</Text>
+        </View>
+        <View style={styles.feePill}>
+          <Ionicons name="flash" size={14} color={colors.accent} />
+          <Text style={styles.feeText}>Under ₦100 / bid</Text>
+        </View>
+      </View>
+      <Text style={styles.subtitle}>Choose an auction, enter your value, and compete to win.</Text>
 
-      <View style={{ marginBottom: spacing.lg }}>
-        <CountdownBadge />
+      <View style={styles.stepRow}>
+        <Step number="1" label="Choose" active colors={colors} />
+        <View style={styles.stepLine} />
+        <Step number="2" label="Enter bid" active={!!bid} colors={colors} />
+        <View style={styles.stepLine} />
+        <Step number="3" label="Win & own" active={submitted} colors={colors} />
       </View>
 
-      <Card style={styles.infoCard}>
-        <View style={styles.infoHeader}>
-          <Ionicons name="bulb-outline" size={18} color={colors.primary} />
-          <Text style={styles.infoTitle}>How scoring works</Text>
+      <Text style={styles.sectionTitle}>Select an auction</Text>
+      <View style={styles.productRail}>
+        {AUCTION_ITEMS.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[styles.productChip, item.id === selected.id && styles.productChipActive]}
+            onPress={() => selectItem(item)}
+          >
+            <Image source={{ uri: item.image }} style={styles.productChipImage} />
+            <Text style={[styles.productChipText, item.id === selected.id && styles.productChipTextActive]} numberOfLines={2}>
+              {item.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Card style={styles.bidCard}>
+        <View style={styles.productImageWrap}>
+          <Image source={{ uri: selected.image }} style={styles.productImage} />
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE AUCTION</Text>
+          </View>
         </View>
-        <Text style={styles.infoText}>
-          Pick a number — each round is played with your fixed stake amount, which comes out of your wallet balance,
-          separate from the rest. You can pick a stock for any round today in advance, not just the one currently
-          open, but each round can only be played once — there's no changing it after you submit. Once a round
-          settles, results are based on the average pick across all players that round — the closer your number
-          was to the average, the higher your gain; the farther away, the bigger the loss.
-        </Text>
+        <View style={styles.bidCardBody}>
+          <Text style={styles.category}>{selected.category}</Text>
+          <Text style={styles.productTitle}>{selected.title}</Text>
+          <View style={styles.statsRow}>
+            <AuctionStat label="Highest bid" value={formatMoney(selected.highestBid)} colors={colors} />
+            <AuctionStat label="Lowest bid" value={formatMoney(selected.lowestBid)} colors={colors} />
+            <AuctionStat label="Quantity" value={String(selected.quantity)} colors={colors} />
+          </View>
+          <View style={styles.closeRow}>
+            <Ionicons name="time-outline" size={17} color={colors.primary} />
+            <Text style={styles.closeText}>Closes {selected.closesAt}</Text>
+            <Text style={styles.bidders}>{selected.bidders} bidders</Text>
+          </View>
+
+          <Text style={styles.inputLabel}>Your bid value</Text>
+          <View style={[styles.inputWrap, bid.length > 0 && styles.inputWrapActive]}>
+            <Text style={styles.currency}>₦</Text>
+            <TextInput
+              value={bid}
+              onChangeText={(value) => {
+                setBid(value.replace(/[^0-9]/g, ''));
+                setSubmitted(false);
+              }}
+              placeholder={`Minimum ${formatMoney(selected.lowestBid)}`}
+              placeholderTextColor={colors.textDim}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+          <Text style={styles.helper}>Your bid must be at least {formatMoney(selected.lowestBid)}. Bidding cost is less than ₦100.</Text>
+
+          {submitted ? (
+            <View style={styles.successBox}>
+              <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+              <View style={styles.successCopy}>
+                <Text style={styles.successTitle}>Bid ready to submit</Text>
+                <Text style={styles.successText}>Your bid is saved on this device for this prototype.</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('MyBids')}><Text style={styles.viewBids}>View</Text></TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={[styles.placeButton, !canBid && styles.placeButtonDisabled]} onPress={handlePlaceBid} disabled={!canBid}>
+              <Ionicons name="hammer-outline" size={18} color={colors.onPrimary} />
+              <Text style={styles.placeButtonText}>Place bid</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </Card>
 
-      <MasterAutoPlayToggle />
-
-      {openRounds.length === 0 && (
-        <Card style={{ marginTop: spacing.lg }}>
-          <EmptyState
-            icon="hourglass-outline"
-            title="No rounds left to pick a stock for today"
-            message="Check back after the next operating day starts."
-          />
-        </Card>
-      )}
-
-      <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
-        {openRounds.map((round) => (
-          <Card key={round.slot.id}>
-            <View style={styles.roundHeader}>
-              <View style={styles.roundIndexCircle}>
-                <Text style={styles.roundIndexText}>{round.slot.index}</Text>
-              </View>
-              <View>
-                <Text style={styles.roundLabel}>Round {round.slot.index}</Text>
-                <Text style={styles.roundTime}>
-                  Opens {formatTime12h(round.slot.submitTime)} · Settles {formatTime12h(round.slot.settleTime)}
-                </Text>
-              </View>
-            </View>
-
-            <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
-
-            <PredictionControl
-              roundId={round.slot.id}
-              currentValue={round.prediction?.value}
-              slotAmount={slotAmount}
-              onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
-            />
-          </Card>
-        ))}
+      <View style={styles.deliveryCard}>
+        <View style={styles.deliveryIcon}><Ionicons name="cube-outline" size={20} color={colors.primary} /></View>
+        <View style={styles.deliveryCopy}>
+          <Text style={styles.deliveryTitle}>Win it. We deliver it.</Text>
+          <Text style={styles.deliveryText}>Winners are contacted after the auction closes and products are delivered to their location.</Text>
+        </View>
       </View>
     </Screen>
   );
 }
 
+function Step({ number, label, active, colors }: { number: string; label: string; active: boolean; colors: Colors }) {
+  return (
+    <View style={{ alignItems: 'center', gap: 5 }}>
+      <View style={{ width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? colors.primary : colors.surfaceAlt, borderWidth: 1, borderColor: active ? colors.primary : colors.border }}>
+        <Text style={{ color: active ? colors.onPrimary : colors.textMuted, fontSize: 12, fontWeight: '800' }}>{number}</Text>
+      </View>
+      <Text style={{ color: active ? colors.text : colors.textMuted, fontSize: 10, fontWeight: '700' }}>{label}</Text>
+    </View>
+  );
+}
+
+function AuctionStat({ label, value, colors }: { label: string; value: string; colors: Colors }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={{ color: colors.textMuted, fontSize: 10 }}>{label}</Text>
+      <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800', marginTop: 3 }}>{value}</Text>
+    </View>
+  );
+}
+
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
-    roundHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-    roundIndexCircle: {
-      width: 40,
-      height: 40,
-      borderRadius: 13,
-      backgroundColor: colors.primaryTint,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    roundIndexText: { ...typography.h3, color: colors.primary },
-    roundLabel: { ...typography.h3, color: colors.text },
-    roundTime: { ...typography.small, color: colors.textMuted, marginTop: 2 },
-    infoCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
-    infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-    infoTitle: { ...typography.h3, color: colors.text },
-    infoText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    title: { ...typography.h1, color: colors.text, marginTop: 3 },
+    subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: spacing.sm },
+    feePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.accentTint, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 7 },
+    feeText: { color: colors.accent, fontSize: 10, fontWeight: '800' },
+    stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: spacing.xl },
+    stepLine: { height: 1, backgroundColor: colors.border, width: 38, marginHorizontal: spacing.sm, marginBottom: 18 },
+    sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '800', marginBottom: spacing.md },
+    productRail: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+    productChip: { width: 86, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 5, backgroundColor: colors.surface },
+    productChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
+    productChipImage: { width: 74, height: 56, borderRadius: 8, backgroundColor: colors.surfaceAlt },
+    productChipText: { color: colors.textMuted, fontSize: 10, fontWeight: '700', marginTop: 5, minHeight: 25 },
+    productChipTextActive: { color: colors.primary },
+    bidCard: { padding: 0, overflow: 'hidden' },
+    productImageWrap: { height: 205, position: 'relative' },
+    productImage: { width: '100%', height: '100%', backgroundColor: colors.surfaceAlt },
+    liveBadge: { position: 'absolute', top: spacing.md, left: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 6 },
+    liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+    liveText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
+    bidCardBody: { padding: spacing.lg },
+    category: { color: colors.primary, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.7 },
+    productTitle: { color: colors.text, fontSize: 23, fontWeight: '800', marginTop: 5 },
+    statsRow: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.lg },
+    closeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.md },
+    closeText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+    bidders: { color: colors.textMuted, fontSize: 11, marginLeft: 'auto' },
+    inputLabel: { color: colors.text, fontSize: 13, fontWeight: '800', marginTop: spacing.xl, marginBottom: spacing.sm },
+    inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, height: 55 },
+    inputWrapActive: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
+    currency: { color: colors.text, fontSize: 20, fontWeight: '800', marginRight: spacing.sm },
+    input: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '800', padding: 0 },
+    helper: { color: colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: spacing.sm },
+    placeButton: { height: 52, backgroundColor: colors.primary, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.lg },
+    placeButtonDisabled: { opacity: 0.45 },
+    placeButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '800' },
+    successBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.successTint, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.lg },
+    successCopy: { marginLeft: spacing.sm },
+    successTitle: { color: colors.success, fontWeight: '800', fontSize: 13 },
+    successText: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
+    viewBids: { color: colors.primary, fontSize: 12, fontWeight: '800', marginLeft: spacing.sm },
+    deliveryCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.lg },
+    deliveryIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryTint },
+    deliveryCopy: { flex: 1, marginLeft: spacing.md },
+    deliveryTitle: { color: colors.text, fontSize: 13, fontWeight: '800' },
+    deliveryText: { color: colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 3 },
   });
 }

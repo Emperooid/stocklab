@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { Button } from './Button';
+import { Input } from './Input';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 import { useWalletStore } from '../store/walletStore';
-import { getErrorMessage } from '../lib/validation';
+import { useAuthStore } from '../store/authStore';
+import { getErrorMessage, validateDepositAmount } from '../lib/validation';
 import { formatMoney } from '../lib/format';
 
 const AUTO_CHECK_INTERVAL_S = 10;
@@ -19,24 +20,34 @@ const AUTO_CHECK_INTERVAL_S = 10;
 const MAX_AUTO_CHECKS = 30;
 
 /**
- * Full-screen deposit modal — big account details with per-field copy, plus
- * a live "waiting for your transfer" loop: auto-refreshes the balance every
- * 10s (visible countdown) and offers a manual "Check Now" for anyone who
- * doesn't want to wait. No per-transaction reference exists for a virtual
- * account transfer (unlike the old PAY/GR checkout flow), so "credited" is
- * simply detected by comparing the live balance against a snapshot taken
- * the moment this modal opened — the same before/after comparison the
- * removed verifyDepositByReference used, just without a reference to key
- * off of.
+ * Full-screen deposit modal — Flutterwave card/transfer checkout.
+ *
+ * Flow: the user enters an amount, we initialize a payment via PAY (see
+ * walletStore.createDeposit → httpApi.createDepositReference) and hand back a
+ * hosted checkout URL, which we open in the device browser. The backend
+ * credits the wallet via webhook once the payment completes — there is no
+ * client-side verify/confirm call — so "credited" is detected by comparing
+ * the live balance against a snapshot taken when the payment was initiated.
+ *
+ * The previous virtual-account (VV/BB) flow is retained in the API/store but
+ * is no longer used here; this modal was the only consumer.
  */
 export function DepositModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { balance, refresh, virtualAccount, virtualAccountLoading, fetchVirtualAccount } = useWalletStore();
+  const { balance, refresh, createDeposit, verifyDeposit } = useWalletStore();
+  const user = useAuthStore((s) => s.user);
 
+  const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  // The tx_ref + amount for the payment just initiated, so we can verify it
+  // via UPS once the user has paid (bank transfers settle asynchronously).
+  const pendingRef = useRef<string | null>(null);
+  const pendingAmount = useRef<number>(0);
   const [loadError, setLoadError] = useState('');
   const [checking, setChecking] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [secondsToNextCheck, setSecondsToNextCheck] = useState(AUTO_CHECK_INTERVAL_S);
   const [autoChecksExhausted, setAutoChecksExhausted] = useState(false);
   const autoCheckCount = useRef(0);
@@ -45,59 +56,90 @@ export function DepositModal({ visible, onClose }: { visible: boolean; onClose: 
 
   useEffect(() => {
     if (!visible) return;
-    startingBalance.current = balance;
+    // Reset every time the modal opens — a fresh deposit each time.
+    setAmount('');
+    setAmountError('');
+    setCheckoutUrl(null);
+    pendingRef.current = null;
+    pendingAmount.current = 0;
     setLoadError('');
     setSecondsToNextCheck(AUTO_CHECK_INTERVAL_S);
     autoCheckCount.current = 0;
     setAutoChecksExhausted(false);
-    if (!virtualAccount) {
-      fetchVirtualAccount().catch((e) => setLoadError(getErrorMessage(e, 'Could not load your deposit account.')));
-    }
+    startingBalance.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || credited || autoChecksExhausted) return;
+    if (!visible || !checkoutUrl || credited || autoChecksExhausted) return;
     const timer = setInterval(() => {
-      setSecondsToNextCheck((s) => {
-        if (s <= 1) {
-          checkNow(true);
-          return AUTO_CHECK_INTERVAL_S;
-        }
-        return s - 1;
-      });
+      // Pure tick — just counts down to 0 and stops there. The actual check
+      // runs from the effect below in response to the countdown reaching 0.
+      setSecondsToNextCheck((s) => Math.max(0, s - 1));
     }, 1000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, credited, autoChecksExhausted]);
+  }, [visible, checkoutUrl, credited, autoChecksExhausted]);
+
+  useEffect(() => {
+    if (!visible || !checkoutUrl || credited || autoChecksExhausted || checking) return;
+    if (secondsToNextCheck === 0) checkNow(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsToNextCheck]);
 
   async function checkNow(isAuto = false) {
     if (isAuto) {
       autoCheckCount.current += 1;
       if (autoCheckCount.current >= MAX_AUTO_CHECKS) setAutoChecksExhausted(true);
     } else {
-      // A manual tap always re-arms auto-checking, in case someone comes back
-      // to a modal that had already timed out.
       autoCheckCount.current = 0;
       setAutoChecksExhausted(false);
     }
     setChecking(true);
     try {
+      // Verify the payment via UPS first — if Flutterwave hasn't confirmed
+      // the transaction yet (bank transfers settle slowly), there's no point
+      // refreshing the balance.
+      if (pendingRef.current) {
+        const { verified } = await verifyDeposit(pendingRef.current);
+        if (!verified) {
+          setChecking(false);
+          setSecondsToNextCheck(AUTO_CHECK_INTERVAL_S);
+          return;
+        }
+      }
       await refresh();
     } catch {
-      // Silent — a failed background balance check isn't worth interrupting
-      // someone who's just waiting; the next auto-check (or manual retry)
-      // covers it.
+      // Silent — the next auto-check (or manual retry) covers it.
     } finally {
       setChecking(false);
       setSecondsToNextCheck(AUTO_CHECK_INTERVAL_S);
     }
   }
 
-  async function handleCopy(field: string, value: string) {
-    await Clipboard.setStringAsync(value);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField((f) => (f === field ? null : f)), 1500);
+  async function handleDeposit() {
+    const err = validateDepositAmount(amount);
+    if (err) {
+      setAmountError(err);
+      return;
+    }
+    setAmountError('');
+    setSubmitting(true);
+    setLoadError('');
+    try {
+      const { redirectUrl, reference } = await createDeposit(Number(amount), user?.name, user?.email);
+      startingBalance.current = balance;
+      // Store the tx_ref + amount so checkNow can verify via UPS.
+      pendingRef.current = reference;
+      pendingAmount.current = Number(amount);
+      setCheckoutUrl(redirectUrl);
+      // Open the hosted checkout in the device browser.
+      await Linking.openURL(redirectUrl).catch(() => {});
+    } catch (e) {
+      setLoadError(getErrorMessage(e, 'Could not start your deposit. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const insets = useSafeAreaInsets();
@@ -105,100 +147,69 @@ export function DepositModal({ visible, onClose }: { visible: boolean; onClose: 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { paddingBottom: spacing.xl + insets.bottom }]}>
+        <View style={[styles.sheet, { paddingBottom: Math.round(spacing.xl + insets.bottom) }]}>
           <View style={styles.headerRow}>
-            <Text style={styles.title}>Your Deposit Account</Text>
+            <Text style={styles.title}>{checkoutUrl ? 'Complete Your Deposit' : 'Add Money'}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.subtitle}>
-            Transfer any amount to this account from your own bank — it's yours alone, and we'll pick it up
-            automatically below.
-          </Text>
 
-          {virtualAccountLoading ? (
-            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.xl }} />
-          ) : !!loadError ? (
-            <Text style={styles.errorText}>{loadError}</Text>
-          ) : virtualAccount ? (
+          {!checkoutUrl ? (
             <>
-              <View style={styles.accountBox}>
-                <BigRow label="Bank" value={virtualAccount.bankName} onCopy={handleCopy} copiedField={copiedField} />
-                <BigRow
-                  label="Account Number"
-                  value={virtualAccount.accountNumber}
-                  onCopy={handleCopy}
-                  copiedField={copiedField}
-                  emphasize
-                />
-                <BigRow label="Account Name" value={virtualAccount.accountName} onCopy={handleCopy} copiedField={copiedField} last />
-              </View>
-
-              {credited ? (
-                <View style={styles.creditedBox}>
-                  <Ionicons name="checkmark-circle" size={32} color={colors.success} />
-                  <Text style={styles.creditedTitle}>Deposit received!</Text>
-                  <Text style={styles.creditedBody}>Your balance is now {formatMoney(balance)}.</Text>
-                  <Button title="Done" onPress={onClose} style={{ marginTop: spacing.md }} />
-                </View>
-              ) : (
-                <View style={styles.waitingBox}>
-                  {checking ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="time-outline" size={18} color={colors.textMuted} />
-                  )}
-                  <Text style={styles.waitingText}>
-                    {checking
-                      ? 'Checking for your transfer…'
-                      : autoChecksExhausted
-                        ? 'Still waiting — transfers can occasionally take a few minutes. Tap Check Now once you\'ve sent it.'
-                        : `Waiting for your transfer — checking again in ${secondsToNextCheck}s`}
-                  </Text>
-                  <TouchableOpacity onPress={() => checkNow(false)} disabled={checking} style={styles.checkNowBtn}>
-                    <Text style={styles.checkNowText}>Check Now</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              <Text style={styles.subtitle}>Enter an amount and we'll open a secure payment page for you to pay.</Text>
+              <Input
+                label="Amount (₦)"
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="number-pad"
+                placeholder="e.g. 5000"
+                error={amountError}
+                style={{ fontSize: typography.h3.fontSize, fontWeight: '700' }}
+                containerStyle={{ marginTop: spacing.lg }}
+              />
+              {!!loadError && <Text style={styles.errorText}>{loadError}</Text>}
+              <Button
+                title={submitting ? 'Starting…' : 'Continue to Payment'}
+                onPress={handleDeposit}
+                disabled={submitting}
+                loading={submitting}
+                style={{ marginTop: spacing.lg }}
+              />
             </>
-          ) : null}
+          ) : credited ? (
+            <View style={styles.creditedBox}>
+              <Ionicons name="checkmark-circle" size={32} color={colors.success} />
+              <Text style={styles.creditedTitle}>Deposit received!</Text>
+              <Text style={styles.creditedBody}>Your balance is now {formatMoney(balance)}.</Text>
+              <Button title="Done" onPress={onClose} style={{ marginTop: spacing.md }} />
+            </View>
+          ) : (
+            <View style={styles.waitingBox}>
+              <TouchableOpacity style={styles.reopenBtn} onPress={() => Linking.openURL(checkoutUrl).catch(() => {})}>
+                <Ionicons name="open-outline" size={18} color={colors.primary} />
+                <Text style={styles.reopenText}>Reopen payment page</Text>
+              </TouchableOpacity>
+              {checking ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="time-outline" size={18} color={colors.textMuted} />
+              )}
+              <Text style={styles.waitingText}>
+                {checking
+                  ? 'Checking for your payment…'
+                  : autoChecksExhausted
+                    ? 'Still waiting — payments can take a minute to confirm. Tap Check Now once you\'ve paid.'
+                    : `Waiting for your payment — checking again in ${secondsToNextCheck}s`}
+              </Text>
+              <TouchableOpacity onPress={() => checkNow(false)} disabled={checking} style={styles.checkNowBtn}>
+                <Text style={styles.checkNowText}>Check Now</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
-  );
-}
-
-function BigRow({
-  label,
-  value,
-  onCopy,
-  copiedField,
-  emphasize,
-  last,
-}: {
-  label: string;
-  value: string;
-  onCopy: (field: string, value: string) => void;
-  copiedField: string | null;
-  emphasize?: boolean;
-  last?: boolean;
-}) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const isCopied = copiedField === label;
-  return (
-    <View style={[styles.bigRow, last && { borderBottomWidth: 0 }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.bigRowLabel}>{label}</Text>
-        <Text style={[styles.bigRowValue, emphasize && styles.bigRowValueEmphasized]} selectable>
-          {value}
-        </Text>
-      </View>
-      <Pressable onPress={() => onCopy(label, value)} hitSlop={10} style={styles.copyBtn}>
-        <Ionicons name={isCopied ? 'checkmark' : 'copy-outline'} size={18} color={isCopied ? colors.success : colors.primary} />
-      </Pressable>
-    </View>
   );
 }
 
@@ -216,37 +227,21 @@ function createStyles(colors: Colors) {
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.small, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 18 },
     errorText: { ...typography.small, color: colors.danger, marginTop: spacing.lg },
-    accountBox: {
-      marginTop: spacing.lg,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
-      paddingHorizontal: spacing.md,
-    },
-    bigRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      gap: spacing.sm,
-    },
-    bigRowLabel: { ...typography.tiny, color: colors.textMuted, fontWeight: '700', letterSpacing: 0.3 },
-    bigRowValue: { ...typography.body, color: colors.text, fontWeight: '600', marginTop: 2 },
-    bigRowValueEmphasized: { ...typography.h2, marginTop: 4 },
-    copyBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: colors.primaryTint,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     waitingBox: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.xs },
     waitingText: { ...typography.small, color: colors.textMuted, textAlign: 'center' },
     checkNowBtn: { marginTop: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
     checkNowText: { ...typography.small, color: colors.primary, fontWeight: '700' },
+    reopenBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.primaryTint,
+      borderRadius: radius.pill,
+      marginBottom: spacing.md,
+    },
+    reopenText: { ...typography.small, color: colors.primary, fontWeight: '700' },
     creditedBox: { alignItems: 'center', marginTop: spacing.xl, gap: 4 },
     creditedTitle: { ...typography.h3, color: colors.text, marginTop: spacing.sm },
     creditedBody: { ...typography.small, color: colors.textMuted },

@@ -38,7 +38,7 @@ export function BankPickerModal({
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={handleClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { paddingBottom: spacing.lg + insets.bottom }]}>
+        <View style={[styles.sheet, { paddingBottom: Math.round(spacing.lg + insets.bottom) }]}>
           <View style={styles.headerRow}>
             <Text style={styles.title}>Select Your Bank</Text>
             <TouchableOpacity onPress={handleClose} hitSlop={8}>

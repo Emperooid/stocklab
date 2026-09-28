@@ -13,18 +13,18 @@ export function CountdownBadge() {
   if (!next) {
     return (
       <View style={styles.wrap}>
-        <Text style={styles.label}>No more rounds today</Text>
+        <Text style={styles.label}>All auctions are closed for today</Text>
       </View>
     );
   }
 
   const remaining = next.at.getTime() - now.getTime();
-  const verb = next.kind === 'open' ? 'opens' : 'settles';
+  const verb = next.kind === 'open' ? 'opens' : 'closes';
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>
-        Round {next.slot.index} {verb} in
+        Auction {verb} in
       </Text>
       <Text style={styles.countdown}>{formatCountdown(remaining)}</Text>
     </View>

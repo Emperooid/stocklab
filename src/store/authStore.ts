@@ -5,6 +5,11 @@ import { User } from '../types';
 import { api } from '../api';
 import { getSession, onSessionInvalidated, setSession, Session } from '../api/backendClient';
 import { useAlertPopupStore } from './alertPopupStore';
+import { useWalletStore } from './walletStore';
+import { useRoundsStore } from './roundsStore';
+import { useAutoPlayStore } from './autoPlayStore';
+import { useInviteStore } from './inviteStore';
+import { useAuctionStore } from './auctionStore';
 
 /**
  * Thrown by registerComplete when registration itself succeeded but the
@@ -56,10 +61,19 @@ interface AuthState {
   // shown once on the Login screen so a forced logout doesn't look like the
   // app just randomly signed the user out with no explanation.
   sessionExpiredMessage: string | null;
+  // Set by logout() so AuthNavigator can send a just-logged-out user
+  // straight to Login instead of its normal initial route (Welcome, once
+  // introStore's hasSeenIntro is true) — someone who had an account and just
+  // signed out almost always wants to log back into that same account, not
+  // re-see the Create-account-or-Login choice screen. Cleared once
+  // AuthNavigator reads it, so a later fresh sign-in-then-logout still shows
+  // this every time rather than only the first.
+  justLoggedOut: boolean;
   login: (phone: string, pin: string) => Promise<void>;
   registerStart: (phone: string) => Promise<void>;
   registerComplete: (phone: string, fullname: string, gender: string, pin: string, otp: string, email: string) => Promise<void>;
   logout: () => void;
+  clearJustLoggedOut: () => void;
   refreshUser: () => Promise<void>;
   requestPasswordReset: (phone: string) => Promise<void>;
   resetPassword: (phone: string, code: string, newPin: string) => Promise<void>;
@@ -75,6 +89,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       hasHydrated: false,
       sessionExpiredMessage: null,
+      justLoggedOut: false,
 
       login: async (phone, pin) => {
         set({ isLoading: true });
@@ -145,8 +160,23 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         setSession(null);
-        set({ user: null, session: null });
+        set({ user: null, session: null, justLoggedOut: true });
+        // CONFIRMED live bug this fixes: none of these stores have their
+        // own reset, and only roundsStore/inviteStore even persist to
+        // AsyncStorage — so a second account logging in on the same app
+        // session inherited the first account's balance, transactions,
+        // Auto Play config, invite list, and (most visibly) virtualAccount,
+        // since DepositModal only re-fetches a deposit account when it's
+        // currently null. That showed one account's bank details on
+        // another account's Deposit screen.
+        useWalletStore.getState().reset();
+        useRoundsStore.getState().reset();
+        useAutoPlayStore.getState().reset();
+        useInviteStore.getState().reset();
+        useAuctionStore.getState().reset();
       },
+
+      clearJustLoggedOut: () => set({ justLoggedOut: false }),
 
       clearSessionExpiredMessage: () => set({ sessionExpiredMessage: null }),
 

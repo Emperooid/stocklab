@@ -14,11 +14,11 @@ import { getErrorMessage, isValidPhone, validatePassword } from '../../lib/valid
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 type Step = 'request' | 'reset' | 'done';
 
-export default function ForgotPasswordScreen({ navigation }: Props) {
+export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [step, setStep] = useState<Step>('request');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(route.params?.prefillPhone ?? '');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');

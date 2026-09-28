@@ -11,9 +11,22 @@ export function scale(size: number): number {
   return (SCREEN_WIDTH / BASE_WIDTH) * size;
 }
 
-/** Scales a size toward the linear value by `factor` (0 = no scaling, 1 = full linear scaling). */
+/**
+ * Scales a size toward the linear value by `factor` (0 = no scaling, 1 = full linear scaling).
+ *
+ * CONFIRMED live: this fed a value like 16.403200000000002 (spacing.lg on a
+ * 402pt-wide screen) into a `gap` style property, and crashed under the New
+ * Architecture with "Exception in HostFunction: Loss of precision during
+ * arithmetic conversion: (long long) 16.4032...". Fabric validates `gap`
+ * more strictly than the long-established padding/margin properties, which
+ * silently tolerate a fractional CGFloat — throwing instead of rounding a
+ * non-integer flexbox gap. Rounded here, once, rather than at every
+ * individual call site, since spacing/typography/every moderateScale() user
+ * across the app was equally exposed to this on any screen width other
+ * than the 375pt baseline.
+ */
 export function moderateScale(size: number, factor = 0.35): number {
-  return size + (scale(size) - size) * factor;
+  return Math.round(size + (scale(size) - size) * factor);
 }
 
 export const layout = {
@@ -26,60 +39,58 @@ export const layout = {
 };
 
 export const darkColors = {
-  // A softer slate rather than near-black — reduces the "heavy" feel of
-  // the previous #0B0F0D/#121815 pairing without losing dark-mode contrast.
-  background: '#10171A',
-  surface: '#1A2226',
-  surfaceAlt: '#212B30',
-  surfaceRaised: '#263136',
-  border: '#2C3739',
-  borderLight: '#3A464A',
-  // Deep enough emerald to keep WHITE legible on top of it — the lighter
-  // #34D399 tried before this reads too washed-out with white text, which
-  // is why onPrimary was dark instead. Matches the light theme's existing
-  // primary, so both modes now use white-on-green consistently.
-  primary: '#10B981',
-  primaryDark: '#059669',
+  background: '#080D1C',
+  surface: '#10182B',
+  surfaceAlt: '#17233D',
+  surfaceRaised: '#202F50',
+  border: '#263A5B',
+  borderLight: '#3A5278',
+  primary: '#4F8CFF',
+  primaryDark: '#3478F6',
   onPrimary: '#FFFFFF',
-  text: '#F3F6F5',
-  textMuted: '#98A6A0',
-  textDim: '#67746E',
-  success: '#10B981',
-  successTint: 'rgba(16, 185, 129, 0.14)',
+  text: '#F5F8FF',
+  textMuted: '#A8B6D0',
+  textDim: '#7181A0',
+  success: '#2DD4BF',
+  successTint: 'rgba(45, 212, 191, 0.14)',
   danger: '#F87171',
   dangerTint: 'rgba(248, 113, 113, 0.14)',
   warning: '#FBBF24',
   warningTint: 'rgba(251, 191, 36, 0.14)',
-  primaryTint: 'rgba(16, 185, 129, 0.12)',
-  purple: '#A78BFA',
-  purpleTint: 'rgba(167, 139, 250, 0.14)',
+  primaryTint: 'rgba(79, 140, 255, 0.14)',
+  accent: '#A78BFA',
+  accentTint: 'rgba(167, 139, 250, 0.16)',
+  purple: '#C4B5FD',
+  purpleTint: 'rgba(196, 181, 253, 0.14)',
   blue: '#60A5FA',
   blueTint: 'rgba(96, 165, 250, 0.14)',
   overlay: 'rgba(0, 0, 0, 0.55)',
 };
 
 export const lightColors = {
-  background: '#F5F8F6',
+  background: '#F4F7FF',
   surface: '#FFFFFF',
-  surfaceAlt: '#EEF3EF',
+  surfaceAlt: '#EDF2FC',
   surfaceRaised: '#FFFFFF',
-  border: '#DCE5DF',
-  borderLight: '#E8EFEA',
-  primary: '#10B981',
-  primaryDark: '#059669',
+  border: '#D9E2F2',
+  borderLight: '#E8EEF9',
+  primary: '#3478F6',
+  primaryDark: '#245FCD',
   onPrimary: '#FFFFFF',
-  text: '#0F241A',
-  textMuted: '#57685F',
-  textDim: '#8C9A92',
-  success: '#10B981',
-  successTint: 'rgba(16, 185, 129, 0.10)',
+  text: '#111B32',
+  textMuted: '#5B6B88',
+  textDim: '#8997B0',
+  success: '#0F9F91',
+  successTint: 'rgba(15, 159, 145, 0.10)',
   danger: '#DC2626',
   dangerTint: 'rgba(220, 38, 38, 0.08)',
   warning: '#B45309',
   warningTint: 'rgba(180, 83, 9, 0.09)',
-  primaryTint: 'rgba(16, 185, 129, 0.10)',
-  purple: '#7C3AED',
-  purpleTint: 'rgba(124, 58, 237, 0.10)',
+  primaryTint: 'rgba(52, 120, 246, 0.10)',
+  accent: '#7C5CE6',
+  accentTint: 'rgba(124, 92, 230, 0.11)',
+  purple: '#6D4BD1',
+  purpleTint: 'rgba(109, 75, 209, 0.10)',
   blue: '#2563EB',
   blueTint: 'rgba(37, 99, 235, 0.10)',
   overlay: 'rgba(15, 36, 26, 0.4)',

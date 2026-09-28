@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -16,10 +18,19 @@ import { formatMoney, formatSigned } from '../../lib/format';
 import { getDeviceId } from '../../lib/deviceId';
 import { api } from '../../api';
 import { SupportContact } from '../../types';
+import { LegalDoc, MainStackParamList, MainTabParamList } from '../../navigation/types';
+
+const LEGAL_ROWS: { doc: LegalDoc; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { doc: 'privacy', label: 'Privacy Policy', icon: 'shield-checkmark-outline' },
+  { doc: 'terms', label: 'Terms of Service', icon: 'document-text-outline' },
+  { doc: 'responsible', label: 'Responsible Use', icon: 'heart-outline' },
+];
 
 export default function ProfileScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
+  const stackNavigation = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const refreshUser = useAuthStore((s) => s.refreshUser);
@@ -130,10 +141,9 @@ export default function ProfileScreen() {
             <Ionicons name="notifications-outline" size={18} color={colors.primary} />
           </View>
           <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>Round reminders</Text>
+            <Text style={styles.rowLabel}>Auction notifications</Text>
             <Text style={styles.rowHint}>
-              Alerts when a round opens, when it's about to close, when your result is ready, and a nudge if you
-              haven't played yet today.
+              Alerts for auctions closing soon, bid updates, winners, and order delivery progress.
             </Text>
           </View>
           <Switch
@@ -194,14 +204,35 @@ export default function ProfileScreen() {
         )}
       </Card>
 
+      <Text style={styles.sectionTitle}>Legal</Text>
+      <Card style={styles.section}>
+        {LEGAL_ROWS.map((row, index) => (
+          <TouchableOpacity
+            key={row.doc}
+            style={[styles.row, index > 0 && styles.rowDivider]}
+            onPress={() => stackNavigation?.navigate('Legal', { doc: row.doc })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.rowIconCircle}>
+              <Ionicons name={row.icon} size={18} color={colors.primary} />
+            </View>
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>{row.label}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        ))}
+      </Card>
+
       <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
 
-      <Text style={styles.footer}>CrowdStock · v1.0.0</Text>
-      {!!deviceId && (
+      <Text style={styles.footer}>CrowdStock</Text>
+      {/* Device ID display temporarily disabled — see deviceId state above. */}
+      {/* {!!deviceId && (
         <Text style={styles.deviceId} selectable>
           Device ID: {deviceId}
         </Text>
-      )}
+      )} */}
     </Screen>
   );
 }

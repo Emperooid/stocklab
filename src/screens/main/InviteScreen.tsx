@@ -152,7 +152,7 @@ export default function InviteScreen() {
     const firstName = contact.name.split(' ')[0];
     const linkLine = downloadUrl ? ` Download here: ${downloadUrl}` : '';
     const message = encodeURIComponent(
-      `Hey ${firstName}, join me on CrowdStock! Download the app and let's play together.${linkLine}`
+      `Hey ${firstName}, join me on CrowdStock! Download the app and join our live product auctions.${linkLine}`
     );
     Linking.openURL(`https://wa.me/234${contact.phone.slice(1)}?text=${message}`).catch(() => {});
   }
@@ -184,7 +184,7 @@ export default function InviteScreen() {
 
             <Card style={styles.statsCard}>
               <Text style={styles.statsBody}>
-                Earn more by bringing others to CrowdStock — the more people you onboard, the higher your payout gets.
+                Invite friends to discover live auctions, win products, and grow the CrowdStock community.
               </Text>
               <View style={styles.statsRow}>
                 <StatBlock icon="people-outline" value={stats?.successfulConversions ?? 0} label="People Onboarded" loading={statsLoading} />
@@ -352,8 +352,8 @@ function createStyles(colors: Colors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    statsCard: { backgroundColor: colors.successTint, borderColor: colors.success },
-    trackingCard: { marginTop: spacing.md, backgroundColor: colors.blueTint, borderColor: colors.blue },
+    statsCard: { backgroundColor: colors.successTint },
+    trackingCard: { marginTop: spacing.md, backgroundColor: colors.blueTint },
     trackingTitle: { ...typography.small, color: colors.text, fontWeight: '700' },
     trackingBody: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
     statsBody: { ...typography.small, color: colors.text, lineHeight: 18 },

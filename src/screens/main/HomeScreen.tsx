@@ -1,40 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { Button } from '../../components/Button';
-import { CountdownBadge } from '../../components/CountdownBadge';
-import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
-import { Badge, BadgeTone } from '../../components/Badge';
+import { formatMoney } from '../../lib/format';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
-import { useInviteStore } from '../../store/inviteStore';
-import { useAutoPlayStore } from '../../store/autoPlayStore';
-import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
-import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
-import { ROUND_SLOTS, getSlotStatus } from '../../lib/schedule';
-import { formatMoney, formatPercent, formatSigned, formatTime12h } from '../../lib/format';
-import { DailyRound, RoundStatus, WalletTransaction } from '../../types';
-import { MainStackParamList, MainTabParamList } from '../../navigation/types';
-
-const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
-  deposit: 'arrow-down-circle',
-  withdrawal: 'arrow-up-circle',
-  round_stake: 'game-controller-outline',
-  round_gain: 'trending-up',
-  round_loss: 'trending-down',
-};
-
-const ROUND_STATUS_META: Record<RoundStatus, { label: string; tone: BadgeTone }> = {
-  upcoming: { label: 'Upcoming', tone: 'neutral' },
-  open: { label: 'Open', tone: 'primary' },
-  awaiting_result: { label: 'Awaiting', tone: 'warning' },
-  settled: { label: 'Settled', tone: 'info' },
-};
+import { MainTabParamList } from '../../navigation/types';
+import { MainStackParamList } from '../../navigation/types';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AUCTION_ITEMS, AUCTION_WINNERS } from '../../data/auctions';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -42,55 +20,36 @@ export default function HomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const stackNavigation = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const user = useAuthStore((s) => s.user);
-  const { balance, transactions, refresh } = useWalletStore();
-  const { rounds, fetchRounds } = useRoundsStore();
-  const inviteStats = useInviteStore((s) => s.stats);
-  const fetchInviteStats = useInviteStore((s) => s.fetchStats);
-  const autoPlaySlots = useAutoPlayStore((s) => s.slots);
-  const autoPlayLoaded = useAutoPlayStore((s) => s.loaded);
-  const loadAutoPlayFromServer = useAutoPlayStore((s) => s.loadFromServer);
-  const now = useRoundsLiveRefresh();
+  const { balance, refresh } = useWalletStore();
   const [refreshing, setRefreshing] = useState(false);
-  const { profit: totalProfit, profitPercent: totalProfitPercent } = computeTodayProfit(rounds);
 
   useFocusEffect(
     useCallback(() => {
       refresh().catch(() => {});
-      fetchRounds().catch(() => {});
-      fetchInviteStats().catch(() => {});
-      loadAutoPlayFromServer().catch(() => {});
-    }, [])
+    }, [refresh])
   );
 
   async function handleRefresh() {
     setRefreshing(true);
-    await Promise.all([refresh(), fetchRounds(), fetchInviteStats().catch(() => {}), loadAutoPlayFromServer().catch(() => {})]);
-    setRefreshing(false);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
   }
 
-  const hasNews = !!user?.alertMessage || !!user?.newsMessage;
-  const openRound = rounds.find((r) => getSlotStatus(r.slot, now) === 'open' && !r.prediction);
-  const settledToday = rounds.filter((r) => r.result).length;
-  const latestResult = [...rounds].reverse().find((r) => r.result);
-  const isProfitPositive = totalProfit >= 0;
-  const upcomingRounds = rounds
-    .filter((r) => getSlotStatus(r.slot, now) !== 'settled')
-    .sort((a, b) => a.slot.index - b.slot.index)
-    .slice(0, 3);
-  const autoPlayEnabledCount = ROUND_SLOTS.filter((slot) => autoPlaySlots[slot.id]?.enabled).length;
-  const recentTransactions = transactions.slice(0, 3);
+  const featured = AUCTION_ITEMS[0];
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <View style={styles.headerRow}>
+      <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>WELCOME BACK</Text>
-          <Text style={styles.greeting}>{user?.name?.split(' ')[0] ?? 'Trader'}</Text>
+          <Text style={styles.brand}>Crowd<Text style={styles.brandAccent}>Stock</Text></Text>
+          <Text style={styles.tagline}>Bid · Win · Own</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.bellButton} onPress={() => stackNavigation?.navigate('News')}>
-            <Ionicons name="notifications-outline" size={20} color={colors.text} />
-            {hasNews && <View style={styles.bellDot} />}
+          <Pressable style={styles.iconButton}>
+            <Ionicons name="notifications-outline" size={21} color={colors.text} />
           </Pressable>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -99,313 +58,171 @@ export default function HomeScreen() {
       </View>
 
       <Card style={styles.balanceCard}>
-          <View style={styles.balanceTopRow}>
-            <Text style={styles.balanceLabel}>Your Balance</Text>
-            <View style={[styles.profitPill, { backgroundColor: isProfitPositive ? colors.successTint : colors.dangerTint }]}>
-              <Ionicons
-                name={isProfitPositive ? 'trending-up' : 'trending-down'}
-                size={12}
-                color={isProfitPositive ? colors.success : colors.danger}
-              />
-              <Text style={[styles.profitPillText, { color: isProfitPositive ? colors.success : colors.danger }]}>
-                {formatPercent(totalProfitPercent)}
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-          {formatMoney(balance)}
-        </Text>
-          <Text style={[styles.profit, { color: isProfitPositive ? colors.success : colors.danger }]}>
-            {formatSigned(totalProfit)} today
-          </Text>
-        </Card>
+        <View style={styles.balanceIcon}>
+          <Ionicons name="wallet-outline" size={21} color={colors.primary} />
+        </View>
+        <View style={styles.balanceCopy}>
+          <Text style={styles.balanceLabel}>Wallet Balance</Text>
+          <Text style={styles.balance}>{formatMoney(balance)}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Card>
 
-      <View style={styles.countdownWrap}>
-        <CountdownBadge />
+      <View style={styles.hero}>
+        <Image source={{ uri: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200' }} style={styles.heroImage} />
+        <View style={styles.heroShade} />
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroEyebrow}>TODAY'S AUCTIONS</Text>
+          <Text style={styles.heroTitle}>Bid smart. Own more.</Text>
+          <Text style={styles.heroSubtitle}>Quality products at prices you choose.</Text>
+          <TouchableOpacity style={styles.heroButton} onPress={() => navigation.navigate('Rounds')}>
+            <Text style={styles.heroButtonText}>Start bidding</Text>
+            <Ionicons name="arrow-forward" size={15} color={colors.onPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {latestResult && <LatestResultCard round={latestResult} />}
-
-      {openRound ? (
-        <Card style={styles.ctaCard}>
-          <View style={styles.ctaIconCircle}>
-            <Ionicons name="flash" size={22} color={colors.onPrimary} />
-          </View>
-          <View style={styles.ctaTextWrap}>
-            <Text style={styles.ctaTitle}>Round {openRound.slot.index} is open</Text>
-            <Text style={styles.ctaSubtitle}>Submit your stock pick before {openRound.slot.settleTime}.</Text>
-          </View>
-          <Button title="Pick Stock Now" onPress={() => navigation.navigate('Predict')} size="sm" style={{ marginTop: spacing.md }} />
-        </Card>
-      ) : (
-        <Card style={styles.ctaCard}>
-          <View style={[styles.ctaIconCircle, { backgroundColor: colors.surfaceAlt }]}>
-            <Ionicons name="calendar-outline" size={22} color={colors.textMuted} />
-          </View>
-          <View style={styles.ctaTextWrap}>
-            <Text style={styles.ctaTitle}>No round open right now</Text>
-            <Text style={styles.ctaSubtitle}>Check the Rounds tab for today's full schedule.</Text>
-          </View>
-          <Button title="View Rounds" variant="outline" size="sm" onPress={() => navigation.navigate('Rounds')} style={{ marginTop: spacing.md }} />
-        </Card>
-      )}
-
-      <View style={styles.statsRow}>
-        <Card style={styles.statCard}>
-          <Ionicons name="checkmark-done-circle-outline" size={20} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue}>{settledToday}/{rounds.length}</Text>
-          <Text style={styles.statLabel}>Rounds settled today</Text>
-        </Card>
-      </View>
-
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Today's Rounds</Text>
-        <TouchableOpacity style={styles.viewAllLink} onPress={() => navigation.navigate('Rounds')}>
-          <Text style={styles.viewAllText}>View All</Text>
-          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Live auctions</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Rounds')}>
+          <Text style={styles.link}>View all</Text>
         </TouchableOpacity>
       </View>
-      <View style={{ gap: spacing.sm }}>
-        {upcomingRounds.length === 0 ? (
-          <Card style={styles.emptyMiniCard}>
-            <Text style={styles.emptyMiniText}>No rounds left to pick a stock for today.</Text>
-          </Card>
-        ) : (
-          upcomingRounds.map((round) => {
-            const status = getSlotStatus(round.slot, now);
-            const { label, tone } = ROUND_STATUS_META[status];
-            return (
-              <TouchableOpacity key={round.slot.id} activeOpacity={0.85} onPress={() => navigation.navigate('Predict')}>
-                <Card style={styles.miniRoundCard}>
-                  <View style={styles.miniRoundIndexCircle}>
-                    <Text style={styles.miniRoundIndexText}>{round.slot.index}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.miniRoundTitle}>Round {round.slot.index}</Text>
-                    <Text style={styles.miniRoundTime}>
-                      {formatTime12h(round.slot.submitTime)} - {formatTime12h(round.slot.settleTime)}
-                    </Text>
-                  </View>
-                  <Badge label={label} tone={tone} />
-                </Card>
-              </TouchableOpacity>
-            );
-          })
-        )}
+
+      <Card style={styles.featuredCard}>
+        <Image source={{ uri: featured.image }} style={styles.featuredImage} />
+        <View style={styles.featuredBody}>
+          <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE NOW</Text></View>
+          <Text style={styles.featuredTitle}>{featured.title}</Text>
+          <Text style={styles.featuredMeta}>Highest bid <Text style={styles.accent}>{formatMoney(featured.highestBid)}</Text></Text>
+          <Text style={styles.featuredMeta}>{featured.quantity} available · closes {featured.closesAt}</Text>
+          <TouchableOpacity style={styles.bidButton} onPress={() => navigation.navigate('Rounds')}>
+            <Text style={styles.bidButtonText}>View auction</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.onPrimary} />
+          </TouchableOpacity>
+        </View>
+      </Card>
+
+      <View style={styles.infoRow}>
+        <Ionicons name="pricetag-outline" size={19} color={colors.primary} />
+        <View style={styles.infoCopy}>
+          <Text style={styles.infoTitle}>Every bid costs less than ₦100</Text>
+          <Text style={styles.infoText}>Bidding closes at the time shown on each product.</Text>
+        </View>
       </View>
 
-      <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('Predict')}>
-        <Card style={styles.autoPlaySummaryCard}>
-          <View style={styles.autoPlaySummaryIconCircle}>
-            <Ionicons name="flash-outline" size={18} color={colors.onPrimary} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.autoPlaySummaryTitle} numberOfLines={1}>
-              Auto Play
-            </Text>
-            <Text style={styles.autoPlaySummarySubtitle} numberOfLines={1}>
-              {autoPlayLoaded ? `${autoPlayEnabledCount} of ${ROUND_SLOTS.length} rounds enabled` : 'Loading…'}
-            </Text>
+        <TouchableOpacity style={styles.myBidsCard} onPress={() => stackNavigation?.navigate('MyBids')} activeOpacity={0.8}>
+          <View style={styles.myBidsIcon}><Ionicons name="hammer-outline" size={20} color={colors.primary} /></View>
+          <View style={styles.providerCopy}>
+            <Text style={styles.providerTitle}>Track my bids</Text>
+            <Text style={styles.providerText}>See which auctions you are leading or have been outbid on.</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </Card>
+        </TouchableOpacity>
+
+      <TouchableOpacity style={styles.providerCard} onPress={() => stackNavigation?.navigate('Invite')} activeOpacity={0.8}>
+        <Ionicons name="storefront-outline" size={24} color={colors.primary} />
+        <View style={styles.providerCopy}>
+          <Text style={styles.providerTitle}>Are you a provider or seller?</Text>
+          <Text style={styles.providerText}>Chat with us to auction your product.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </TouchableOpacity>
 
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity style={styles.viewAllLink} onPress={() => navigation.navigate('Wallet')}>
-          <Text style={styles.viewAllText}>View All</Text>
-          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+      <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+        <View>
+          <Text style={styles.sectionTitle}>Our winners</Text>
+          <Text style={styles.sectionSubtitle}>Real people, real deals.</Text>
+        </View>
+        <TouchableOpacity onPress={() => stackNavigation?.navigate('Winners')}>
+          <Text style={styles.link}>View all</Text>
         </TouchableOpacity>
       </View>
-      {recentTransactions.length === 0 ? (
-        <Card style={styles.emptyMiniCard}>
-          <Text style={styles.emptyMiniText}>No transactions yet.</Text>
-        </Card>
-      ) : (
-        <View style={{ gap: spacing.sm }}>
-          {recentTransactions.map((tx) => {
-            const isPositive = tx.amount >= 0;
-            return (
-              <Card key={tx.id} style={styles.txCard}>
-                <View style={[styles.txIconCircle, { backgroundColor: isPositive ? colors.successTint : colors.dangerTint }]}>
-                  <Ionicons name={TX_ICON[tx.type]} size={16} color={isPositive ? colors.success : colors.danger} />
-                </View>
-                <Text style={styles.txDescription} numberOfLines={1}>
-                  {tx.description}
-                </Text>
-                <Text style={[styles.txAmount, { color: isPositive ? colors.success : colors.danger }]}>
-                  {formatSigned(tx.amount)}
-                </Text>
-              </Card>
-            );
-          })}
-        </View>
-      )}
 
-      <TouchableOpacity activeOpacity={0.85} onPress={() => stackNavigation?.navigate('Invite')}>
-        <Card style={styles.inviteCard}>
-          <View style={styles.inviteHeaderRow}>
-            <View style={styles.inviteIconCircle}>
-              <Ionicons name="people-outline" size={18} color={colors.onPrimary} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.winnersScroll}>
+        {AUCTION_WINNERS.map((winner) => (
+          <View key={winner.id} style={styles.winnerCard}>
+            <View>
+              <Image source={{ uri: winner.image }} style={styles.winnerImage} />
+              <View style={styles.winnerBadge}>
+                <Ionicons name="trophy" size={11} color={colors.onPrimary} />
+                <Text style={styles.winnerBadgeText}>AUCTION WIN</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.inviteTitle}>Invite Others and Earn Credits</Text>
-              <Text style={styles.inviteSubtitle}>Invite your friends to CrowdStock and earn amazing rewards.</Text>
+            <View style={styles.winnerBody}>
+              <Text style={styles.winnerName} numberOfLines={1}>{winner.name}</Text>
+              <Text style={styles.winnerProduct} numberOfLines={1}>{winner.product}</Text>
+              <View style={styles.winnerBottomRow}>
+                <Text style={styles.discount}>{winner.discount}</Text>
+                <Text style={styles.winnerDate}>{winner.date}</Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </View>
-          <View style={styles.inviteStatsRow}>
-            <Text style={styles.inviteStatText}>{inviteStats?.successfulConversions ?? 0} People Onboarded</Text>
-            <Text style={styles.inviteStatText}>{inviteStats?.credits ?? 0} Reward Credits</Text>
-          </View>
-        </Card>
-      </TouchableOpacity>
+        ))}
+      </ScrollView>
     </Screen>
-  );
-}
-
-function LatestResultCard({ round }: { round: DailyRound }) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const result = round.result!;
-  const gainPositive = result.finalOutcome ? result.finalOutcome === 'gain' : (result.valueGained ?? 0) >= 0;
-
-  return (
-    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.success : colors.danger }]}>
-      <View style={styles.resultHeaderRow}>
-        <Text style={styles.resultTitle}>Latest Result · Round {round.slot.index}</Text>
-        <View style={[styles.resultPill, { backgroundColor: gainPositive ? colors.successTint : colors.dangerTint }]}>
-          <Text style={[styles.resultPillText, { color: gainPositive ? colors.success : colors.danger }]}>
-            {formatSigned(result.valueGained ?? 0)}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.resultSubtitle}>
-        You picked {result.userPrediction ?? '—'} · Avg Pick {result.average != null ? result.average.toFixed(2) : '—'} ·
-        Deviation {result.distance != null ? result.distance.toFixed(2) : '—'}
-      </Text>
-    </Card>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
-    eyebrow: { ...typography.tiny, color: colors.textDim, letterSpacing: 1 },
-    greeting: { ...typography.h2, color: colors.text, marginTop: 2 },
-    avatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    avatarText: { ...typography.h3, color: colors.onPrimary },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+    brand: { color: colors.text, fontSize: 25, fontWeight: '800', letterSpacing: -1 },
+    brandAccent: { color: colors.primary },
+    tagline: { color: colors.textMuted, fontSize: 11, marginTop: 1, letterSpacing: 1 },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    bellButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: colors.surfaceAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    bellDot: {
-      position: 'absolute',
-      top: 8,
-      right: 9,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.danger,
-      borderWidth: 1.5,
-      borderColor: colors.surfaceAlt,
-    },
-    balanceCard: { alignItems: 'flex-start' },
-    balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+    iconButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+    avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary },
+    avatarText: { color: colors.primary, fontWeight: '800' },
+    balanceCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, marginBottom: spacing.lg },
+    balanceIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
+    balanceCopy: { flex: 1, marginLeft: spacing.md },
     balanceLabel: { ...typography.small, color: colors.textMuted },
-    profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
-    profitPillText: { ...typography.tiny, fontWeight: '700' },
-    balance: { ...typography.h1, color: colors.text, marginTop: spacing.xs },
-    profit: { ...typography.small, marginTop: 4, fontWeight: '600' },
-    countdownWrap: { marginTop: spacing.lg },
-    resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
-    resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    resultTitle: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
-    resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-    resultPillText: { ...typography.small, fontWeight: '800' },
-    resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
-    ctaCard: { marginTop: spacing.lg },
-    ctaIconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.sm,
-    },
-    ctaTextWrap: {},
-    ctaTitle: { ...typography.h3, color: colors.text },
-    ctaSubtitle: { ...typography.small, color: colors.textMuted, marginTop: 4 },
-    statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-    statCard: { flex: 1, alignItems: 'center' },
-    statValue: { ...typography.h2, color: colors.primary },
-    statLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: spacing.xl,
-      marginBottom: spacing.sm,
-    },
-    sectionTitle: { ...typography.h3, color: colors.text },
-    viewAllLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    viewAllText: { ...typography.small, color: colors.primary, fontWeight: '700' },
-    emptyMiniCard: { backgroundColor: colors.surfaceAlt },
-    emptyMiniText: { ...typography.small, color: colors.textMuted },
-    miniRoundCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    miniRoundIndexCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 11,
-      backgroundColor: colors.primaryTint,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    miniRoundIndexText: { ...typography.small, color: colors.primary, fontWeight: '700' },
-    miniRoundTitle: { ...typography.body, color: colors.text, fontWeight: '600' },
-    miniRoundTime: { ...typography.tiny, color: colors.textMuted, marginTop: 1 },
-    autoPlaySummaryCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, backgroundColor: colors.blueTint },
-    autoPlaySummaryIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    autoPlaySummaryTitle: { ...typography.body, color: colors.text, fontWeight: '700' },
-    autoPlaySummarySubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-    txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    txIconCircle: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    txDescription: { ...typography.small, color: colors.text, flex: 1 },
-    txAmount: { ...typography.small, fontWeight: '700' },
-    inviteCard: { marginTop: spacing.lg, backgroundColor: colors.successTint },
-    inviteHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    inviteIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.success,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    inviteTitle: { ...typography.body, color: colors.text, fontWeight: '700' },
-    inviteSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
-    inviteStatsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md },
-    inviteStatText: { ...typography.small, color: colors.text, fontWeight: '600' },
+    balance: { ...typography.h2, color: colors.text, marginTop: 2 },
+    hero: { height: 190, borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.xl },
+    heroImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+    heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 25, 19, 0.68)' },
+    heroCopy: { padding: spacing.lg, flex: 1, justifyContent: 'center' },
+    heroEyebrow: { color: '#9EF2CA', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    heroTitle: { color: '#FFF', fontSize: 27, fontWeight: '800', marginTop: 5 },
+    heroSubtitle: { color: '#D9F8E9', fontSize: 13, marginTop: 4 },
+    heroButton: { alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing.md },
+    heroButtonText: { color: colors.onPrimary, fontWeight: '800', fontSize: 12 },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+    sectionTitle: { ...typography.h2, color: colors.text },
+    sectionSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+    link: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+    featuredCard: { padding: 0, overflow: 'hidden', marginBottom: spacing.lg },
+    featuredImage: { width: '100%', height: 150 },
+    featuredBody: { padding: spacing.md },
+    livePill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.successTint, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4 },
+    liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 5 },
+    liveText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
+    featuredTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: spacing.sm },
+    featuredMeta: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+    accent: { color: colors.accent, fontWeight: '800' },
+    bidButton: { alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md },
+    bidButtonText: { color: colors.onPrimary, fontWeight: '800', fontSize: 12 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+    infoCopy: { marginLeft: spacing.sm, flex: 1 },
+    infoTitle: { color: colors.text, fontWeight: '800', fontSize: 13 },
+    infoText: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
+    providerCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+    myBidsCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+    myBidsIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+    providerCopy: { flex: 1, marginLeft: spacing.md },
+    providerTitle: { color: colors.text, fontWeight: '800', fontSize: 13 },
+    providerText: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+    winnersScroll: { gap: spacing.md, paddingRight: spacing.lg },
+    winnerCard: { width: 220, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg },
+    winnerImage: { width: '100%', height: 120, backgroundColor: colors.surfaceAlt },
+    winnerBadge: { position: 'absolute', top: spacing.sm, right: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 5 },
+    winnerBadgeText: { color: colors.onPrimary, fontSize: 9, fontWeight: '800' },
+    winnerBody: { padding: spacing.md },
+    winnerName: { color: colors.text, fontWeight: '800', fontSize: 13 },
+    winnerProduct: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
+    winnerBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
+    discount: { color: colors.primary, backgroundColor: colors.primaryTint, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 4, fontSize: 10, fontWeight: '800' },
+    winnerDate: { color: colors.textDim, fontSize: 9 },
   });
 }
