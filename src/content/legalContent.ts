@@ -1,8 +1,7 @@
 import { LegalDoc } from '../navigation/types';
 
 /**
- * Mirrors, word for word, the pages in the CrowdStock landing site repo
- * (crowdstock-landing/src/app/{privacy,terms,responsible-use}/page.tsx) as
+ * Mirrors the legal pages presented in the SoCheap app as
  * of 2026-09-20 — kept as one source of truth in each place rather than a
  * shared package since the two are separate apps/repos. If the website
  * copy changes, re-sync this file by hand.
@@ -45,13 +44,13 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
     title: 'Privacy Policy',
     updated: 'September 20, 2026',
     intro:
-      'This Privacy Policy explains what information CrowdStock collects, how we use it, and the choices and rights you have over your data.',
+      'This Privacy Policy explains what information SoCheap collects, how we use it, and the choices and rights you have over your data.',
     sections: [
       {
         title: '1. Who we are',
         blocks: [
           p(
-            'CrowdStock ("CrowdStock", "we", "us") operates the CrowdStock mobile app and website, through which people set an hourly stock value together. This policy applies to anyone who visits our website or uses the app.'
+            'SoCheap ("SoCheap", "we", "us") operates the SoCheap mobile app and website, where people discover products, place bids, win deals, and receive deliveries. This policy applies to anyone who visits our website or uses the app.'
           ),
         ],
       },
@@ -61,7 +60,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
           p('We collect information in three ways:'),
           list([
             '**You give it to us** — name, email address, phone number, date of birth, and identity verification documents when you create an account; bank or card details when you fund your wallet or request a payout.',
-            '**We collect it automatically** — device type, operating system, IP address, app version, and how you use the app (rounds joined, values set, pages visited).',
+            '**We collect it automatically** — device type, operating system, IP address, app version, and how you use the app (auctions viewed, bids placed, pages visited).',
             '**We receive it from others** — confirmation of a payment from our payment processors, or identity confirmation from a verification provider.',
           ]),
         ],
@@ -71,9 +70,9 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         blocks: [
           list([
             'To create and maintain your account and wallet.',
-            "To run each hourly round: record the stock value you set, calculate the People's Hourly Stock Value, and settle results.",
-            'To process deposits and payouts, and to verify your identity where required by law.',
-            'To send you round reminders, receipts, and service updates.',
+            'To operate auctions, record bids, select winners, process orders, and coordinate delivery.',
+            'To process wallet deposits, bid-access fees, winner payments, refunds, and withdrawals.',
+            'To send you auction reminders, bid updates, delivery notifications, receipts, and service updates.',
             'To detect and prevent fraud, multiple-accounting, or abuse of the platform.',
             'To respond to support requests and improve the app.',
           ]),
@@ -126,14 +125,14 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
             'Restrict or object to certain uses of your data.',
             'Withdraw consent for marketing communications at any time.',
           ]),
-          p('To exercise any of these rights, contact us at [privacy@crowdstock.app](mailto:privacy@crowdstock.app).'),
+          p('To exercise any of these rights, contact us at [privacy@socheap.app](mailto:privacy@socheap.app).'),
         ],
       },
       {
         title: '9. Age restriction',
         blocks: [
           p(
-            'CrowdStock is for people aged 18 and older. We do not knowingly collect information from anyone under 18, and we verify age as part of identity verification.'
+            'SoCheap is for people aged 18 and older. We do not knowingly collect information from anyone under 18, and we verify age as part of identity verification.'
           ),
         ],
       },
@@ -155,7 +154,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
       },
       {
         title: '12. Contact us',
-        blocks: [p('Questions about this policy or your data can be sent to [privacy@crowdstock.app](mailto:privacy@crowdstock.app).')],
+        blocks: [p('Questions about this policy or your data can be sent to [privacy@socheap.app](mailto:privacy@socheap.app).')],
       },
     ],
   },
@@ -163,12 +162,12 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
   terms: {
     title: 'Terms of Service',
     updated: 'September 20, 2026',
-    intro: 'These Terms govern your use of the CrowdStock app and website. By creating an account, you agree to them.',
+    intro: 'These Terms govern your use of the SoCheap app and website. By creating an account, you agree to them.',
     sections: [
       {
         title: '1. Acceptance of these terms',
         blocks: [
-          p('By creating a CrowdStock account or using the app, you agree to these Terms and our Privacy Policy. If you do not agree, please do not use CrowdStock.'),
+          p('By creating a SoCheap account or using the app, you agree to these Terms and our Privacy Policy. If you do not agree, please do not use SoCheap.'),
         ],
       },
       {
@@ -177,16 +176,16 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
           list([
             'You must be at least 18 years old.',
             'You must complete any identity verification we require.',
-            'You may hold only one CrowdStock account.',
-            'You are responsible for using CrowdStock in line with the laws of the location you use it from.',
+            'You may hold only one SoCheap account.',
+            'You are responsible for using SoCheap in line with the laws of the location you use it from.',
           ]),
         ],
       },
       {
-        title: '3. What CrowdStock is',
+        title: '3. What SoCheap is',
         blocks: [
           p(
-            "CrowdStock is a participation platform built around hourly rounds. In each round, every participant sets their own stock value. When the round closes, CrowdStock combines everyone's stock value into the People's Hourly Stock Value. How much you earn from a round depends on how close your stock value was to that number. Auto Stock is an optional feature that sets your chosen value automatically at the start of each round you enable it for."
+            'SoCheap is a product-auction marketplace. Each auction has its own product, bid range, quantity, and closing time. A ₦100 bid-access fee is debited when an accepted bid is placed; the bid amount is recorded for ranking and is not debited at that point. When an auction closes, eligible winners are selected under the published auction rules, and SoCheap coordinates payment and delivery.'
           ),
         ],
       },
@@ -194,7 +193,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '4. Not an investment product',
         blocks: [
           p(
-            "CrowdStock is not a bank, broker, investment adviser, or provider of financial products. Setting a stock value does not buy shares, securities, or any real-world asset, and nothing in the app is financial advice. The People's Hourly Stock Value is generated entirely from participants' own submitted values each round — it does not track any market, index, or external price. Outcomes depend on the collective behavior of participants that hour and are inherently uncertain; CrowdStock does not guarantee any return, outcome, or level of earnings."
+            'SoCheap is not a bank, broker, investment adviser, or provider of financial products. A bid is an offer to participate in a product auction, not a purchase of shares or securities. SoCheap does not guarantee that a user will win an auction, receive a particular price, or obtain a particular product until the order is confirmed.'
           ),
         ],
       },
@@ -202,7 +201,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '5. Your account',
         blocks: [
           p(
-            'Keep your login details and device secure — you are responsible for activity on your account. Tell us immediately at [support@crowdstock.app](mailto:support@crowdstock.app) if you suspect unauthorized access.'
+            'Keep your login details and device secure — you are responsible for activity on your account. Tell us immediately at [support@socheap.app](mailto:support@socheap.app) if you suspect unauthorized access.'
           ),
         ],
       },
@@ -210,18 +209,18 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '6. Wallet, funding & payouts',
         blocks: [
           list([
-            'You fund your CrowdStock wallet using the payment methods we support.',
-            'Amounts set into an open round are held for that round and released back into your wallet, plus any earnings, once the round settles.',
-            'Payout requests are sent to the bank details you provide and processed within the timeframe shown in the app.',
-            'We may apply limits to deposits, payouts, or round participation to manage risk and comply with regulation.',
+            'You fund your SoCheap wallet using the payment methods we support.',
+            'Bid-access fees, winner payments, delivery fees, and refunds are shown in the app before confirmation where applicable.',
+            'Winner payments are processed before fulfilment and delivery begins.',
+            'We may apply limits to deposits, withdrawals, bids, purchases, or delivery regions to manage risk and comply with regulation.',
           ]),
         ],
       },
       {
-        title: '7. Round settlement is final',
+        title: '7. Auction results and orders',
         blocks: [
           p(
-            "Once a round settles and results are published, that result is final, save for cases of a proven technical error or fraud on our part or another participant's part."
+            'Once an auction closes and results are published, the result is final except where a proven technical error, fraud, stock problem, payment failure, or delivery issue requires correction.'
           ),
         ],
       },
@@ -231,9 +230,9 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
           p('You agree not to:'),
           list([
             'Create or use more than one account.',
-            'Use bots, scripts, or automation to set stock values.',
-            "Attempt to coordinate with other participants to manipulate the People's Hourly Stock Value.",
-            'Use CrowdStock for money laundering or any unlawful purpose.',
+            'Use bots, scripts, or automation to manipulate bids or auction results.',
+            'Attempt to coordinate with other participants to manipulate an auction.',
+            'Use SoCheap for money laundering or any unlawful purpose.',
             "Attempt to access another user's account or our systems without authorization.",
           ]),
           p('We may suspend or close accounts that breach this section, and withhold funds connected to the breach where permitted by law.'),
@@ -247,7 +246,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
       },
       {
         title: '10. Taxes',
-        blocks: [p('You are responsible for determining and paying any taxes that apply to your use of CrowdStock under the laws of your jurisdiction.')],
+        blocks: [p('You are responsible for determining and paying any taxes that apply to your use of SoCheap under the laws of your jurisdiction.')],
       },
       {
         title: '11. Suspending or closing your account',
@@ -261,7 +260,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '12. Disclaimers & limitation of liability',
         blocks: [
           p(
-            'CrowdStock is provided "as is." To the fullest extent permitted by law, CrowdStock is not liable for indirect, incidental, or consequential losses arising from your use of the app, including losses relating to round outcomes, service interruptions, or third-party payment failures.'
+            'SoCheap is provided "as is." To the fullest extent permitted by law, SoCheap is not liable for indirect, incidental, or consequential losses arising from your use of the app, including losses relating to auction outcomes, service interruptions, payment failures, product availability, or delivery delays.'
           ),
         ],
       },
@@ -269,7 +268,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '13. Changes to these terms',
         blocks: [
           p(
-            'We may update these Terms from time to time. We will post the updated version here and update the "Last updated" date. Continuing to use CrowdStock after an update means you accept the revised Terms.'
+            'We may update these Terms from time to time. We will post the updated version here and update the "Last updated" date. Continuing to use SoCheap after an update means you accept the revised Terms.'
           ),
         ],
       },
@@ -279,7 +278,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
       },
       {
         title: '15. Contact',
-        blocks: [p('Questions about these Terms can be sent to [support@crowdstock.app](mailto:support@crowdstock.app).')],
+        blocks: [p('Questions about these Terms can be sent to [support@socheap.app](mailto:support@socheap.app).')],
       },
     ],
   },
@@ -288,13 +287,13 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
     title: 'Responsible Use',
     updated: 'September 20, 2026',
     intro:
-      "CrowdStock is meant to be a fun way to take part alongside other people, not a way to make ends meet. Here's how to keep it that way.",
+      "SoCheap is a product marketplace, not a guaranteed source of income. Use it thoughtfully and only spend what you can afford.",
     sections: [
       {
         title: '1. Only set what you can afford to set aside',
         blocks: [
           p(
-            'Treat any amount you put into a round as spent the moment you set it. Never fund your wallet with money you need for rent, bills, school fees, or any other essential cost, and never borrow money to take part.'
+            'Treat bid-access fees and confirmed purchases as spending. Never fund your wallet with money you need for rent, bills, school fees, or any other essential cost, and never borrow money to participate.'
           ),
         ],
       },
@@ -311,11 +310,11 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         blocks: [
           p('Consider taking a break if you notice yourself:'),
           list([
-            'Setting more into rounds than you planned to, to try to make up for an earlier round.',
+            'Placing more bids than you planned to, to try to make up for an earlier loss.',
             'Spending money meant for essentials to fund your wallet.',
-            'Thinking about rounds when you should be focused on work, school, or family.',
+            'Thinking about auctions when you should be focused on work, school, or family.',
             'Feeling anxious, guilty, or unable to stop when you try to take a break.',
-            'Hiding your activity on CrowdStock from people close to you.',
+            'Hiding your activity on SoCheap from people close to you.',
           ]),
         ],
       },
@@ -323,7 +322,7 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '4. Take a break or self-exclude',
         blocks: [
           p(
-            'You can pause your account for a set period, or close it entirely, from Settings → Account → Take a Break. While paused, you will not be able to fund your wallet or join rounds. Contact [support@crowdstock.app](mailto:support@crowdstock.app) if you would like help setting this up.'
+            'You can pause your account for a set period, or close it entirely, from Settings → Account → Take a Break. While paused, you will not be able to fund your wallet, place bids, or make purchases. Contact [support@socheap.app](mailto:support@socheap.app) if you would like help setting this up.'
           ),
         ],
       },
@@ -332,8 +331,8 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         blocks: [
           list([
             'Set a time limit for how long you spend in the app each day.',
-            "Don't treat CrowdStock as a source of income or a way to solve financial difficulty.",
-            'Take regular breaks between rounds rather than joining every hour.',
+            "Don't treat SoCheap as a source of income or a way to solve financial difficulty.",
+            'Take regular breaks between auctions and avoid bidding impulsively.',
           ]),
         ],
       },
@@ -341,19 +340,19 @@ export const LEGAL_CONTENT: Record<LegalDoc, LegalDocContent> = {
         title: '6. Supporting someone else',
         blocks: [
           p(
-            "If you're worried about a friend or family member's use of CrowdStock, encourage them to use the limit and take-a-break tools in the app, and to talk to a licensed financial counselor if money management becomes difficult. We're also glad to talk through the tools available — reach us at [support@crowdstock.app](mailto:support@crowdstock.app)."
+            "If you're worried about a friend or family member's use of SoCheap, encourage them to use the limit and take-a-break tools in the app, and to talk to a licensed financial counselor if money management becomes difficult. We're also glad to talk through the tools available — reach us at [support@socheap.app](mailto:support@socheap.app)."
           ),
         ],
       },
       {
         title: '7. Age restriction',
-        blocks: [p('CrowdStock is strictly for people aged 18 and older. Identity verification is required to confirm this.')],
+        blocks: [p('SoCheap is strictly for people aged 18 and older. Identity verification is required to confirm this.')],
       },
       {
         title: '8. Getting help',
         blocks: [
           p(
-            "If spending on CrowdStock — or anywhere else — is affecting your finances, wellbeing, or relationships, please speak with a licensed financial counselor or a mental health professional in your area. You can also reach our support team at [support@crowdstock.app](mailto:support@crowdstock.app) — we're glad to help you set limits or pause your account."
+            "If spending on SoCheap — or anywhere else — is affecting your finances, wellbeing, or relationships, please speak with a licensed financial counselor or a mental health professional in your area. You can also reach our support team at [support@socheap.app](mailto:support@socheap.app) — we're glad to help you set limits or pause your account."
           ),
         ],
       },

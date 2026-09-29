@@ -31,7 +31,6 @@ yarn-error.*
 *.pem
 
 # local env files
-.env
 .env*.local
 
 # typescript
@@ -45,3 +44,4 @@ AGENTS.md
 # generated native folders
 /ios
 /android
+config.bat

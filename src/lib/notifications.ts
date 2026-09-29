@@ -6,7 +6,7 @@ import { slotSettleAt, slotSubmitAt } from './schedule';
 // Bumped each time the channel's sound/importance changes — Android locks
 // those in at creation and never lets an app change them for an existing
 // install, so a real sound swap needs a new channel id, not new options on
-// the old one. v1 here is a fresh channel identity for the CrowdStock
+// the old one. v1 here is a fresh channel identity for the auction app
 // rebrand (the prior stocklab-rounds-v3 channel is abandoned, not renamed).
 const CHANNEL_ID = 'crowdstock-rounds-v1';
 
@@ -93,7 +93,7 @@ export async function scheduleTodaysRoundNotifications(rounds: DailyRound[]) {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: `Auction update`,
-          body: 'Open CrowdStock to check your bid and auction result.',
+          body: 'Open SoCheap to check your bid and auction result.',
           sound: NOTIFICATION_SOUND,
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: settleAt, channelId: CHANNEL_ID },
