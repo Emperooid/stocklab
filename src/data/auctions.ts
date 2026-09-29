@@ -5,10 +5,13 @@ export interface AuctionItem {
   image: string;
   highestBid: number;
   lowestBid: number;
+  currentMarketPrice: number;
   quantity: number;
   bidders: number;
   closesAt: string;
   closesIn: string;
+  caption: string;
+  features: string[];
 }
 
 export interface AuctionWinner {
@@ -36,10 +39,13 @@ export const AUCTION_ITEMS: AuctionItem[] = [
     image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=900',
     highestBid: 180000,
     lowestBid: 120000,
+    currentMarketPrice: 165000,
     quantity: 3,
     bidders: 12,
     closesAt: '10:50 AM',
     closesIn: '00:48:23',
+    caption: 'Flagship performance for work, entertainment, and everyday use.',
+    features: ['Fast delivery', 'Warranty included', 'Verified product'],
   },
   {
     id: 'air-fryer',
@@ -48,10 +54,13 @@ export const AUCTION_ITEMS: AuctionItem[] = [
     image: 'https://images.unsplash.com/photo-1585515320310-259814833e62?w=900',
     highestBid: 75000,
     lowestBid: 50000,
+    currentMarketPrice: 68000,
     quantity: 8,
     bidders: 8,
     closesAt: '11:50 AM',
     closesIn: '01:48:23',
+    caption: 'Crispy meals with less oil and less effort.',
+    features: ['5.5L capacity', 'Easy clean', 'Fast delivery'],
   },
   {
     id: 'hp-laptop',
@@ -60,10 +69,13 @@ export const AUCTION_ITEMS: AuctionItem[] = [
     image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=900',
     highestBid: 260000,
     lowestBid: 190000,
+    currentMarketPrice: 245000,
     quantity: 4,
     bidders: 15,
     closesAt: '12:50 PM',
     closesIn: '02:48:23',
+    caption: 'A dependable screen for work, study, and entertainment.',
+    features: ['15.6 inch display', 'Delivery included', 'Verified product'],
   },
   {
     id: 'rice-cooker',
@@ -72,10 +84,13 @@ export const AUCTION_ITEMS: AuctionItem[] = [
     image: 'https://images.unsplash.com/photo-1585515320310-259814833e62?w=900',
     highestBid: 40000,
     lowestBid: 28000,
+    currentMarketPrice: 36000,
     quantity: 6,
     bidders: 6,
     closesAt: '1:50 PM',
     closesIn: '03:48:23',
+    caption: 'Simple, reliable cooking for everyday meals.',
+    features: ['5L capacity', 'Keep warm', 'Fast delivery'],
   },
   {
     id: 'smart-tv',
@@ -84,10 +99,13 @@ export const AUCTION_ITEMS: AuctionItem[] = [
     image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=900',
     highestBid: 320000,
     lowestBid: 240000,
+    currentMarketPrice: 295000,
     quantity: 3,
     bidders: 14,
     closesAt: '2:50 PM',
     closesIn: '04:48:23',
+    caption: 'Bring your favourite entertainment home.',
+    features: ['43 inch display', 'Warranty included', 'Delivery included'],
   },
   {
     id: 'power-bank',
@@ -96,10 +114,13 @@ export const AUCTION_ITEMS: AuctionItem[] = [
     image: 'https://images.unsplash.com/photo-1609592424842-7d3d4b8f3f6c?w=900',
     highestBid: 25000,
     lowestBid: 16000,
+    currentMarketPrice: 22000,
     quantity: 15,
     bidders: 7,
     closesAt: '4:50 PM',
     closesIn: '06:48:23',
+    caption: 'Reliable power for your everyday devices.',
+    features: ['10,000mAh', 'Fast charging', 'Fast delivery'],
   },
 ];
 
