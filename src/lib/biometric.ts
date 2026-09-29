@@ -28,7 +28,7 @@ export async function isBiometricAvailable(): Promise<boolean> {
 }
 
 /** Prompts Face ID / fingerprint / device PIN. Resolves true only on success. */
-export async function authenticateWithBiometric(reason = 'Log in to CrowdStock'): Promise<boolean> {
+export async function authenticateWithBiometric(reason = 'Log in to SoCheap'): Promise<boolean> {
   const result = await LocalAuthentication.authenticateAsync({
     promptMessage: reason,
     disableDeviceFallback: false,

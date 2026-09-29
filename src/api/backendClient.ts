@@ -2,7 +2,7 @@ import { BACKEND_AUTH_SECRET_KEY, BACKEND_AUTH_USER_ID, BACKEND_BASE_URL } from 
 import { getDeviceId } from '../lib/deviceId';
 
 /**
- * Client for the CrowdStock backend gateway.
+ * Client for the existing wallet/auth backend gateway.
  *
  * Two endpoints, confirmed working directly against the live server:
  *   POST {BASE_URL}/st/AuthSP     { userId, secretKey } -> { status, message, token }

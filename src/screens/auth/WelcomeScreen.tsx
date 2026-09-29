@@ -28,13 +28,13 @@ export default function WelcomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.center}>
         <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.brandText}>CrowdStock</Text>
+        <Text style={styles.brandText}>SoCheap</Text>
 
         <Text style={styles.headline}>
-          Guess the market.{'\n'}
-          <Text style={{ color: colors.primary }}>Grow your money.</Text>
+          Bid smart.{'\n'}
+          <Text style={{ color: colors.primary }}>Get more for less.</Text>
         </Text>
-        <Text style={styles.subtext}>Pick a stock. Say if it will go up or down. See how you do.</Text>
+        <Text style={styles.subtext}>Bid on quality products, win great deals, and get them delivered to you.</Text>
       </View>
 
       <View style={styles.actions}>

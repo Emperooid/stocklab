@@ -226,7 +226,7 @@ export default function ProfileScreen() {
 
       <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
 
-      <Text style={styles.footer}>CrowdStock</Text>
+      <Text style={styles.footer}>SoCheap</Text>
       {/* Device ID display temporarily disabled — see deviceId state above. */}
       {/* {!!deviceId && (
         <Text style={styles.deviceId} selectable>
