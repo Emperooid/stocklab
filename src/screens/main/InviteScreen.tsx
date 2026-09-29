@@ -152,13 +152,13 @@ export default function InviteScreen() {
     const firstName = contact.name.split(' ')[0];
     const linkLine = downloadUrl ? ` Download here: ${downloadUrl}` : '';
     const message = encodeURIComponent(
-      `Hey ${firstName}, join me on CrowdStock! Download the app and join our live product auctions.${linkLine}`
+      `Hey ${firstName}, join me on SoCheap! Download the app and join our live product auctions.${linkLine}`
     );
     Linking.openURL(`https://wa.me/234${contact.phone.slice(1)}?text=${message}`).catch(() => {});
   }
 
   function handleGiftInfo() {
-    Alert.alert('Reward Credits', 'Earn credits and payout by inviting friends who join and play CrowdStock.');
+    Alert.alert('Reward Credits', 'Earn credits and rewards by inviting friends to join SoCheap.');
   }
 
   const showList = permission === 'granted';
@@ -184,7 +184,7 @@ export default function InviteScreen() {
 
             <Card style={styles.statsCard}>
               <Text style={styles.statsBody}>
-                Invite friends to discover live auctions, win products, and grow the CrowdStock community.
+                Invite friends to discover live auctions, win products, and grow the SoCheap community.
               </Text>
               <View style={styles.statsRow}>
                 <StatBlock icon="people-outline" value={stats?.successfulConversions ?? 0} label="People Onboarded" loading={statsLoading} />
@@ -244,7 +244,7 @@ export default function InviteScreen() {
           ) : permission === 'undetermined' ? (
             <Card style={styles.permissionCard}>
               <Ionicons name="people-circle-outline" size={40} color={colors.primary} />
-              <Text style={styles.permissionTitle}>See who's already on CrowdStock</Text>
+              <Text style={styles.permissionTitle}>See who's already on SoCheap</Text>
               <Text style={styles.permissionBody}>
                 Allow contacts access so we can show which of your contacts have already joined, and help you invite
                 the rest.
@@ -323,7 +323,7 @@ function ContactRow({
         <ActivityIndicator size="small" color={colors.textMuted} />
       ) : status === true ? (
         <View style={styles.registeredPill}>
-          <Text style={styles.registeredPillText}>CrowdStock</Text>
+          <Text style={styles.registeredPillText}>SoCheap</Text>
           <Ionicons name="checkmark-circle" size={14} color={colors.success} />
         </View>
       ) : (
