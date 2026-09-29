@@ -66,7 +66,7 @@ export default function RoundsScreen() {
           </View>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('RoundHistory')} style={styles.historyLink}>
-          <Text style={styles.historyLinkText}>History</Text>
+          <Text style={styles.historyLinkText}>All Results</Text>
           <Ionicons name="chevron-forward" size={14} color={colors.primary} />
         </TouchableOpacity>
       </View>
