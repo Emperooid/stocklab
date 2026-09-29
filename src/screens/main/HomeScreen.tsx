@@ -44,8 +44,8 @@ export default function HomeScreen() {
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.brand}>Crowd<Text style={styles.brandAccent}>Stock</Text></Text>
-          <Text style={styles.tagline}>Bid · Win · Own</Text>
+          <Text style={styles.brand}>So<Text style={styles.brandAccent}>Cheap</Text></Text>
+          <Text style={styles.tagline}>Bid · Save · Get More</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.iconButton}>

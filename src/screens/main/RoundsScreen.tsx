@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/types';
 import { formatMoney } from '../../lib/format';
 import { AUCTION_CATEGORIES, AUCTION_ITEMS, AuctionItem } from '../../data/auctions';
+import { useAuctionStore } from '../../store/auctionStore';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 
 export default function RoundsScreen() {
@@ -100,6 +101,28 @@ function BidModal({ item, onClose }: { item: AuctionItem | null; onClose: () => 
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const placeAuctionBid = useAuctionStore((state) => state.placeAuctionBid);
+  const amount = Number(value);
+
+  useEffect(() => {
+    setValue('');
+    setError('');
+    setSubmitted(false);
+  }, [item?.id]);
+
+  function handlePlaceBid() {
+    if (!item) return;
+    if (!Number.isFinite(amount) || amount < item.lowestBid || amount > item.highestBid) {
+      setError(`Enter a bid between ${formatMoney(item.lowestBid)} and ${formatMoney(item.highestBid)}.`);
+      return;
+    }
+    placeAuctionBid(item.id, amount);
+    setSubmitted(true);
+    setError('');
+  }
+
   return (
     <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
@@ -116,7 +139,19 @@ function BidModal({ item, onClose }: { item: AuctionItem | null; onClose: () => 
           </View>
           <TextInput value={value} onChangeText={(text) => setValue(text.replace(/[^0-9]/g, ''))} placeholder="Your bid value (₦)" placeholderTextColor={colors.textDim} keyboardType="number-pad" style={styles.bidInput} />
           <Text style={styles.feeNote}>₦100 bid access is debited. Your bid amount is recorded, not debited.</Text>
-          <TouchableOpacity style={styles.confirmButton} onPress={onClose}><Text style={styles.confirmText}>Place bid</Text></TouchableOpacity>
+          {submitted ? (
+            <View style={styles.successBox}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={styles.successText}>Bid recorded on this device. Check My Bids for its status.</Text>
+            </View>
+          ) : (
+            <>
+              {!!error && <Text style={styles.errorText}>{error}</Text>}
+              <TouchableOpacity style={styles.confirmButton} onPress={handlePlaceBid}>
+                <Text style={styles.confirmText}>Place bid</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </Pressable>
       </Pressable>
     </Modal>
@@ -194,6 +229,9 @@ function createStyles(colors: Colors) {
     previewHint: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs },
     bidInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginTop: spacing.lg, fontSize: 17 },
     feeNote: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: spacing.sm },
+    errorText: { color: colors.danger, fontSize: 12, textAlign: 'center', marginTop: spacing.sm },
+    successBox: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.successTint, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.lg },
+    successText: { flex: 1, color: colors.success, fontSize: 12, lineHeight: 17, fontWeight: '700' },
     confirmButton: { backgroundColor: colors.primary, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.lg },
     confirmText: { color: colors.onPrimary, fontWeight: '800', fontSize: 15 },
   });

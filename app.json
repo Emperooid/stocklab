@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "CrowdStock",
-    "slug": "stock",
+    "name": "SoCheap",
+    "slug": "socheap",
     "version": "1.0.0",
-    "scheme": "crowdstock",
+    "scheme": "socheap",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.streetfriendly.crowdstock",
+      "bundleIdentifier": "com.streetfriendly.socheap",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
@@ -59,7 +59,7 @@
       }
     },
     "android": {
-      "package": "com.streetfriendly.crowdstock",
+      "package": "com.streetfriendly.socheap",
       "adaptiveIcon": {
         "backgroundColor": "#080D15",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -92,7 +92,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow CrowdStock to access your contacts so you can invite them to join."
+          "contactsPermission": "Allow SoCheap to access your contacts so you can invite them to join."
         }
       ],
       [
