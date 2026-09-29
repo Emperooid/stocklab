@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Tracks whether this device has ever seen the pre-login "what is
- * CrowdStock" intro slides — separate from tourStore's hasCompletedTour,
+ * SoCheap intro slides — separate from tourStore's hasCompletedTour,
  * which is a *post-login* feature walkthrough shown once per account. This
  * one is per-device and shown before the person even has an account, so a
  * different phone signing in later on the same device correctly skips it.

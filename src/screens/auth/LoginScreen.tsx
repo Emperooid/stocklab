@@ -97,7 +97,7 @@ export default function LoginScreen({ navigation, route }: Props) {
     setInfoMessage('');
     setBiometricLoading(true);
     try {
-      const ok = await authenticateWithBiometric('Log in to CrowdStock');
+      const ok = await authenticateWithBiometric('Log in to SoCheap');
       if (!ok) return;
       const saved = await getSavedCredentials();
       if (!saved) {

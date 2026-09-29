@@ -560,7 +560,7 @@ export const httpApi = {
       // The gateway validates femail as a real email address and rejects a
       // bare phone number — use the account's real email when known, else a
       // synthesized address that at least passes format validation.
-      const femail = opts.email?.trim() || `${phone.replace(/\D/g, '')}@crowdstock.app`;
+      const femail = opts.email?.trim() || `${phone.replace(/\D/g, '')}@socheap.app`;
 
       const res = await callGateway<any>(
         'PAY',

@@ -15,18 +15,18 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Intro'>;
 const SLIDES: { icon: keyof typeof Ionicons.glyphMap; title: string; body: string }[] = [
   {
     icon: 'trending-up',
-    title: 'Guess the market',
-    body: 'Every hour, pick a number from 1 to 5. Get close to the real number, win money.',
+    title: 'Bid on great products',
+    body: 'Discover quality products and place a bid for the deal you want.',
   },
   {
     icon: 'time',
-    title: 'A new round every hour',
-    body: "You don't have to be quick. New rounds open all day — play the ones that suit you.",
+    title: 'Fresh auctions every day',
+    body: 'Explore live product auctions and choose the ones that suit you.',
   },
   {
     icon: 'wallet',
-    title: 'Cash out anytime',
-    body: 'Deposit, play, and withdraw your winnings straight to your bank account.',
+    title: 'We deliver your wins',
+    body: 'Win an auction, complete payment, and we deliver your product to your location.',
   },
 ];
 
