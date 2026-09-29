@@ -21,7 +21,7 @@ export function MainStack() {
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="RoundHistory" component={RoundHistoryScreen} options={{ title: 'Round History' }} />
+      <Stack.Screen name="RoundHistory" component={RoundHistoryScreen} options={{ title: 'All Results' }} />
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} options={{ title: 'Withdraw' }} />
       <Stack.Screen name="News" component={NewsScreen} options={{ title: 'News & Alerts' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Increase Payout' }} />
