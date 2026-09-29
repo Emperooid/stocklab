@@ -8,12 +8,12 @@ const BASE_WIDTH = 375;
 
 /** Scales a size linearly with screen width. */
 export function scale(size: number): number {
-  return (SCREEN_WIDTH / BASE_WIDTH) * size;
+  return Math.round((SCREEN_WIDTH / BASE_WIDTH) * size);
 }
 
 /** Scales a size toward the linear value by `factor` (0 = no scaling, 1 = full linear scaling). */
 export function moderateScale(size: number, factor = 0.35): number {
-  return size + (scale(size) - size) * factor;
+  return Math.round(size + (scale(size) - size) * factor);
 }
 
 export const layout = {
