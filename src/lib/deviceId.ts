@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Deliberately NOT renamed as part of the CrowdStock rebrand, unlike every
+// Deliberately stable across app rebrands so existing device identity is preserved.
 // other persisted key in this app: this value is sent to and validated
 // server-side (ValidateDeviceId(), see below) — renaming it generates a
 // fresh, unrecognized device id for every existing account, which the

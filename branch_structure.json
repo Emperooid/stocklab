@@ -1,0 +1,21 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "auction-marketplace",
+    "main",
+    "origin",
+    "redesign/cards-and-deposits"
+  ],
+  "parent": {
+    "auction-marketplace": "main",
+    "main": null,
+    "origin": "main",
+    "redesign/cards-and-deposits": "main"
+  },
+  "order": [
+    "main",
+    "auction-marketplace",
+    "origin",
+    "redesign/cards-and-deposits"
+  ]
+}
