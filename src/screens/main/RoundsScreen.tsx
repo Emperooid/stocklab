@@ -141,7 +141,10 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
   const result = round.result;
   const gainPositive = result?.finalOutcome ? result.finalOutcome === 'gain' : (result?.valueGained ?? 0) >= 0;
   const isSettled = !!result;
-  const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
+  // slot.index is 0-based (it matches the hour), so index directly — the old
+  // `(index - 1) % length` produced -1 for the midnight round, and palette[-1]
+  // is undefined, which crashed the whole Rounds screen. (Pre-existing bug.)
+  const palette = ROUND_CARD_PALETTES[round.slot.index % ROUND_CARD_PALETTES.length];
   const tint = (alpha: number): ColorValue => withAlpha(palette.accent, alpha);
   const rule = withAlpha(palette.ink, 0.14);
 

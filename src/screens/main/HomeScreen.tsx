@@ -215,7 +215,8 @@ export default function HomeScreen() {
           upcomingRounds.map((round) => {
             const status = getSlotStatus(round.slot, now);
             const { label, tone } = ROUND_STATUS_META[status];
-            const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
+            // slot.index is 0-based — see RoundsScreen for why `(index - 1) % len` crashed.
+            const palette = ROUND_CARD_PALETTES[round.slot.index % ROUND_CARD_PALETTES.length];
             return (
               <TouchableOpacity key={round.slot.id} activeOpacity={0.85} onPress={() => navigation.navigate('Predict')}>
                 <Card style={[styles.miniRoundCard, { backgroundColor: palette.background, borderColor: palette.border }]}>

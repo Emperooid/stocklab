@@ -36,7 +36,7 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh }
     return (
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.flex}>
+          <View style={[styles.flex, styles.clip]}>
             {decor}
             <View style={[styles.flex, styles.content, styles.centered, style]}>{children}</View>
           </View>
@@ -48,7 +48,7 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh }
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.flex}>
+        <View style={[styles.flex, styles.clip]}>
           {decor}
           <ScrollView
             style={styles.container}
@@ -69,6 +69,9 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
     flex: { flex: 1 },
+    // The decorative blobs bleed past the edges on purpose — clip them so they
+    // can't widen the page (matters on web, where overflow is not contained).
+    clip: { overflow: 'hidden' },
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
     centered: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },

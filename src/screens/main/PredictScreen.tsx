@@ -91,7 +91,8 @@ export default function PredictScreen() {
 
       <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
         {openRounds.map((round) => {
-          const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
+          // slot.index is 0-based — see RoundsScreen for why `(index - 1) % len` crashed.
+          const palette = ROUND_CARD_PALETTES[round.slot.index % ROUND_CARD_PALETTES.length];
           return (
             <Card key={round.slot.id} padded={false}>
               <View style={[styles.roundBand, { backgroundColor: palette.background, borderBottomColor: palette.border }]}>

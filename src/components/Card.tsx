@@ -53,10 +53,24 @@ export function Card({ style, children, tone = 'surface', variant = 'soft', padd
 
   if (variant === 'sticker') {
     const depth = 5;
+    // The hard-shadow layer is absolutely positioned against the wrapper, so
+    // the face must always span the wrapper's full width. Callers legitimately
+    // pass content alignment (e.g. `alignItems: 'center'`) via `style` — if that
+    // reached the wrapper it would shrink the face to its content and leave the
+    // shadow slab poking out, so split alignment onto the face and keep the
+    // rest (margins, flex) on the wrapper.
+    const flat = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
+    const { alignItems, justifyContent, ...wrapperStyle } = flat;
     return (
-      <View style={[styles.stickerWrap, { paddingBottom: depth, paddingRight: depth }, style]} {...rest}>
+      <View style={[styles.stickerWrap, { paddingBottom: depth, paddingRight: depth }, wrapperStyle]} {...rest}>
         <View pointerEvents="none" style={[styles.stickerBase, { top: depth, left: depth, backgroundColor: withAlpha(colors.ink, 0.9) }]} />
-        <View style={[styles.card, padded && styles.padded, { backgroundColor: bg, borderColor: border, borderWidth: 2 }]}>
+        <View
+          style={[
+            styles.card,
+            padded && styles.padded,
+            { backgroundColor: bg, borderColor: border, borderWidth: 2, alignSelf: 'stretch', alignItems, justifyContent },
+          ]}
+        >
           {children}
         </View>
       </View>
