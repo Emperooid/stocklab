@@ -20,6 +20,7 @@ import { ROUND_SLOTS, getSlotStatus } from '../../lib/schedule';
 import { formatMoney, formatPercent, formatSigned, formatTime12h } from '../../lib/format';
 import { DailyRound, RoundStatus, WalletTransaction } from '../../types';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
+import { ROUND_CARD_PALETTES } from '../../theme/theme';
 
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
@@ -174,11 +175,12 @@ export default function HomeScreen() {
           upcomingRounds.map((round) => {
             const status = getSlotStatus(round.slot, now);
             const { label, tone } = ROUND_STATUS_META[status];
+            const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
             return (
               <TouchableOpacity key={round.slot.id} activeOpacity={0.85} onPress={() => navigation.navigate('Predict')}>
                 <Card style={styles.miniRoundCard}>
-                  <View style={styles.miniRoundIndexCircle}>
-                    <Text style={styles.miniRoundIndexText}>{round.slot.index}</Text>
+                  <View style={[styles.miniRoundIndexCircle, { backgroundColor: palette.accent }]}>
+                    <Text style={[styles.miniRoundIndexText, { color: '#FFFFFF' }]}>{round.slot.index}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.miniRoundTitle}>Round {round.slot.index}</Text>
@@ -323,13 +325,18 @@ function createStyles(colors: Colors) {
       borderWidth: 1.5,
       borderColor: colors.surfaceAlt,
     },
-    balanceCard: { alignItems: 'flex-start' },
+    balanceCard: {
+      alignItems: 'flex-start',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+      shadowColor: colors.primary,
+    },
     balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
-    balanceLabel: { ...typography.small, color: colors.textMuted },
+    balanceLabel: { ...typography.small, color: 'rgba(255,255,255,0.78)' },
     profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
     profitPillText: { ...typography.tiny, fontWeight: '700' },
-    balance: { ...typography.h1, color: colors.text, marginTop: spacing.xs },
-    profit: { ...typography.small, marginTop: 4, fontWeight: '600' },
+    balance: { ...typography.h1, color: colors.onPrimary, marginTop: spacing.xs },
+    profit: { ...typography.small, marginTop: 4, fontWeight: '600', color: colors.onPrimary },
     countdownWrap: { marginTop: spacing.lg },
     resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
     resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -337,7 +344,7 @@ function createStyles(colors: Colors) {
     resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
     resultPillText: { ...typography.small, fontWeight: '800' },
     resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
-    ctaCard: { marginTop: spacing.lg },
+    ctaCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceRaised },
     ctaIconCircle: {
       width: 44,
       height: 44,
@@ -361,7 +368,7 @@ function createStyles(colors: Colors) {
       marginTop: spacing.xl,
       marginBottom: spacing.sm,
     },
-    sectionTitle: { ...typography.h3, color: colors.text },
+    sectionTitle: { ...typography.h3, color: colors.text, letterSpacing: 0.1 },
     viewAllLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     viewAllText: { ...typography.small, color: colors.primary, fontWeight: '700' },
     emptyMiniCard: { backgroundColor: colors.surfaceAlt },

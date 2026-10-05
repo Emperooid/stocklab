@@ -16,11 +16,11 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     card: {
       backgroundColor: colors.surface,
-      borderRadius: radius.lg,
+      borderRadius: radius.xl,
       borderWidth: 1,
       borderColor: colors.border,
       padding: spacing.lg,
-      ...shadow.sm,
+      ...shadow.md,
     },
   });
 }

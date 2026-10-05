@@ -9,7 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { PredictionControl } from '../../components/PredictionControl';
 import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
 import { MasterAutoPlayToggle } from '../../components/MasterAutoPlayToggle';
-import { Colors, spacing, typography, useColors } from '../../theme/theme';
+import { Colors, spacing, typography, useColors, ROUND_CARD_PALETTES } from '../../theme/theme';
 import { useRoundsStore } from '../../store/roundsStore';
 import { useAuthStore } from '../../store/authStore';
 import { useAutoPlayStore } from '../../store/autoPlayStore';
@@ -84,8 +84,8 @@ export default function PredictScreen() {
         {openRounds.map((round) => (
           <Card key={round.slot.id}>
             <View style={styles.roundHeader}>
-              <View style={styles.roundIndexCircle}>
-                <Text style={styles.roundIndexText}>{round.slot.index}</Text>
+              <View style={[styles.roundIndexCircle, { backgroundColor: ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length].accent }]}>
+                <Text style={[styles.roundIndexText, { color: '#FFFFFF' }]}>{round.slot.index}</Text>
               </View>
               <View>
                 <Text style={styles.roundLabel}>Round {round.slot.index}</Text>

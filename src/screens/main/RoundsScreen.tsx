@@ -8,7 +8,7 @@ import { Card } from '../../components/Card';
 import { Badge, BadgeTone } from '../../components/Badge';
 import { PredictionControl } from '../../components/PredictionControl';
 import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
-import { Colors, layout, radius, spacing, typography, useColors } from '../../theme/theme';
+import { Colors, layout, moderateScale, radius, ROUND_CARD_PALETTES, spacing, typography, useColors } from '../../theme/theme';
 import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
 import { useWalletStore } from '../../store/walletStore';
 import { useAuthStore } from '../../store/authStore';
@@ -113,6 +113,7 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
   const result = round.result;
   const gainPositive = result?.finalOutcome ? result.finalOutcome === 'gain' : (result?.valueGained ?? 0) >= 0;
   const isSettled = !!result;
+  const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
 
   // A round accepts input from right now until ITS OWN close time — no
   // waiting for its nominal submit time to arrive. "Upcoming" is gone as a
@@ -126,15 +127,15 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
   const countdownMs = countdownTarget ? countdownTarget.getTime() - now.getTime() : 0;
 
   return (
-    <Card style={styles.roundCard}>
+    <Card style={[styles.roundCard, { backgroundColor: palette.background, borderColor: palette.border }]}>
       <View style={styles.roundHeaderRow}>
         <View style={styles.roundTitleWrap}>
-          <View style={styles.roundIndexCircle}>
-            <Text style={styles.roundIndexText}>{round.slot.index}</Text>
+          <View style={[styles.roundIndexCircle, { backgroundColor: palette.accent }]}>
+            <Text style={styles.roundIndexText}>{String(round.slot.index).padStart(2, '0')}</Text>
           </View>
           <View>
-            <Text style={styles.roundTitle}>Round {round.slot.index}</Text>
-            <Text style={styles.roundTime}>
+            <Text style={[styles.roundTitle, { color: palette.ink }]}>Round {round.slot.index}</Text>
+            <Text style={[styles.roundTime, { color: palette.ink, opacity: 0.72 }]}>
               {formatTime12h(round.slot.submitTime)} - {formatTime12h(round.slot.settleTime)}
             </Text>
           </View>
@@ -143,19 +144,19 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       </View>
 
       {countdownTarget && (
-        <View style={styles.countdownRow}>
-          <Text style={styles.countdownLabel}>{countdownLabel}</Text>
-          <Text style={styles.countdownValue}>{formatCountdown(countdownMs)}</Text>
+        <View style={[styles.countdownRow, { borderTopColor: palette.border }]}>
+          <Text style={[styles.countdownLabel, { color: palette.ink, opacity: 0.72 }]}>{countdownLabel}</Text>
+          <Text style={[styles.countdownValue, { color: palette.accent }]}>{formatCountdown(countdownMs)}</Text>
         </View>
       )}
 
       {result && (
-        <View style={styles.resultRow}>
-          <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} colors={colors} />
-          <MiniStat label="Avg Pick" value={result.average != null ? result.average.toFixed(2) : '—'} colors={colors} />
-          <MiniStat label="Deviation" value={result.distance != null ? result.distance.toFixed(2) : '—'} colors={colors} />
+        <View style={[styles.resultRow, { borderTopColor: palette.border }]}>
+          <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} colors={colors} ink={palette.ink} />
+          <MiniStat label="Avg Pick" value={result.average != null ? result.average.toFixed(2) : '—'} colors={colors} ink={palette.ink} />
+          <MiniStat label="Deviation" value={result.distance != null ? result.distance.toFixed(2) : '—'} colors={colors} ink={palette.ink} />
           <View style={styles.resultValueWrap}>
-            <Text style={styles.miniStatLabel}>Value</Text>
+            <Text style={[styles.miniStatLabel, { color: palette.ink, opacity: 0.72 }]}>Value</Text>
             <View style={[styles.valuePill, { backgroundColor: gainPositive ? colors.successTint : colors.dangerTint }]}>
               <Text style={[styles.valuePillText, { color: gainPositive ? colors.success : colors.danger }]}>
                 {formatSigned(result.valueGained ?? 0)}
@@ -169,9 +170,9 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       )}
 
       {!isSettled && !isOpen && (
-        <View style={styles.pendingRow}>
-          <Ionicons name={round.prediction ? 'time-outline' : 'help-circle-outline'} size={16} color={colors.textDim} />
-          <Text style={styles.pendingText}>
+        <View style={[styles.pendingRow, { borderTopColor: palette.border }]}>
+          <Ionicons name={round.prediction ? 'time-outline' : 'help-circle-outline'} size={16} color={palette.ink} />
+          <Text style={[styles.pendingText, { color: palette.ink }]}>
             {round.prediction
               ? `You picked ${round.prediction.value} — waiting for the result`
               : 'Round closed — no stock was submitted'}
@@ -180,7 +181,7 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       )}
 
       {isOpen && (
-        <View style={styles.predictBox}>
+        <View style={[styles.predictBox, { borderTopColor: palette.border }]}>
           <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
           <PredictionControl
             roundId={round.slot.id}
@@ -194,12 +195,12 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
   );
 }
 
-function MiniStat({ label, value, colors }: { label: string; value: string; colors: Colors }) {
+function MiniStat({ label, value, colors, ink }: { label: string; value: string; colors: Colors; ink?: string }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={{ alignItems: 'flex-start', flexShrink: 1 }}>
-      <Text style={styles.miniStatLabel}>{label}</Text>
-      <Text style={styles.miniStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+      <Text style={[styles.miniStatLabel, ink ? { color: ink, opacity: 0.72 } : null]}>{label}</Text>
+      <Text style={[styles.miniStatValue, ink ? { color: ink } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
         {value}
       </Text>
     </View>
@@ -263,7 +264,11 @@ function createStyles(colors: Colors) {
       marginBottom: spacing.md,
     },
     sectionTitle: { ...typography.h3, color: colors.text },
-    roundCard: {},
+    roundCard: {
+      overflow: 'hidden',
+      borderWidth: 1.5,
+      padding: spacing.lg,
+    },
     roundHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     roundTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
     roundIndexCircle: {
@@ -274,9 +279,9 @@ function createStyles(colors: Colors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    roundIndexText: { ...typography.h3, color: colors.onPrimary },
-    roundTitle: { ...typography.h3, color: colors.text },
-    roundTime: { ...typography.tiny, color: colors.textMuted, marginTop: 1 },
+    roundIndexText: { ...typography.h3, color: colors.onPrimary, fontVariant: ['tabular-nums'] },
+    roundTitle: { ...typography.h3, color: colors.text, fontSize: moderateScale(17) },
+    roundTime: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
     countdownRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',

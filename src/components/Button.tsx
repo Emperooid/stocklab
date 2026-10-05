@@ -74,13 +74,13 @@ const TEXT_STYLE = (colors: Colors) => ({
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     base: {
-      height: 50,
-      borderRadius: radius.md,
+      height: 52,
+      borderRadius: radius.lg,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.lg,
     },
-    baseSm: { height: 40, paddingHorizontal: spacing.md },
+    baseSm: { height: 42, paddingHorizontal: spacing.md, borderRadius: radius.md },
     primary: { backgroundColor: colors.primary },
     danger: { backgroundColor: colors.danger },
     outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },

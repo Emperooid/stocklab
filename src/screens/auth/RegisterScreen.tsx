@@ -213,9 +213,15 @@ export default function RegisterScreen({ navigation }: Props) {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     centerContent: { flexGrow: 1, justifyContent: 'center' },
-    header: { alignItems: 'center', marginBottom: spacing.xl },
+    header: {
+      alignItems: 'center',
+      marginBottom: spacing.xl,
+      paddingVertical: spacing.lg,
+      borderRadius: radius.xl,
+      backgroundColor: colors.primaryTint,
+    },
     logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
-    logo: { ...typography.h2, color: colors.text, letterSpacing: 0.2 },
+    logo: { ...typography.h2, color: colors.primary, letterSpacing: 0.2 },
     title: { ...typography.h2, color: colors.text, textAlign: 'center' },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl, textAlign: 'center' },
     form: { gap: spacing.sm },

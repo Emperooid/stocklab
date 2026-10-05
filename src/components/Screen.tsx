@@ -24,7 +24,11 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh }
     return (
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[styles.flex, styles.content, styles.centered, style]}>{children}</View>
+          <View style={styles.flex}>
+            <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
+            <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+            <View style={[styles.flex, styles.content, styles.centered, style]}>{children}</View>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -33,15 +37,19 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh }
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={[styles.content, styles.centered, style]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={refreshControl}
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ScrollView>
+        <View style={styles.flex}>
+          <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
+          <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={[styles.content, styles.centered, style]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -54,5 +62,8 @@ function createStyles(colors: Colors) {
     container: { flex: 1, backgroundColor: colors.background },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl },
     centered: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
+    orb: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.22 },
+    orbTop: { top: -125, right: -80, backgroundColor: colors.primaryTint },
+    orbBottom: { bottom: -145, left: -95, backgroundColor: colors.blueTint },
   });
 }

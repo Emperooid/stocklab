@@ -162,14 +162,21 @@ export default function LoginScreen({ navigation, route }: Props) {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    header: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.xxl },
+    header: {
+      alignItems: 'center',
+      marginTop: spacing.lg,
+      marginBottom: spacing.xxl,
+      paddingVertical: spacing.xl,
+      borderRadius: radius.xl,
+      backgroundColor: colors.primaryTint,
+    },
     logoMark: {
       width: 72,
       height: 72,
       borderRadius: 18,
       marginBottom: spacing.md,
     },
-    logo: { ...typography.h1, color: colors.text, letterSpacing: 0.2 },
+    logo: { ...typography.h1, color: colors.primary, letterSpacing: 0.2 },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },

@@ -11,7 +11,7 @@ interface RaisedTabButtonProps extends BottomTabBarButtonProps {
 
 // A low scaling factor keeps this a floating action button rather than
 // letting it balloon on tablets the way body text intentionally does.
-const SIZE = moderateScale(54, 0.2);
+const SIZE = moderateScale(52, 0.2);
 
 export function RaisedTabButton({ icon, label, onPress, accessibilityState, testID }: RaisedTabButtonProps) {
   const colors = useColors();
@@ -33,7 +33,7 @@ export function RaisedTabButton({ icon, label, onPress, accessibilityState, test
           style={[
             styles.circle,
             shadow.md,
-            { backgroundColor: focused ? colors.primary : colors.surfaceRaised, transform: [{ scale: pressScale }] },
+            { backgroundColor: focused ? colors.primary : colors.surface, transform: [{ scale: pressScale }] },
           ]}
         >
           <Ionicons name={icon} size={24} color={focused ? colors.onPrimary : colors.textMuted} />
@@ -47,7 +47,7 @@ export function RaisedTabButton({ icon, label, onPress, accessibilityState, test
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     wrap: { flex: 1, alignItems: 'center' },
-    pressable: { alignItems: 'center', top: -14 },
+    pressable: { alignItems: 'center', top: -10 },
     circle: {
       width: SIZE,
       height: SIZE,
@@ -55,8 +55,9 @@ function createStyles(colors: Colors) {
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 3,
-      borderColor: colors.background,
+      borderColor: colors.surface,
+      shadowColor: colors.primary,
     },
-    label: { ...typography.tiny, fontWeight: '700', marginTop: 4 },
+    label: { ...typography.tiny, fontWeight: '700', marginTop: 3 },
   });
 }

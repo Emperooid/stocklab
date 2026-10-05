@@ -196,9 +196,9 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-    balanceCard: { marginHorizontal: spacing.lg },
-    balanceLabel: { ...typography.small, color: colors.textMuted },
-    balance: { ...typography.h1, color: colors.text, marginTop: 4 },
+    balanceCard: { marginHorizontal: spacing.lg, backgroundColor: colors.primary, borderColor: colors.primary, shadowColor: colors.primary },
+    balanceLabel: { ...typography.small, color: 'rgba(255,255,255,0.78)' },
+    balance: { ...typography.h1, color: colors.onPrimary, marginTop: 4 },
     quickActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
     quickActionBtn: {
       flex: 1,
@@ -209,8 +209,8 @@ function createStyles(colors: Colors) {
       height: 44,
       borderRadius: radius.md,
       borderWidth: 1.5,
-      borderColor: colors.primary,
-      backgroundColor: 'transparent',
+      borderColor: colors.borderLight,
+      backgroundColor: colors.surface,
     },
     quickActionBtnActive: { backgroundColor: colors.primary },
     quickActionText: { ...typography.small, color: colors.primary, fontWeight: '700' },

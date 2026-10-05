@@ -8,7 +8,7 @@ import WalletScreen from '../screens/main/WalletScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import { RaisedTabButton } from '../components/RaisedTabButton';
 import { MainTabParamList } from './types';
-import { layout, radius, shadow, typography, useColors } from '../theme/theme';
+import { layout, shadow, typography, useColors } from '../theme/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -21,9 +21,8 @@ const ICONS: Record<keyof MainTabParamList, [keyof typeof Ionicons.glyphMap, key
 };
 
 // Icon/label content area, independent of the device's bottom inset.
-const TAB_BAR_CONTENT_HEIGHT = 50;
-const TAB_BAR_PADDING_TOP = 6;
-const TAB_BAR_MIN_PADDING_BOTTOM = 10;
+const TAB_BAR_CONTENT_HEIGHT = 54;
+const TAB_BAR_MIN_PADDING_BOTTOM = 8;
 
 export function MainTabs() {
   const colors = useColors();
@@ -42,12 +41,16 @@ export function MainTabs() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
         tabBarLabelStyle: { fontSize: typography.tiny.fontSize, fontWeight: '600' },
+        tabBarItemStyle: { marginVertical: 0 },
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: TAB_BAR_CONTENT_HEIGHT + TAB_BAR_PADDING_TOP + bottomPadding,
+          borderTopWidth: 0,
+          borderWidth: 0,
+          height: TAB_BAR_CONTENT_HEIGHT + bottomPadding,
           paddingBottom: bottomPadding,
-          paddingTop: TAB_BAR_PADDING_TOP,
+          paddingTop: 0,
+          marginHorizontal: 0,
+          marginBottom: 0,
           // Every screen caps content at layout.contentMaxWidth and centers
           // it on tablets (see Screen.tsx) — an edge-to-edge tab bar would
           // stretch 5 tabs across the full width and look inconsistent with
@@ -55,13 +58,9 @@ export function MainTabs() {
           ...(layout.isTablet && {
             width: layout.contentMaxWidth,
             alignSelf: 'center',
-            borderLeftWidth: 1,
-            borderRightWidth: 1,
-            borderColor: colors.border,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
+            borderRadius: 0,
           }),
-          ...shadow.md,
+          ...shadow.sm,
         },
         tabBarIcon: ({ color, size, focused }) => {
           const [active, inactive] = ICONS[route.name as keyof MainTabParamList];

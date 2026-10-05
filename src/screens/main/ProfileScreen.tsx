@@ -236,12 +236,14 @@ function SupportRow({
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
-    profileCard: { alignItems: 'center', paddingVertical: spacing.xl },
+    profileCard: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.primaryTint, borderColor: colors.primary },
     avatar: {
       width: 68,
       height: 68,
       borderRadius: 34,
       backgroundColor: colors.primary,
+      borderWidth: 5,
+      borderColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.md,

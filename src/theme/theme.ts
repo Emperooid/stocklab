@@ -26,63 +26,57 @@ export const layout = {
 };
 
 export const darkColors = {
-  // A softer slate rather than near-black — reduces the "heavy" feel of
-  // the previous #0B0F0D/#121815 pairing without losing dark-mode contrast.
-  background: '#10171A',
-  surface: '#1A2226',
-  surfaceAlt: '#212B30',
-  surfaceRaised: '#263136',
-  border: '#2C3739',
-  borderLight: '#3A464A',
-  // Deep enough emerald to keep WHITE legible on top of it — the lighter
-  // #34D399 tried before this reads too washed-out with white text, which
-  // is why onPrimary was dark instead. Matches the light theme's existing
-  // primary, so both modes now use white-on-green consistently.
-  primary: '#10B981',
-  primaryDark: '#059669',
+  background: '#0B0F1E',
+  surface: '#151A2E',
+  surfaceAlt: '#1D2440',
+  surfaceRaised: '#232B4D',
+  border: '#2B3357',
+  borderLight: '#39426B',
+  primary: '#7C6CFF',
+  primaryDark: '#6A57F0',
   onPrimary: '#FFFFFF',
-  text: '#F3F6F5',
-  textMuted: '#98A6A0',
-  textDim: '#67746E',
-  success: '#10B981',
-  successTint: 'rgba(16, 185, 129, 0.14)',
-  danger: '#F87171',
-  dangerTint: 'rgba(248, 113, 113, 0.14)',
-  warning: '#FBBF24',
-  warningTint: 'rgba(251, 191, 36, 0.14)',
-  primaryTint: 'rgba(16, 185, 129, 0.12)',
-  purple: '#A78BFA',
-  purpleTint: 'rgba(167, 139, 250, 0.14)',
-  blue: '#60A5FA',
-  blueTint: 'rgba(96, 165, 250, 0.14)',
+  text: '#F7F8FE',
+  textMuted: '#A8B2CD',
+  textDim: '#6F7A9B',
+  success: '#34D99B',
+  successTint: 'rgba(52, 217, 155, 0.16)',
+  danger: '#FF5F7E',
+  dangerTint: 'rgba(255, 95, 126, 0.16)',
+  warning: '#FFB224',
+  warningTint: 'rgba(255, 178, 36, 0.16)',
+  primaryTint: 'rgba(124, 108, 255, 0.18)',
+  purple: '#B892FF',
+  purpleTint: 'rgba(184, 146, 255, 0.16)',
+  blue: '#5EB6FF',
+  blueTint: 'rgba(94, 182, 255, 0.16)',
   overlay: 'rgba(0, 0, 0, 0.55)',
 };
 
 export const lightColors = {
-  background: '#F5F8F6',
+  background: '#F6F7FD',
   surface: '#FFFFFF',
-  surfaceAlt: '#EEF3EF',
+  surfaceAlt: '#EEF0FB',
   surfaceRaised: '#FFFFFF',
-  border: '#DCE5DF',
-  borderLight: '#E8EFEA',
-  primary: '#10B981',
-  primaryDark: '#059669',
+  border: '#E2E6F2',
+  borderLight: '#ECEFF8',
+  primary: '#6C5CFF',
+  primaryDark: '#5A49E8',
   onPrimary: '#FFFFFF',
-  text: '#0F241A',
-  textMuted: '#57685F',
-  textDim: '#8C9A92',
-  success: '#10B981',
-  successTint: 'rgba(16, 185, 129, 0.10)',
-  danger: '#DC2626',
-  dangerTint: 'rgba(220, 38, 38, 0.08)',
-  warning: '#B45309',
-  warningTint: 'rgba(180, 83, 9, 0.09)',
-  primaryTint: 'rgba(16, 185, 129, 0.10)',
-  purple: '#7C3AED',
-  purpleTint: 'rgba(124, 58, 237, 0.10)',
-  blue: '#2563EB',
-  blueTint: 'rgba(37, 99, 235, 0.10)',
-  overlay: 'rgba(15, 36, 26, 0.4)',
+  text: '#151A2E',
+  textMuted: '#5B6682',
+  textDim: '#8B94AD',
+  success: '#0CA678',
+  successTint: 'rgba(12, 166, 120, 0.10)',
+  danger: '#E54863',
+  dangerTint: 'rgba(229, 72, 99, 0.10)',
+  warning: '#B77900',
+  warningTint: 'rgba(183, 121, 0, 0.10)',
+  primaryTint: 'rgba(108, 92, 255, 0.10)',
+  purple: '#7B55D9',
+  purpleTint: 'rgba(123, 85, 217, 0.10)',
+  blue: '#287CD1',
+  blueTint: 'rgba(40, 124, 209, 0.10)',
+  overlay: 'rgba(21, 26, 46, 0.4)',
 };
 
 export type Colors = typeof darkColors;
@@ -107,12 +101,46 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 26,
   pill: 999,
 };
+
+/**
+ * One vibrant palette per round slot (24 total) — each hour renders as a
+ * distinct, saturated card. `accent` is the bold color (index chip, borders),
+ * `background` is its light tint for the card body, and `ink` is the dark
+ * text color that stays readable on that light background regardless of the
+ * app's dark/light theme.
+ */
+export const ROUND_CARD_PALETTES = [
+  { accent: '#E8590C', background: '#FFE8D9', border: '#F3B08C', ink: '#5C2E08' },
+  { accent: '#0CA678', background: '#E3F7EE', border: '#84D5B5', ink: '#0B4A35' },
+  { accent: '#E64980', background: '#FFE3EC', border: '#F3A3BE', ink: '#5C1530' },
+  { accent: '#1C7ED6', background: '#E5F1FF', border: '#98C5F2', ink: '#0B3357' },
+  { accent: '#7048E8', background: '#F0EBFF', border: '#BBA6F0', ink: '#2B165C' },
+  { accent: '#F08C00', background: '#FFF0D6', border: '#F3C77E', ink: '#5C3200' },
+  { accent: '#0CA678', background: '#E6FBF4', border: '#7CD8BC', ink: '#0B4A35' },
+  { accent: '#E03131', background: '#FFE3E3', border: '#F2A0A0', ink: '#5C0B0B' },
+  { accent: '#66A80F', background: '#F0F8D9', border: '#B8D67F', ink: '#2E4A05' },
+  { accent: '#9C36B5', background: '#F7E9FF', border: '#D3A0E8', ink: '#3F1150' },
+  { accent: '#1098AD', background: '#E3F8FB', border: '#84CDD9', ink: '#0A3C46' },
+  { accent: '#D6336C', background: '#FFE6F0', border: '#F2A0C0', ink: '#5C0E2E' },
+  { accent: '#E6A800', background: '#FFF6D9', border: '#F0D066', ink: '#5C4200' },
+  { accent: '#3B5BDB', background: '#E8EDFF', border: '#A3B2F0', ink: '#16225C' },
+  { accent: '#2F9E44', background: '#E9F8EC', border: '#92D5A4', ink: '#0B4A1D' },
+  { accent: '#E85D5D', background: '#FFE8E8', border: '#F2A8A8', ink: '#5C1414' },
+  { accent: '#5F3DC4', background: '#EFE9FF', border: '#B9A6F0', ink: '#24105C' },
+  { accent: '#0B7285', background: '#E3F8F8', border: '#82CED2', ink: '#0A3A42' },
+  { accent: '#E8590C', background: '#FFF0E6', border: '#F3B58E', ink: '#5C2A06' },
+  { accent: '#1971C2', background: '#E7F2FF', border: '#96C2F0', ink: '#0B2E52' },
+  { accent: '#A61E4D', background: '#FFE7F0', border: '#EFA2C0', ink: '#4A0B22' },
+  { accent: '#5C940D', background: '#F1F8DE', border: '#BCD489', ink: '#2A4205' },
+  { accent: '#E67700', background: '#FFF1DC', border: '#F2C07C', ink: '#5C3000' },
+  { accent: '#4263EB', background: '#EAEEFF', border: '#A6B3F0', ink: '#18235C' },
+] as const;
 
 export const typography = {
   h1: { fontSize: moderateScale(28), fontWeight: '800' as const, letterSpacing: -0.3 },
