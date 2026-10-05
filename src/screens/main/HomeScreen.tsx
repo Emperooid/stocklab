@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,8 +7,15 @@ import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { CountdownBadge } from '../../components/CountdownBadge';
-import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
+import { AppIcon } from '../../components/AppIcon';
+import { IconBubble } from '../../components/IconBubble';
+import { SectionHeader } from '../../components/SectionHeader';
+import { StatTile } from '../../components/StatTile';
+import { EmptyState } from '../../components/EmptyState';
+import { Colors, glow, radius, spacing, typography, useColors } from '../../theme/theme';
 import { Badge, BadgeTone } from '../../components/Badge';
+import { IconName } from '../../theme/icons';
+import { withAlpha } from '../../lib/color';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
 import { useInviteStore } from '../../store/inviteStore';
@@ -22,12 +28,12 @@ import { DailyRound, RoundStatus, WalletTransaction } from '../../types';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { ROUND_CARD_PALETTES } from '../../theme/theme';
 
-const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
-  deposit: 'arrow-down-circle',
-  withdrawal: 'arrow-up-circle',
-  round_stake: 'game-controller-outline',
-  round_gain: 'trending-up',
-  round_loss: 'trending-down',
+const TX_ICON: Record<WalletTransaction['type'], IconName> = {
+  deposit: 'deposit',
+  withdrawal: 'withdraw',
+  round_stake: 'stock',
+  round_gain: 'trend-up',
+  round_loss: 'trend-down',
 };
 
 const ROUND_STATUS_META: Record<RoundStatus, { label: string; tone: BadgeTone }> = {
@@ -83,14 +89,16 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+      {/* ── Warm greeting header ─────────────────────────────────────────── */}
       <View style={styles.headerRow}>
-        <View>
+        <View style={styles.headerText}>
           <Text style={styles.eyebrow}>WELCOME BACK</Text>
           <Text style={styles.greeting}>{user?.name?.split(' ')[0] ?? 'Trader'}</Text>
+          <Text style={styles.greetingSub}>Let's find today's lucky figure.</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.bellButton} onPress={() => stackNavigation?.navigate('News')}>
-            <Ionicons name="notifications-outline" size={20} color={colors.text} />
+            <AppIcon name="bell-outline" size={20} color={colors.text} />
             {hasNews && <View style={styles.bellDot} />}
           </Pressable>
           <View style={styles.avatar}>
@@ -99,12 +107,18 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <Card style={styles.balanceCard}>
+      {/* ── Hero: balance ────────────────────────────────────────────────── */}
+      <View style={[styles.balanceCardShell, glow(colors.primary)]}>
+        <Card tone="hero" style={styles.balanceCard}>
+          <AppIcon name="sparkle" size={148} opacity={0.18} style={styles.heroArt} />
           <View style={styles.balanceTopRow}>
-            <Text style={styles.balanceLabel}>Your Balance</Text>
-            <View style={[styles.profitPill, { backgroundColor: isProfitPositive ? colors.successTint : colors.dangerTint }]}>
-              <Ionicons
-                name={isProfitPositive ? 'trending-up' : 'trending-down'}
+            <View style={styles.balanceLabelRow}>
+              <IconBubble name="wallet" size={38} iconSize={20} background={withAlpha(colors.cream, 0.22)} />
+              <Text style={styles.balanceLabel}>Your Balance</Text>
+            </View>
+            <View style={[styles.profitPill, { backgroundColor: colors.surface }]}>
+              <AppIcon
+                name={isProfitPositive ? 'trend-up' : 'trend-down'}
                 size={12}
                 color={isProfitPositive ? colors.success : colors.danger}
               />
@@ -114,12 +128,20 @@ export default function HomeScreen() {
             </View>
           </View>
           <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-          {formatMoney(balance)}
-        </Text>
-          <Text style={[styles.profit, { color: isProfitPositive ? colors.success : colors.danger }]}>
-            {formatSigned(totalProfit)} today
+            {formatMoney(balance)}
           </Text>
+          <View style={styles.profitRow}>
+            <View style={[styles.profitTrend, { backgroundColor: colors.surface }]}>
+              <AppIcon
+                name={isProfitPositive ? 'trend-up' : 'trend-down'}
+                size={13}
+                color={isProfitPositive ? colors.success : colors.danger}
+              />
+            </View>
+            <Text style={styles.profit}>{formatSigned(totalProfit)} today</Text>
+          </View>
         </Card>
+      </View>
 
       <View style={styles.countdownWrap}>
         <CountdownBadge />
@@ -127,49 +149,67 @@ export default function HomeScreen() {
 
       {latestResult && <LatestResultCard round={latestResult} />}
 
+      {/* ── Open round call-to-action ────────────────────────────────────── */}
       {openRound ? (
-        <Card style={styles.ctaCard}>
-          <View style={styles.ctaIconCircle}>
-            <Ionicons name="flash" size={22} color={colors.onPrimary} />
+        <Card tone="amber" style={styles.ctaCard}>
+          <View style={styles.ctaHeaderRow}>
+            <IconBubble name="bolt" size={48} iconSize={24} color={colors.amber} background={colors.surface} />
+            <View style={styles.ctaTextWrap}>
+              <Text style={styles.ctaTitle}>Round {openRound.slot.index} is open</Text>
+              <Text style={styles.ctaSubtitle}>Submit your stock pick before {openRound.slot.settleTime}.</Text>
+            </View>
           </View>
-          <View style={styles.ctaTextWrap}>
-            <Text style={styles.ctaTitle}>Round {openRound.slot.index} is open</Text>
-            <Text style={styles.ctaSubtitle}>Submit your stock pick before {openRound.slot.settleTime}.</Text>
-          </View>
-          <Button title="Pick Stock Now" onPress={() => navigation.navigate('Predict')} size="sm" style={{ marginTop: spacing.md }} />
+          <Button
+            title="Pick Stock Now"
+            icon="arrow-right"
+            variant="accent"
+            onPress={() => navigation.navigate('Predict')}
+            size="sm"
+            style={{ marginTop: spacing.md }}
+          />
         </Card>
       ) : (
-        <Card style={styles.ctaCard}>
-          <View style={[styles.ctaIconCircle, { backgroundColor: colors.surfaceAlt }]}>
-            <Ionicons name="calendar-outline" size={22} color={colors.textMuted} />
+        <Card tone="alt" style={styles.ctaCard}>
+          <View style={styles.ctaHeaderRow}>
+            <IconBubble name="calendar" size={48} iconSize={24} color={colors.textMuted} background={colors.surface} />
+            <View style={styles.ctaTextWrap}>
+              <Text style={styles.ctaTitle}>No round open right now</Text>
+              <Text style={styles.ctaSubtitle}>Check the Rounds tab for today's full schedule.</Text>
+            </View>
           </View>
-          <View style={styles.ctaTextWrap}>
-            <Text style={styles.ctaTitle}>No round open right now</Text>
-            <Text style={styles.ctaSubtitle}>Check the Rounds tab for today's full schedule.</Text>
-          </View>
-          <Button title="View Rounds" variant="outline" size="sm" onPress={() => navigation.navigate('Rounds')} style={{ marginTop: spacing.md }} />
+          <Button
+            title="View Rounds"
+            variant="outline"
+            icon="arrow-right"
+            size="sm"
+            onPress={() => navigation.navigate('Rounds')}
+            style={{ marginTop: spacing.md }}
+          />
         </Card>
       )}
 
+      {/* ── Today at a glance ────────────────────────────────────────────── */}
       <View style={styles.statsRow}>
-        <Card style={styles.statCard}>
-          <Ionicons name="checkmark-done-circle-outline" size={20} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue}>{settledToday}/{rounds.length}</Text>
-          <Text style={styles.statLabel}>Rounds settled today</Text>
-        </Card>
+        <StatTile
+          icon="trophy"
+          label="Rounds settled today"
+          value={`${settledToday}/${rounds.length}`}
+          color={colors.teal}
+          hint={rounds.length > 0 ? `${rounds.length - settledToday} still to settle` : undefined}
+        />
       </View>
 
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Today's Rounds</Text>
-        <TouchableOpacity style={styles.viewAllLink} onPress={() => navigation.navigate('Rounds')}>
-          <Text style={styles.viewAllText}>View All</Text>
-          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+      {/* ── Today's rounds ───────────────────────────────────────────────── */}
+      <SectionHeader
+        eyebrow="TODAY'S SCHEDULE"
+        title="Today's Rounds"
+        actionLabel="View All"
+        onAction={() => navigation.navigate('Rounds')}
+      />
       <View style={{ gap: spacing.sm }}>
         {upcomingRounds.length === 0 ? (
-          <Card style={styles.emptyMiniCard}>
-            <Text style={styles.emptyMiniText}>No rounds left to pick a stock for today.</Text>
+          <Card tone="alt">
+            <EmptyState icon="calendar" title="No rounds left to pick a stock for today." />
           </Card>
         ) : (
           upcomingRounds.map((round) => {
@@ -178,13 +218,13 @@ export default function HomeScreen() {
             const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
             return (
               <TouchableOpacity key={round.slot.id} activeOpacity={0.85} onPress={() => navigation.navigate('Predict')}>
-                <Card style={styles.miniRoundCard}>
+                <Card style={[styles.miniRoundCard, { backgroundColor: palette.background, borderColor: palette.border }]}>
                   <View style={[styles.miniRoundIndexCircle, { backgroundColor: palette.accent }]}>
-                    <Text style={[styles.miniRoundIndexText, { color: '#FFFFFF' }]}>{round.slot.index}</Text>
+                    <Text style={[styles.miniRoundIndexText, { color: colors.cream }]}>{round.slot.index}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.miniRoundTitle}>Round {round.slot.index}</Text>
-                    <Text style={styles.miniRoundTime}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.miniRoundTitle, { color: palette.ink }]}>Round {round.slot.index}</Text>
+                    <Text style={[styles.miniRoundTime, { color: palette.ink }]}>
                       {formatTime12h(round.slot.submitTime)} - {formatTime12h(round.slot.settleTime)}
                     </Text>
                   </View>
@@ -196,11 +236,10 @@ export default function HomeScreen() {
         )}
       </View>
 
+      {/* ── Auto Play summary ────────────────────────────────────────────── */}
       <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('Predict')}>
-        <Card style={styles.autoPlaySummaryCard}>
-          <View style={styles.autoPlaySummaryIconCircle}>
-            <Ionicons name="flash-outline" size={18} color={colors.onPrimary} />
-          </View>
+        <Card tone="info" style={styles.autoPlaySummaryCard}>
+          <IconBubble name="bolt" size={46} iconSize={23} color={colors.blue} background={colors.surface} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.autoPlaySummaryTitle} numberOfLines={1}>
               Auto Play
@@ -209,30 +248,34 @@ export default function HomeScreen() {
               {autoPlayLoaded ? `${autoPlayEnabledCount} of ${ROUND_SLOTS.length} rounds enabled` : 'Loading…'}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <AppIcon name="chevron-right" size={18} color={colors.textMuted} />
         </Card>
       </TouchableOpacity>
 
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity style={styles.viewAllLink} onPress={() => navigation.navigate('Wallet')}>
-          <Text style={styles.viewAllText}>View All</Text>
-          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+      {/* ── Recent activity ──────────────────────────────────────────────── */}
+      <SectionHeader
+        eyebrow="YOUR MOVES"
+        title="Recent Activity"
+        actionLabel="View All"
+        onAction={() => navigation.navigate('Wallet')}
+      />
       {recentTransactions.length === 0 ? (
-        <Card style={styles.emptyMiniCard}>
-          <Text style={styles.emptyMiniText}>No transactions yet.</Text>
+        <Card tone="alt">
+          <EmptyState icon="doc" title="No transactions yet." />
         </Card>
       ) : (
         <View style={{ gap: spacing.sm }}>
           {recentTransactions.map((tx) => {
             const isPositive = tx.amount >= 0;
             return (
-              <Card key={tx.id} style={styles.txCard}>
-                <View style={[styles.txIconCircle, { backgroundColor: isPositive ? colors.successTint : colors.dangerTint }]}>
-                  <Ionicons name={TX_ICON[tx.type]} size={16} color={isPositive ? colors.success : colors.danger} />
-                </View>
+              <Card key={tx.id} tone={isPositive ? 'success' : 'danger'} style={styles.txCard}>
+                <IconBubble
+                  name={TX_ICON[tx.type]}
+                  size={42}
+                  iconSize={21}
+                  color={isPositive ? colors.success : colors.danger}
+                  background={colors.surface}
+                />
                 <Text style={styles.txDescription} numberOfLines={1}>
                   {tx.description}
                 </Text>
@@ -245,21 +288,26 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* ── Invite ───────────────────────────────────────────────────────── */}
       <TouchableOpacity activeOpacity={0.85} onPress={() => stackNavigation?.navigate('Invite')}>
-        <Card style={styles.inviteCard}>
+        <Card tone="pink" style={styles.inviteCard}>
           <View style={styles.inviteHeaderRow}>
-            <View style={styles.inviteIconCircle}>
-              <Ionicons name="people-outline" size={18} color={colors.onPrimary} />
-            </View>
-            <View style={{ flex: 1 }}>
+            <IconBubble name="people" size={46} iconSize={24} color={colors.pink} background={colors.surface} />
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.inviteTitle}>Invite Others and Earn Credits</Text>
               <Text style={styles.inviteSubtitle}>Invite your friends to CrowdStock and earn amazing rewards.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            <AppIcon name="chevron-right" size={18} color={colors.textMuted} />
           </View>
           <View style={styles.inviteStatsRow}>
-            <Text style={styles.inviteStatText}>{inviteStats?.successfulConversions ?? 0} People Onboarded</Text>
-            <Text style={styles.inviteStatText}>{inviteStats?.credits ?? 0} Reward Credits</Text>
+            <View style={styles.inviteStatPill}>
+              <AppIcon name="user-outline" size={13} color={colors.pink} />
+              <Text style={styles.inviteStatText}>{inviteStats?.successfulConversions ?? 0} People Onboarded</Text>
+            </View>
+            <View style={styles.inviteStatPill}>
+              <AppIcon name="gift-outline" size={13} color={colors.pink} />
+              <Text style={styles.inviteStatText}>{inviteStats?.credits ?? 0} Reward Credits</Text>
+            </View>
           </View>
         </Card>
       </TouchableOpacity>
@@ -274,32 +322,45 @@ function LatestResultCard({ round }: { round: DailyRound }) {
   const gainPositive = result.finalOutcome ? result.finalOutcome === 'gain' : (result.valueGained ?? 0) >= 0;
 
   return (
-    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.success : colors.danger }]}>
+    <Card tone={gainPositive ? 'success' : 'danger'} style={styles.resultCard}>
       <View style={styles.resultHeaderRow}>
-        <Text style={styles.resultTitle}>Latest Result · Round {round.slot.index}</Text>
-        <View style={[styles.resultPill, { backgroundColor: gainPositive ? colors.successTint : colors.dangerTint }]}>
+        <View style={styles.resultTitleRow}>
+          <IconBubble
+            name={gainPositive ? 'trend-up' : 'trend-down'}
+            size={40}
+            iconSize={20}
+            color={gainPositive ? colors.success : colors.danger}
+            background={colors.surface}
+          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.resultTitle}>Latest Result · Round {round.slot.index}</Text>
+            <Text style={styles.resultSubtitle}>
+              You picked {result.userPrediction ?? '—'} · Avg Pick {result.average != null ? result.average.toFixed(2) : '—'} ·
+              Deviation {result.distance != null ? result.distance.toFixed(2) : '—'}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.resultPill, { backgroundColor: colors.surface }]}>
           <Text style={[styles.resultPillText, { color: gainPositive ? colors.success : colors.danger }]}>
             {formatSigned(result.valueGained ?? 0)}
           </Text>
         </View>
       </View>
-      <Text style={styles.resultSubtitle}>
-        You picked {result.userPrediction ?? '—'} · Avg Pick {result.average != null ? result.average.toFixed(2) : '—'} ·
-        Deviation {result.distance != null ? result.distance.toFixed(2) : '—'}
-      </Text>
     </Card>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
-    eyebrow: { ...typography.tiny, color: colors.textDim, letterSpacing: 1 },
-    greeting: { ...typography.h2, color: colors.text, marginTop: 2 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+    headerText: { flex: 1, minWidth: 0 },
+    eyebrow: { ...typography.label, color: colors.textDim },
+    greeting: { ...typography.h1, color: colors.text, marginTop: 2 },
+    greetingSub: { ...typography.small, color: colors.textMuted, marginTop: 3 },
     avatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -307,112 +368,88 @@ function createStyles(colors: Colors) {
     avatarText: { ...typography.h3, color: colors.onPrimary },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     bellButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: colors.surfaceAlt,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     bellDot: {
       position: 'absolute',
-      top: 8,
-      right: 9,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.danger,
+      top: 9,
+      right: 10,
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      backgroundColor: colors.pink,
       borderWidth: 1.5,
-      borderColor: colors.surfaceAlt,
+      borderColor: colors.surface,
     },
+    balanceCardShell: { borderRadius: radius.xxl, backgroundColor: colors.primary },
     balanceCard: {
       alignItems: 'flex-start',
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-      shadowColor: colors.primary,
+      borderRadius: radius.xxl,
+      padding: spacing.xl,
+      overflow: 'hidden',
     },
-    balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
-    balanceLabel: { ...typography.small, color: 'rgba(255,255,255,0.78)' },
-    profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
-    profitPillText: { ...typography.tiny, fontWeight: '700' },
-    balance: { ...typography.h1, color: colors.onPrimary, marginTop: spacing.xs },
-    profit: { ...typography.small, marginTop: 4, fontWeight: '600', color: colors.onPrimary },
+    heroArt: { position: 'absolute', right: -22, bottom: -26 },
+    balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: spacing.sm },
+    balanceLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
+    balanceLabel: { ...typography.small, color: 'rgba(255,255,255,0.82)', fontWeight: '700' },
+    profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.pill },
+    profitPillText: { ...typography.tiny, fontWeight: '800' },
+    balance: { ...typography.display, color: colors.onPrimary, marginTop: spacing.md },
+    profitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+    profitTrend: { width: 24, height: 24, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+    profit: { ...typography.body, fontWeight: '800', color: colors.onPrimary },
     countdownWrap: { marginTop: spacing.lg },
-    resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
-    resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    resultTitle: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
-    resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-    resultPillText: { ...typography.small, fontWeight: '800' },
-    resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
-    ctaCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceRaised },
-    ctaIconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.sm,
-    },
-    ctaTextWrap: {},
+    resultCard: { marginTop: spacing.lg },
+    resultHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    resultTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1, minWidth: 0 },
+    resultTitle: { ...typography.small, color: colors.text, fontWeight: '800' },
+    resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5, flexShrink: 0 },
+    resultPillText: { ...typography.small, fontWeight: '900' },
+    resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 3, lineHeight: 15 },
+    ctaCard: { marginTop: spacing.lg },
+    ctaHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    ctaTextWrap: { flex: 1, minWidth: 0 },
     ctaTitle: { ...typography.h3, color: colors.text },
-    ctaSubtitle: { ...typography.small, color: colors.textMuted, marginTop: 4 },
+    ctaSubtitle: { ...typography.small, color: colors.textMuted, marginTop: 3 },
     statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-    statCard: { flex: 1, alignItems: 'center' },
-    statValue: { ...typography.h2, color: colors.primary },
-    statLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: spacing.xl,
-      marginBottom: spacing.sm,
-    },
-    sectionTitle: { ...typography.h3, color: colors.text, letterSpacing: 0.1 },
-    viewAllLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    viewAllText: { ...typography.small, color: colors.primary, fontWeight: '700' },
-    emptyMiniCard: { backgroundColor: colors.surfaceAlt },
-    emptyMiniText: { ...typography.small, color: colors.textMuted },
-    miniRoundCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    miniRoundCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     miniRoundIndexCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 11,
-      backgroundColor: colors.primaryTint,
+      width: 38,
+      height: 38,
+      borderRadius: radius.sm,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    miniRoundIndexText: { ...typography.small, color: colors.primary, fontWeight: '700' },
-    miniRoundTitle: { ...typography.body, color: colors.text, fontWeight: '600' },
-    miniRoundTime: { ...typography.tiny, color: colors.textMuted, marginTop: 1 },
-    autoPlaySummaryCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, backgroundColor: colors.blueTint },
-    autoPlaySummaryIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    autoPlaySummaryTitle: { ...typography.body, color: colors.text, fontWeight: '700' },
+    miniRoundIndexText: { ...typography.h3 },
+    miniRoundTitle: { ...typography.body, fontWeight: '800' },
+    miniRoundTime: { ...typography.tiny, marginTop: 1, opacity: 0.72 },
+    autoPlaySummaryCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg },
+    autoPlaySummaryTitle: { ...typography.body, color: colors.text, fontWeight: '800' },
     autoPlaySummarySubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-    txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    txIconCircle: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    txDescription: { ...typography.small, color: colors.text, flex: 1 },
-    txAmount: { ...typography.small, fontWeight: '700' },
-    inviteCard: { marginTop: spacing.lg, backgroundColor: colors.successTint },
-    inviteHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    inviteIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.success,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    inviteTitle: { ...typography.body, color: colors.text, fontWeight: '700' },
+    txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    txDescription: { ...typography.body, color: colors.text, flex: 1, minWidth: 0, fontWeight: '600' },
+    txAmount: { ...typography.body, fontWeight: '900' },
+    inviteCard: { marginTop: spacing.lg },
+    inviteHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    inviteTitle: { ...typography.body, color: colors.text, fontWeight: '800' },
     inviteSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
-    inviteStatsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md },
-    inviteStatText: { ...typography.small, color: colors.text, fontWeight: '600' },
+    inviteStatsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, flexWrap: 'wrap' },
+    inviteStatPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.surface,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+    },
+    inviteStatText: { ...typography.tiny, color: colors.text, fontWeight: '800' },
   });
 }

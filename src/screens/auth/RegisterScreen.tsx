@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
+import { Badge } from '../../components/Badge';
+import { AppIcon } from '../../components/AppIcon';
+import { IconBubble } from '../../components/IconBubble';
+import { PageHeader } from '../../components/Decor';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
+import { withAlpha } from '../../lib/color';
 import { RegisteredButLoginFailedError, useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
 import { getErrorMessage, isValidEmail, isValidPhone, validatePassword } from '../../lib/validation';
@@ -94,12 +99,17 @@ export default function RegisterScreen({ navigation }: Props) {
   if (step === 'otp') {
     return (
       <Screen style={styles.centerContent}>
-        <Text style={styles.title}>Enter the code</Text>
-        <Text style={styles.subtitle}>We sent a 6-digit code to {phone}.</Text>
+        <PageHeader
+          title="Enter the code"
+          subtitle={`We sent a 6-digit code to ${phone}.`}
+          icon="mail"
+          color={colors.blue}
+        />
 
-        <View style={styles.form}>
+        <Card tone="info">
           <Input
             label="Verification code"
+            leftIcon="lock"
             value={otp}
             onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
             keyboardType="number-pad"
@@ -109,10 +119,27 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {!!error && <FormError message={error} />}
 
-          <Button title="Continue" onPress={handleOtpContinue} style={{ marginTop: spacing.lg }} />
-          <Button title="Resend code" variant="ghost" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.sm }} />
-          <Button title="Use a different number" variant="ghost" onPress={() => setStep('phone')} />
-        </View>
+          <Button title="Continue" icon="arrow-right" onPress={handleOtpContinue} style={{ marginTop: spacing.lg }} />
+          <Button
+            title="Resend code"
+            icon="refresh"
+            variant="ghost"
+            onPress={handleSendOtp}
+            loading={isLoading}
+            style={{ marginTop: spacing.sm }}
+          />
+        </Card>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Use a different number"
+          onPress={() => setStep('phone')}
+          style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
+        >
+          <IconBubble name="phone" size={32} iconSize={16} color={colors.pink} shape="circle" />
+          <Text style={styles.pillText}>Use a different number</Text>
+          <AppIcon name="chevron-right" size={16} color={colors.textDim} />
+        </Pressable>
       </Screen>
     );
   }
@@ -120,24 +147,25 @@ export default function RegisterScreen({ navigation }: Props) {
   if (step === 'details') {
     return (
       <Screen style={styles.centerContent}>
-        <Text style={styles.title}>Tell us about you</Text>
-        <Text style={styles.subtitle}>Almost done — just a few more details.</Text>
+        <PageHeader
+          title="Tell us about you"
+          subtitle="Almost done — just a few more details."
+          icon="people-outline"
+          color={colors.pink}
+        />
 
-        <View style={styles.form}>
+        <Card tone="surface">
           <View style={styles.verifiedPhoneBox}>
-            <View>
+            <View style={styles.verifiedPhoneCopy}>
               <Text style={styles.verifiedPhoneLabel}>Phone number</Text>
               <Text style={styles.verifiedPhoneValue}>{phone}</Text>
             </View>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-              <Text style={styles.verifiedBadgeText}>Verified</Text>
-            </View>
+            <Badge label="Verified" tone="success" icon="check" size="sm" />
           </View>
 
           <View style={[styles.nameRow, { marginTop: spacing.md }]}>
-            <Input label="First name" value={firstName} onChangeText={setFirstName} placeholder="Ada" containerStyle={styles.nameInput} />
-            <Input label="Last name" value={lastName} onChangeText={setLastName} placeholder="Obi" containerStyle={styles.nameInput} />
+            <Input label="First name" leftIcon="user-outline" value={firstName} onChangeText={setFirstName} placeholder="Ada" containerStyle={styles.nameInput} />
+            <Input label="Last name" leftIcon="user-outline" value={lastName} onChangeText={setLastName} placeholder="Obi" containerStyle={styles.nameInput} />
           </View>
 
           <Text style={styles.genderLabel}>Gender</Text>
@@ -145,9 +173,11 @@ export default function RegisterScreen({ navigation }: Props) {
             {(['Male', 'Female'] as Gender[]).map((g) => (
               <TouchableOpacity
                 key={g}
+                activeOpacity={0.85}
                 style={[styles.genderBtn, gender === g && styles.genderBtnSelected]}
                 onPress={() => setGender(g)}
               >
+                <AppIcon name={g === 'Male' ? 'user-outline' : 'heart'} size={16} color={gender === g ? colors.onPrimary : colors.textMuted} />
                 <Text style={[styles.genderText, gender === g && styles.genderTextSelected]}>{g}</Text>
               </TouchableOpacity>
             ))}
@@ -155,6 +185,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <Input
             label="Email address"
+            leftIcon="mail"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -166,17 +197,26 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <Input
             label="Choose a password"
+            leftIcon="lock"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
             autoCapitalize="none"
             placeholder="At least 6 characters"
-            style={{ marginTop: spacing.md }}
+            containerStyle={{ marginTop: spacing.md }}
           />
 
           {!!error && <FormError message={error} />}
 
-          <Button title="Create Account" onPress={handleCompleteRegistration} loading={isLoading} style={{ marginTop: spacing.lg }} />
+          <Button title="Create Account" icon="check" onPress={handleCompleteRegistration} loading={isLoading} style={{ marginTop: spacing.lg }} />
+        </Card>
+
+        <View style={styles.reassure}>
+          <IconBubble name="shield-check" size={42} iconSize={22} color={colors.teal} />
+          <View style={styles.reassureCopy}>
+            <Text style={styles.reassureTitle}>Your details are encrypted</Text>
+            <Text style={styles.reassureText}>Bank-grade security keeps your name, email and password private.</Text>
+          </View>
         </View>
       </Screen>
     );
@@ -184,17 +224,22 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <Screen style={styles.centerContent}>
-      <View style={styles.header}>
-        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.logo}>CrowdStock</Text>
+      <View style={styles.brandPill}>
+        <AppIcon name="sparkle" size={16} />
+        <Text style={styles.brandPillText}>CrowdStock</Text>
       </View>
 
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Enter your phone number to get started.</Text>
+      <PageHeader
+        title="Create your account"
+        subtitle="Enter your phone number to get started."
+        icon="user-outline"
+        color={colors.accent}
+      />
 
-      <View style={styles.form}>
+      <Card tone="surface">
         <Input
           label="Phone number"
+          leftIcon="phone"
           value={phone}
           onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 11))}
           keyboardType="phone-pad"
@@ -203,9 +248,27 @@ export default function RegisterScreen({ navigation }: Props) {
 
         {!!error && <FormError message={error} />}
 
-        <Button title="Send Code" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.lg }} />
-        <Button title="I already have an account" variant="ghost" onPress={() => navigation.navigate('Login')} style={{ marginTop: spacing.sm }} />
+        <Button title="Send Code" icon="send" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.lg }} />
+      </Card>
+
+      <View style={styles.reassure}>
+        <IconBubble name="shield-check" size={42} iconSize={22} color={colors.teal} />
+        <View style={styles.reassureCopy}>
+          <Text style={styles.reassureTitle}>Your details are encrypted</Text>
+          <Text style={styles.reassureText}>We only use your number to secure your account — never to spam you.</Text>
+        </View>
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="I already have an account"
+        onPress={() => navigation.navigate('Login')}
+        style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
+      >
+        <IconBubble name="logout" size={32} iconSize={16} color={colors.pink} shape="circle" />
+        <Text style={styles.pillText}>I already have an account</Text>
+        <AppIcon name="chevron-right" size={16} color={colors.textDim} />
+      </Pressable>
     </Screen>
   );
 }
@@ -213,49 +276,82 @@ export default function RegisterScreen({ navigation }: Props) {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     centerContent: { flexGrow: 1, justifyContent: 'center' },
-    header: {
+    brandPill: {
+      flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: spacing.xl,
-      paddingVertical: spacing.lg,
-      borderRadius: radius.xl,
+      alignSelf: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.xs + 2,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
       backgroundColor: colors.primaryTint,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.24),
+      marginBottom: spacing.lg,
     },
-    logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
-    logo: { ...typography.h2, color: colors.primary, letterSpacing: 0.2 },
-    title: { ...typography.h2, color: colors.text, textAlign: 'center' },
-    subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl, textAlign: 'center' },
-    form: { gap: spacing.sm },
+    brandPillText: { ...typography.small, color: colors.primary, fontWeight: '800', letterSpacing: 0.2 },
     nameRow: { flexDirection: 'row', gap: spacing.sm, minWidth: 0 },
     nameInput: { flex: 1, minWidth: 0 },
     verifiedPhoneBox: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: colors.surfaceAlt,
-      borderRadius: radius.md,
+      gap: spacing.sm,
+      backgroundColor: colors.successTint,
+      borderRadius: radius.lg,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: withAlpha(colors.success, 0.24),
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingVertical: spacing.sm + 2,
     },
-    verifiedPhoneLabel: { ...typography.tiny, color: colors.textMuted },
-    verifiedPhoneValue: { ...typography.body, color: colors.text, fontWeight: '600', marginTop: 2 },
-    verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    verifiedBadgeText: { ...typography.tiny, color: colors.success, fontWeight: '700' },
-    genderLabel: { ...typography.small, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs },
+    verifiedPhoneCopy: { flex: 1, minWidth: 0 },
+    verifiedPhoneLabel: { ...typography.label, color: colors.textMuted },
+    verifiedPhoneValue: { ...typography.body, color: colors.text, fontWeight: '800', marginTop: 2 },
+    genderLabel: { ...typography.label, color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
     genderRow: { flexDirection: 'row', gap: spacing.sm },
     genderBtn: {
       flex: 1,
-      height: 44,
-      borderRadius: radius.md,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: spacing.xs + 2,
+      height: 48,
+      borderRadius: radius.pill,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
     },
-    genderBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-    genderText: { ...typography.body, color: colors.text, fontWeight: '600' },
+    genderBtnSelected: { backgroundColor: colors.primary, borderColor: colors.primaryDark },
+    genderText: { ...typography.body, color: colors.text, fontWeight: '800' },
     genderTextSelected: { color: colors.onPrimary },
+    reassure: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+      padding: spacing.md,
+      borderRadius: radius.xl,
+      backgroundColor: colors.tealTint,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.teal, 0.24),
+    },
+    reassureCopy: { flex: 1, minWidth: 0 },
+    reassureTitle: { ...typography.h3, color: colors.text },
+    reassureText: { ...typography.small, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      paddingVertical: spacing.xs + 2,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: withAlpha(colors.pink, 0.3),
+      backgroundColor: colors.pinkTint,
+    },
+    pillPressed: { opacity: 0.7 },
+    pillText: { ...typography.small, color: colors.pink, fontWeight: '800' },
   });
 }

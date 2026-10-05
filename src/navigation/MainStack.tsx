@@ -14,10 +14,13 @@ export function MainStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
+        headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
-        headerTitleStyle: { fontSize: typography.h3.fontSize, fontWeight: typography.h3.fontWeight },
+        headerTitleStyle: { fontSize: typography.h3.fontSize, fontWeight: '800' },
         headerShadowVisible: false,
+        headerBackTitle: '',
+        headerLargeTitleShadowVisible: false,
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />

@@ -1,71 +1,58 @@
-import { useMemo } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
-import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
+import { Illustration, AppIcon } from './AppIcon';
+import { withAlpha } from '../lib/color';
+import { radius, spacing, typography, useColors } from '../theme/theme';
 import { useAlertPopupStore } from '../store/alertPopupStore';
 
 /**
- * Shows the account's current alert/news message once, as a blocking
- * popup, right after it's first seen (only G22/login ever supplies these —
- * see authStore) — then never again for that exact message, only when the
- * backend changes it to something new. Queued so an alert AND news arriving
- * together show one after another rather than one clobbering the other.
+ * Shows the account's current alert/news message once, as a blocking popup,
+ * right after it's first seen — then never again for that exact message.
+ * Queued so an alert AND news arriving together show one after another.
  */
 export function AlertPopup() {
   const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const current = useAlertPopupStore((s) => s.pendingPopups[0]);
   const dismissCurrent = useAlertPopupStore((s) => s.dismissCurrent);
 
   if (!current) return null;
 
   const isAlert = current.type === 'alert';
+  const tint = isAlert ? colors.amber : colors.primary;
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={dismissCurrent}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={[styles.iconCircle, { backgroundColor: isAlert ? colors.warningTint : colors.blueTint }]}>
-            <Ionicons name={isAlert ? 'alert-circle' : 'megaphone'} size={26} color={isAlert ? colors.warning : colors.blue} />
+      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.artWell, { backgroundColor: withAlpha(tint, 0.12) }]}>
+            <AppIcon name={isAlert ? 'alert' : 'megaphone'} size={44} color={tint} />
           </View>
-          <Text style={styles.title}>{isAlert ? 'Alert' : "What's new"}</Text>
-          <Text style={styles.message}>{current.message}</Text>
-          <Button title="Got it" onPress={dismissCurrent} style={{ marginTop: spacing.lg, width: '100%' }} />
+          <Text style={[styles.title, { color: colors.text }]}>{isAlert ? 'Heads up!' : "What's new"}</Text>
+          <Text style={[styles.message, { color: colors.textMuted }]}>{current.message}</Text>
+          <Button
+            title={isAlert ? 'Got it' : 'Nice!'}
+            variant={isAlert ? 'accent' : 'primary'}
+            icon="check"
+            onPress={dismissCurrent}
+            style={{ marginTop: spacing.lg, width: '100%' }}
+          />
         </View>
       </View>
     </Modal>
   );
 }
 
-function createStyles(colors: Colors) {
-  return StyleSheet.create({
-    backdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.xl,
-    },
-    card: {
-      width: '100%',
-      maxWidth: 360,
-      backgroundColor: colors.surface,
-      borderRadius: radius.xl,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: spacing.xl,
-      alignItems: 'center',
-    },
-    iconCircle: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.md,
-    },
-    title: { ...typography.h3, color: colors.text },
-    message: { ...typography.small, color: colors.textMuted, textAlign: 'center', marginTop: spacing.sm, lineHeight: 19 },
-  });
-}
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  card: {
+    width: '100%',
+    maxWidth: 370,
+    borderRadius: radius.xxl,
+    borderWidth: 1,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  artWell: { width: 92, height: 92, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  title: { ...typography.h2 },
+  message: { ...typography.body, textAlign: 'center', marginTop: spacing.sm, lineHeight: 21 },
+});

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
+import { AppIcon } from './AppIcon';
+import { IconBubble } from './IconBubble';
+import { radius, shadow, spacing, typography, useColors } from '../theme/theme';
 import { Bank, NIGERIA_BANKS } from '../lib/banks';
 
 export function BankPickerModal({
@@ -15,7 +16,6 @@ export function BankPickerModal({
   onSelect: (bank: Bank) => void;
 }) {
   const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
@@ -37,23 +37,31 @@ export function BankPickerModal({
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.sheet, { paddingBottom: spacing.lg + insets.bottom }]}>
+      <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={handleClose}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: spacing.lg + insets.bottom }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
           <View style={styles.headerRow}>
-            <Text style={styles.title}>Select Your Bank</Text>
-            <TouchableOpacity onPress={handleClose} hitSlop={8}>
-              <Ionicons name="close" size={22} color={colors.textMuted} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.eyebrow, { color: colors.textDim }]}>PAYOUT DESTINATION</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Select your bank</Text>
+            </View>
+            <TouchableOpacity onPress={handleClose} hitSlop={10} style={[styles.closeBtn, { backgroundColor: colors.surfaceAlt }]}>
+              <AppIcon name="close" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchRow}>
-            <Ionicons name="search" size={18} color={colors.textMuted} />
+          <View style={[styles.searchRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+            <AppIcon name="search" size={18} color={colors.textDim} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Search banks…"
               placeholderTextColor={colors.textDim}
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -64,55 +72,61 @@ export function BankPickerModal({
             keyExtractor={(b) => b.code}
             keyboardShouldPersistTaps="handled"
             style={styles.list}
-            ListEmptyComponent={<Text style={styles.emptyText}>No banks match "{query}".</Text>}
+            contentContainerStyle={{ paddingBottom: spacing.lg }}
+            ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.textMuted }]}>No banks match "{query}".</Text>}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.row} onPress={() => handleSelect(item)}>
-                <Text style={styles.rowText}>{item.name}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+              <TouchableOpacity
+                style={[styles.row, { borderBottomColor: colors.borderLight }]}
+                activeOpacity={0.7}
+                onPress={() => handleSelect(item)}
+              >
+                <IconBubble name="bank" size={40} iconSize={20} />
+                <Text style={[styles.rowText, { color: colors.text }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <AppIcon name="chevron-right" size={16} color={colors.textDim} />
               </TouchableOpacity>
             )}
           />
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
-function createStyles(colors: Colors) {
-  return StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
-    sheet: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
-      padding: spacing.lg,
-      height: '80%',
-    },
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    title: { ...typography.h2, color: colors.text },
-    searchRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      backgroundColor: colors.surfaceAlt,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      height: 46,
-      marginTop: spacing.md,
-    },
-    searchInput: { flex: 1, color: colors.text, fontSize: typography.body.fontSize },
-    list: { marginTop: spacing.sm },
-    row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    rowText: { ...typography.body, color: colors.text },
-    emptyText: { ...typography.small, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
-  });
-}
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    padding: spacing.lg,
+    height: '82%',
+    ...shadow.lg,
+  },
+  handle: { width: 48, height: 5, borderRadius: 3, alignSelf: 'center', marginBottom: spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  eyebrow: { ...typography.label },
+  title: { ...typography.h2, marginTop: 2 },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 2,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 52,
+    marginTop: spacing.lg,
+  },
+  searchInput: { flex: 1, fontSize: typography.body.fontSize, fontWeight: '600' },
+  list: { marginTop: spacing.md },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rowText: { ...typography.body, flex: 1, fontWeight: '700' },
+  emptyText: { ...typography.small, textAlign: 'center', marginTop: spacing.xl },
+});

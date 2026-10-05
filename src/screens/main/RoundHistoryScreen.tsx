@@ -1,12 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { EmptyState } from '../../components/EmptyState';
-import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
+import { AppIcon } from '../../components/AppIcon';
+import { IconBubble } from '../../components/IconBubble';
+import { SectionHeader } from '../../components/SectionHeader';
+import { StatTile } from '../../components/StatTile';
+import { Colors, radius, shadow, spacing, typography, useColors } from '../../theme/theme';
 import { api } from '../../api';
 import { DailyHistoryEntry } from '../../types';
 import { formatPercent, formatSigned } from '../../lib/format';
@@ -70,7 +73,7 @@ export default function RoundHistoryScreen() {
   }, [filteredEntries]);
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} style={styles.screen}>
       <FlatList
         data={filteredEntries}
         keyExtractor={(e) => e.date}
@@ -79,30 +82,67 @@ export default function RoundHistoryScreen() {
         contentContainerStyle={{ padding: spacing.lg, flexGrow: 1 }}
         ListHeaderComponent={
           <>
-            <View style={styles.filterRow}>
-              <FilterPill
-                label={MONTH_NAMES[selectedMonth]}
-                sublabel="Month"
-                onPress={() => setMonthPickerVisible(true)}
-              />
-              <FilterPill label={String(selectedYear)} sublabel="Year" onPress={() => setYearPickerVisible(true)} />
-            </View>
+            <Card tone="primary" variant="sticker" style={styles.heroWrap}>
+              <View style={styles.heroRow}>
+                <IconBubble name="trophy" size={52} iconSize={30} background={colors.surface} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.heroEyebrow, { color: colors.primary }]}>PAST ROUNDS</Text>
+                  <Text style={[styles.heroTitle, { color: colors.text }]}>
+                    {MONTH_NAMES[selectedMonth]} {selectedYear}
+                  </Text>
+                  <Text style={[styles.heroSub, { color: colors.textMuted }]}>
+                    {filteredEntries.length} {filteredEntries.length === 1 ? 'day' : 'days'} settled
+                  </Text>
+                </View>
+              </View>
 
-            <Card style={styles.summaryCard}>
-              <SummaryStat label="Total Gains" value={formatSigned(totalGains)} color={colors.success} />
-              <View style={styles.summaryDivider} />
-              <SummaryStat label="Total Losses" value={formatSigned(totalLosses)} color={colors.danger} />
-              <View style={styles.summaryDivider} />
-              <SummaryStat label="Net Gain" value={formatSigned(netGain)} color={netGain >= 0 ? colors.success : colors.danger} />
+              <View style={styles.filterRow}>
+                <FilterPill
+                  label={MONTH_NAMES[selectedMonth]}
+                  sublabel="Month"
+                  icon="calendar"
+                  onPress={() => setMonthPickerVisible(true)}
+                />
+                <FilterPill
+                  label={String(selectedYear)}
+                  sublabel="Year"
+                  icon="filter"
+                  onPress={() => setYearPickerVisible(true)}
+                />
+              </View>
             </Card>
+
+            <SectionHeader title="Totals for this month" eyebrow="MONTH TALLY" />
+            <View style={styles.tilesRow}>
+              <StatTile icon="trend-up" label="Total Gains" value={formatSigned(totalGains)} color={colors.success} />
+              <StatTile icon="trend-down" label="Total Losses" value={formatSigned(totalLosses)} color={colors.danger} />
+            </View>
+            <View style={styles.tilesRow}>
+              <StatTile
+                icon="coin"
+                label="Net Gain"
+                value={formatSigned(netGain)}
+                color={netGain >= 0 ? colors.success : colors.danger}
+              />
+            </View>
           </>
         }
         ListEmptyComponent={
           <EmptyState
-            icon="calendar-outline"
+            illustration="empty"
             title="No rounds this month"
             message={`No settled rounds in ${MONTH_NAMES[selectedMonth]} ${selectedYear}. Try another month.`}
           />
+        }
+        ListFooterComponent={
+          filteredEntries.length > 0 ? (
+            <View style={styles.footerRow}>
+              <AppIcon name="sparkle" size={16} color={colors.accent} />
+              <Text style={[styles.footerText, { color: colors.textMuted }]}>
+                Tap any day to see the rounds inside it.
+              </Text>
+            </View>
+          ) : null
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => (
@@ -137,16 +177,28 @@ export default function RoundHistoryScreen() {
   );
 }
 
-function FilterPill({ label, sublabel, onPress }: { label: string; sublabel: string; onPress: () => void }) {
+function FilterPill({
+  label,
+  sublabel,
+  icon,
+  onPress,
+}: {
+  label: string;
+  sublabel: string;
+  icon: 'calendar' | 'filter';
+  onPress: () => void;
+}) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, minWidth: 0 }}>
       <Text style={styles.filterSublabel}>{sublabel}</Text>
       <TouchableOpacity style={styles.filterPill} onPress={onPress} activeOpacity={0.7}>
-        <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-        <Text style={styles.filterPillText}>{label}</Text>
-        <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
+        <IconBubble name={icon} size={28} iconSize={16} color={colors.primary} background={colors.surface} />
+        <Text style={styles.filterPillText} numberOfLines={1}>
+          {label}
+        </Text>
+        <AppIcon name="chevron-down" size={15} color={colors.textMuted} />
       </TouchableOpacity>
     </View>
   );
@@ -177,34 +229,35 @@ function PickerModal<T extends string | number>({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={22} color={colors.text} />
+              <AppIcon name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
           <FlatList
             data={options}
             keyExtractor={(o) => String(o.value)}
             style={{ maxHeight: 360 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.modalRow} onPress={() => onSelect(item.value)}>
-                <Text style={styles.modalRowText}>{item.label}</Text>
-                {item.value === selectedValue && <Ionicons name="checkmark" size={18} color={colors.primary} />}
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const active = item.value === selectedValue;
+              return (
+                <TouchableOpacity
+                  style={[styles.modalRow, active && { backgroundColor: colors.primaryTint }]}
+                  onPress={() => onSelect(item.value)}
+                >
+                  <Text style={[styles.modalRowText, active && { color: colors.primary, fontWeight: '800' }]}>
+                    {item.label}
+                  </Text>
+                  {active && (
+                    <View style={[styles.modalCheck, { backgroundColor: colors.primary }]}>
+                      <AppIcon name="check" size={13} color={colors.onPrimary} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            }}
           />
         </View>
       </View>
     </Modal>
-  );
-}
-
-function SummaryStat({ label, value, color }: { label: string; value: string; color?: string }) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={[styles.summaryValue, { color }]}>{value}</Text>
-    </View>
   );
 }
 
@@ -216,18 +269,27 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
   return (
     <Card>
       <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={styles.row}>
-        <View style={styles.dateIconCircle}>
-          <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+        <IconBubble name="calendar" size={44} iconSize={22} color={gainColor} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.dateText} numberOfLines={1}>
+            {formatDate(entry.date)}
+          </Text>
+          <Text style={styles.subText}>
+            {entry.roundsSettled}/{entry.rounds.length} rounds settled
+          </Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.dateText}>{formatDate(entry.date)}</Text>
-          <Text style={styles.subText}>{entry.roundsSettled}/{entry.rounds.length} rounds settled</Text>
+        <View style={styles.gainWrap}>
+          <View style={[styles.gainPill, { backgroundColor: gainColor + '1F' }]}>
+            <AppIcon name={entry.totalGain >= 0 ? 'trend-up' : 'trend-down'} size={12} color={gainColor} />
+            <Text style={[styles.gainText, { color: gainColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {formatSigned(entry.totalGain)}
+            </Text>
+          </View>
+          <Text style={[styles.subText, { color: gainColor, fontWeight: '800' }]}>
+            {formatPercent(entry.totalChangePercent)}
+          </Text>
         </View>
-        <View style={{ alignItems: 'flex-end', marginRight: spacing.xs }}>
-          <Text style={[styles.gainText, { color: gainColor }]}>{formatSigned(entry.totalGain)}</Text>
-          <Text style={[styles.subText, { color: gainColor }]}>{formatPercent(entry.totalChangePercent)}</Text>
-        </View>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+        <AppIcon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
       </TouchableOpacity>
 
       {expanded && (
@@ -235,7 +297,7 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
           {entry.rounds.map((r) => (
             <View key={r.slot.id} style={styles.detailRow}>
               <Text style={styles.detailLabel}>Round {r.slot.index}</Text>
-              <Text style={styles.detailInfo}>
+              <Text style={styles.detailInfo} numberOfLines={1}>
                 {r.prediction ? `picked ${r.prediction.value}` : 'no stock pick'}
                 {r.result?.average != null ? ` · Avg ${r.result.average.toFixed(2)}` : ''}
               </Text>
@@ -248,6 +310,7 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
                       : colors.danger,
                   },
                 ]}
+                numberOfLines={1}
               >
                 {r.result ? formatSigned(r.result.valueGained ?? 0) : '—'}
               </Text>
@@ -266,40 +329,59 @@ function formatDate(dateStr: string): string {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    filterRow: { flexDirection: 'row', gap: spacing.md },
-    filterSublabel: { ...typography.tiny, color: colors.textMuted, marginBottom: spacing.xs },
+    screen: { padding: 0 },
+    heroWrap: { paddingBottom: spacing.lg },
+    heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    heroEyebrow: { ...typography.label },
+    heroTitle: { ...typography.h1, marginTop: 2 },
+    heroSub: { ...typography.small, marginTop: 2 },
+    filterRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+    filterSublabel: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
     filterPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
+      gap: spacing.sm,
       borderWidth: 1.5,
       borderColor: colors.primary,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      height: 44,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      height: 52,
     },
-    filterPillText: { ...typography.body, color: colors.text, fontWeight: '600', flex: 1 },
-    summaryCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
-    summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
-    summaryLabel: { ...typography.tiny, color: colors.textMuted },
-    summaryValue: { ...typography.h3, marginTop: 2 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    dateIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.md,
-      backgroundColor: colors.primaryTint,
+    filterPillText: { ...typography.body, color: colors.text, fontWeight: '700', flex: 1 },
+    tilesRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    gainWrap: { alignItems: 'flex-end', gap: 3 },
+    gainPill: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 4,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      maxWidth: 140,
     },
     dateText: { ...typography.h3, color: colors.text },
     subText: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-    gainText: { ...typography.h3 },
-    detail: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
+    gainText: { ...typography.small, fontWeight: '900' },
+    detail: {
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      gap: spacing.sm,
+    },
     detailRow: { flexDirection: 'row', alignItems: 'center' },
     detailLabel: { ...typography.small, color: colors.textMuted, width: 64 },
     detailInfo: { ...typography.small, color: colors.text, flex: 1 },
     detailGain: { ...typography.small, fontWeight: '700', width: 90, textAlign: 'right' },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.xl,
+    },
+    footerText: { ...typography.small },
     modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
     modalSheet: {
       backgroundColor: colors.surface,
@@ -307,6 +389,7 @@ function createStyles(colors: Colors) {
       borderTopRightRadius: radius.xl,
       padding: spacing.lg,
       paddingBottom: spacing.xl,
+      ...shadow.lg,
     },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
     modalTitle: { ...typography.h3, color: colors.text },
@@ -315,9 +398,13 @@ function createStyles(colors: Colors) {
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      marginBottom: 2,
+      borderRadius: radius.md,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     modalRowText: { ...typography.body, color: colors.text },
+    modalCheck: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   });
 }

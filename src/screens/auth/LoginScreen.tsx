@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import { Input } from '../../components/Input';
 import { FormError } from '../../components/FormError';
+import { AppIcon, Illustration } from '../../components/AppIcon';
+import { IconBubble } from '../../components/IconBubble';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
+import { withAlpha } from '../../lib/color';
 import { useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
 import { getErrorMessage, isValidPhone } from '../../lib/validation';
@@ -86,32 +89,43 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.logo}>CrowdStock</Text>
+      <View style={styles.hero}>
+        <View style={styles.heroArt}>
+          <View pointerEvents="none" style={styles.heroGlow} />
+          <Illustration name="hero" size={172} />
+          <View pointerEvents="none" style={styles.heroSparkle}>
+            <AppIcon name="sparkle" size={26} />
+          </View>
+        </View>
+
+        <View style={styles.wordmarkRow}>
+          <AppIcon name="sparkle" size={15} />
+          <Text style={styles.wordmark}>CrowdStock</Text>
+        </View>
         <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
+
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>Log in to continue picking stock.</Text>
       </View>
 
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Log in to continue picking stock.</Text>
-
-      <View style={styles.form}>
+      <Card tone="surface">
         {!!sessionExpiredMessage && (
           <View style={styles.warnBanner}>
-            <Ionicons name="time-outline" size={16} color={colors.warning} />
+            <IconBubble name="clock" size={34} iconSize={17} color={colors.warning} shape="circle" />
             <Text style={styles.warnBannerText}>{sessionExpiredMessage}</Text>
           </View>
         )}
 
         {!!infoMessage && (
           <View style={styles.infoBanner}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+            <IconBubble name="check" size={34} iconSize={17} color={colors.success} shape="circle" />
             <Text style={styles.infoBannerText}>{infoMessage}</Text>
           </View>
         )}
 
         <Input
           label="Phone number"
+          leftIcon="phone"
           value={phone}
           onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 11))}
           keyboardType="phone-pad"
@@ -119,21 +133,23 @@ export default function LoginScreen({ navigation, route }: Props) {
         />
         <Input
           label="Password"
+          leftIcon="lock"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoCapitalize="none"
           placeholder="••••••••"
-          style={{ marginTop: spacing.md }}
+          containerStyle={{ marginTop: spacing.md }}
         />
 
         {!!error && <FormError message={error} />}
 
-        <Button title="Log In" onPress={handleLogin} loading={isLoading} style={{ marginTop: spacing.lg }} />
+        <Button title="Log In" icon="arrow-right" onPress={handleLogin} loading={isLoading} style={{ marginTop: spacing.lg }} />
 
         {biometricReady && (
           <Button
             title="Log in with Face ID / Fingerprint"
+            icon="shield-check"
             variant="outline"
             onPress={handleBiometricLogin}
             loading={biometricLoading}
@@ -141,13 +157,17 @@ export default function LoginScreen({ navigation, route }: Props) {
           />
         )}
 
-        <Button
-          title="Forgot password?"
-          variant="ghost"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Forgot password?"
           onPress={() => navigation.navigate('ForgotPassword')}
-          style={{ marginTop: spacing.sm }}
-        />
-      </View>
+          style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
+        >
+          <IconBubble name="help" size={32} iconSize={16} color={colors.pink} shape="circle" />
+          <Text style={styles.pillText}>Forgot password?</Text>
+          <AppIcon name="chevron-right" size={16} color={colors.textDim} />
+        </Pressable>
+      </Card>
 
       <View style={styles.divider}>
         <View style={styles.dividerLine} />
@@ -155,56 +175,80 @@ export default function LoginScreen({ navigation, route }: Props) {
         <View style={styles.dividerLine} />
       </View>
 
-      <Button title="Create an account" variant="outline" onPress={() => navigation.navigate('Register')} />
+      <Card tone="accent" variant="sticker">
+        <View style={styles.inviteRow}>
+          <IconBubble name="sparkle" size={44} iconSize={24} color={colors.accent} background={colors.surface} />
+          <View style={styles.inviteCopy}>
+            <Text style={styles.inviteTitle}>Start your streak</Text>
+            <Text style={styles.inviteText}>Create an account in under a minute and pick your first stock.</Text>
+          </View>
+        </View>
+        <Button title="Create an account" icon="plus" variant="accent" onPress={() => navigation.navigate('Register')} style={{ marginTop: spacing.md }} />
+      </Card>
     </Screen>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    header: {
-      alignItems: 'center',
-      marginTop: spacing.lg,
-      marginBottom: spacing.xxl,
-      paddingVertical: spacing.xl,
-      borderRadius: radius.xl,
-      backgroundColor: colors.primaryTint,
+    hero: { alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.xl },
+    heroArt: { width: 220, height: 190, alignItems: 'center', justifyContent: 'center' },
+    heroGlow: {
+      position: 'absolute',
+      width: 186,
+      height: 186,
+      borderRadius: 93,
+      backgroundColor: withAlpha(colors.amber, 0.22),
     },
-    logoMark: {
-      width: 72,
-      height: 72,
-      borderRadius: 18,
-      marginBottom: spacing.md,
-    },
-    logo: { ...typography.h1, color: colors.primary, letterSpacing: 0.2 },
-    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
-    title: { ...typography.h2, color: colors.text },
-    subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
-    form: { gap: spacing.sm },
-    infoBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      backgroundColor: colors.successTint,
-      borderRadius: radius.md,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      marginBottom: spacing.xs,
-    },
-    infoBannerText: { ...typography.small, color: colors.success, flex: 1 },
+    heroSparkle: { position: 'absolute', top: 2, right: 16 },
+    wordmarkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+    wordmark: { ...typography.h2, color: colors.primary, letterSpacing: 0.2 },
+    tagline: { ...typography.label, color: colors.textMuted, marginTop: spacing.xs },
+    title: { ...typography.h1, color: colors.text, marginTop: spacing.lg, textAlign: 'center' },
+    subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, textAlign: 'center' },
     warnBanner: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
+      gap: spacing.sm,
       backgroundColor: colors.warningTint,
-      borderRadius: radius.md,
+      borderRadius: radius.lg,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      marginBottom: spacing.xs,
+      marginBottom: spacing.md,
     },
-    warnBannerText: { ...typography.small, color: colors.warning, flex: 1 },
+    warnBannerText: { ...typography.small, color: colors.warning, flex: 1, fontWeight: '700', lineHeight: 18 },
+    infoBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.successTint,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.md,
+    },
+    infoBannerText: { ...typography.small, color: colors.success, flex: 1, fontWeight: '700', lineHeight: 18 },
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      paddingVertical: spacing.xs + 2,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: withAlpha(colors.pink, 0.3),
+      backgroundColor: colors.pinkTint,
+    },
+    pillPressed: { opacity: 0.7 },
+    pillText: { ...typography.small, color: colors.pink, fontWeight: '800' },
     divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.xl, gap: spacing.md },
     dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-    dividerText: { ...typography.small, color: colors.textDim },
+    dividerText: { ...typography.small, color: colors.textDim, fontWeight: '700' },
+    inviteRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    inviteCopy: { flex: 1, minWidth: 0 },
+    inviteTitle: { ...typography.h3, color: colors.text },
+    inviteText: { ...typography.small, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
   });
 }

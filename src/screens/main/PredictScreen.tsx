@@ -1,15 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { CountdownBadge } from '../../components/CountdownBadge';
 import { EmptyState } from '../../components/EmptyState';
+import { IconBubble } from '../../components/IconBubble';
 import { PredictionControl } from '../../components/PredictionControl';
 import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
 import { MasterAutoPlayToggle } from '../../components/MasterAutoPlayToggle';
-import { Colors, spacing, typography, useColors, ROUND_CARD_PALETTES } from '../../theme/theme';
+import { Colors, radius, spacing, typography, useColors, ROUND_CARD_PALETTES } from '../../theme/theme';
+import { withAlpha } from '../../lib/color';
 import { useRoundsStore } from '../../store/roundsStore';
 import { useAuthStore } from '../../store/authStore';
 import { useAutoPlayStore } from '../../store/autoPlayStore';
@@ -48,15 +49,23 @@ export default function PredictScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Text style={styles.title}>Stock</Text>
+      {/* ── Bold header band ─────────────────────────────────────────────── */}
+      <View style={styles.heroHeader}>
+        <IconBubble name="stock" size={56} iconSize={30} color={colors.teal} background={colors.surface} />
+        <View style={styles.heroText}>
+          <Text style={styles.heroEyebrow}>MAKE YOUR PICK</Text>
+          <Text style={styles.title}>Stock</Text>
+          <Text style={styles.heroSub}>Pick your figure for any round today.</Text>
+        </View>
+      </View>
 
       <View style={{ marginBottom: spacing.lg }}>
         <CountdownBadge />
       </View>
 
-      <Card style={styles.infoCard}>
+      <Card tone="info" style={styles.infoCard}>
         <View style={styles.infoHeader}>
-          <Ionicons name="bulb-outline" size={18} color={colors.primary} />
+          <IconBubble name="bulb" size={36} iconSize={18} color={colors.blue} background={colors.surface} />
           <Text style={styles.infoTitle}>How scoring works</Text>
         </View>
         <Text style={styles.infoText}>
@@ -73,7 +82,7 @@ export default function PredictScreen() {
       {openRounds.length === 0 && (
         <Card style={{ marginTop: spacing.lg }}>
           <EmptyState
-            icon="hourglass-outline"
+            illustration="empty"
             title="No rounds left to pick a stock for today"
             message="Check back after the next operating day starts."
           />
@@ -81,30 +90,35 @@ export default function PredictScreen() {
       )}
 
       <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
-        {openRounds.map((round) => (
-          <Card key={round.slot.id}>
-            <View style={styles.roundHeader}>
-              <View style={[styles.roundIndexCircle, { backgroundColor: ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length].accent }]}>
-                <Text style={[styles.roundIndexText, { color: '#FFFFFF' }]}>{round.slot.index}</Text>
+        {openRounds.map((round) => {
+          const palette = ROUND_CARD_PALETTES[(round.slot.index - 1) % ROUND_CARD_PALETTES.length];
+          return (
+            <Card key={round.slot.id} padded={false}>
+              <View style={[styles.roundBand, { backgroundColor: palette.background, borderBottomColor: palette.border }]}>
+                <View style={[styles.roundIndexCircle, { backgroundColor: palette.accent }]}>
+                  <Text style={[styles.roundIndexText, { color: colors.cream }]}>{round.slot.index}</Text>
+                </View>
+                <View style={styles.roundHeaderText}>
+                  <Text style={[styles.roundLabel, { color: palette.ink }]}>Round {round.slot.index}</Text>
+                  <Text style={[styles.roundTime, { color: palette.ink }]}>
+                    Opens {formatTime12h(round.slot.submitTime)} · Settles {formatTime12h(round.slot.settleTime)}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.roundLabel}>Round {round.slot.index}</Text>
-                <Text style={styles.roundTime}>
-                  Opens {formatTime12h(round.slot.submitTime)} · Settles {formatTime12h(round.slot.settleTime)}
-                </Text>
+
+              <View style={styles.roundBody}>
+                <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
+
+                <PredictionControl
+                  roundId={round.slot.id}
+                  currentValue={round.prediction?.value}
+                  slotAmount={slotAmount}
+                  onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
+                />
               </View>
-            </View>
-
-            <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
-
-            <PredictionControl
-              roundId={round.slot.id}
-              currentValue={round.prediction?.value}
-              slotAmount={slotAmount}
-              onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
-            />
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </View>
     </Screen>
   );
@@ -112,22 +126,43 @@ export default function PredictScreen() {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
-    roundHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+    heroHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: withAlpha(colors.teal, 0.1),
+      borderRadius: radius.xxl,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+    },
+    heroText: { flex: 1, minWidth: 0 },
+    heroEyebrow: { ...typography.label, color: colors.teal },
+    title: { ...typography.h1, color: colors.text, marginTop: 2 },
+    heroSub: { ...typography.small, color: colors.textMuted, marginTop: 3 },
+    infoCard: { marginTop: spacing.lg },
+    infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    infoTitle: { ...typography.h3, color: colors.text },
+    infoText: { ...typography.small, color: colors.textMuted, lineHeight: 19 },
+    roundBand: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderTopLeftRadius: radius.xl - 1,
+      borderTopRightRadius: radius.xl - 1,
+    },
     roundIndexCircle: {
-      width: 40,
-      height: 40,
-      borderRadius: 13,
-      backgroundColor: colors.primaryTint,
+      width: 42,
+      height: 42,
+      borderRadius: radius.sm,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    roundIndexText: { ...typography.h3, color: colors.primary },
-    roundLabel: { ...typography.h3, color: colors.text },
-    roundTime: { ...typography.small, color: colors.textMuted, marginTop: 2 },
-    infoCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
-    infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-    infoTitle: { ...typography.h3, color: colors.text },
-    infoText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+    roundIndexText: { ...typography.h3 },
+    roundHeaderText: { flex: 1, minWidth: 0 },
+    roundLabel: { ...typography.h3 },
+    roundTime: { ...typography.small, marginTop: 2, opacity: 0.78 },
+    roundBody: { padding: spacing.lg, paddingBottom: spacing.md },
   });
 }

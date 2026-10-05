@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Linking, StyleSheet, Switch, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
+import { IconBubble } from '../../components/IconBubble';
+import { ListItem } from '../../components/ListItem';
+import { SectionHeader } from '../../components/SectionHeader';
+import { StatTile } from '../../components/StatTile';
+import { PageHeader } from '../../components/Decor';
 import { Colors, spacing, typography, useColors } from '../../theme/theme';
+import { IconName } from '../../theme/icons';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useRoundsStore } from '../../store/roundsStore';
@@ -70,103 +75,96 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <Text style={styles.title}>Profile</Text>
+      <PageHeader
+        title="Profile"
+        subtitle="Your account, preferences and support"
+        icon="profile"
+        color={colors.pink}
+      />
 
-      <Card style={styles.profileCard}>
+      <Card tone="primary" variant="sticker" style={styles.identityCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? '?'}</Text>
         </View>
-        <Text style={styles.name}>{user?.name}</Text>
+        <Text style={styles.name} numberOfLines={1}>
+          {user?.name}
+        </Text>
         <Text style={styles.email}>{user?.phone}</Text>
+        <View style={styles.identityIconsRow}>
+          <IconBubble name="sparkle" size={38} iconSize={20} />
+          <IconBubble name="shield-check" size={38} iconSize={20} color={colors.teal} />
+          <IconBubble name="star-outline" size={38} iconSize={20} color={colors.amber} />
+        </View>
       </Card>
 
-      <View style={styles.statsRow}>
-        <Card style={styles.statCard}>
-          <Ionicons name="wallet-outline" size={18} color={colors.primary} style={{ marginBottom: 6 }} />
-          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
-            {formatMoney(balance)}
-          </Text>
-          <Text style={styles.statLabel}>Balance</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Ionicons
-            name={totalProfit >= 0 ? 'trending-up' : 'trending-down'}
-            size={18}
-            color={totalProfit >= 0 ? colors.success : colors.danger}
-            style={{ marginBottom: 6 }}
-          />
-          <Text
-            style={[styles.statValue, { color: totalProfit >= 0 ? colors.success : colors.danger }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.65}
-          >
-            {formatSigned(totalProfit)}
-          </Text>
-          <Text style={styles.statLabel}>Total profit</Text>
-        </Card>
+      <View style={styles.tilesRow}>
+        <StatTile icon="wallet" label="Balance" value={formatMoney(balance)} color={colors.accent} />
+        <StatTile
+          icon={totalProfit >= 0 ? 'trend-up' : 'trend-down'}
+          label="Total profit"
+          value={formatSigned(totalProfit)}
+          color={totalProfit >= 0 ? colors.success : colors.danger}
+        />
       </View>
 
-      <Text style={styles.sectionTitle}>Preferences</Text>
-      <Card style={styles.section}>
-        <View style={styles.row}>
-          <View style={styles.rowIconCircle}>
-            <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={18} color={colors.primary} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>{isDark ? 'Dark mode' : 'Light mode'}</Text>
-            <Text style={styles.rowHint}>Switch between a dark and light color theme.</Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={colors.text}
-          />
-        </View>
+      <SectionHeader eyebrow="MAKE IT YOURS" title="Preferences" />
+      <Card tone="alt" style={styles.section}>
+        <ListItem
+          icon={isDark ? 'moon' : 'sun'}
+          iconColor={colors.primary}
+          title={isDark ? 'Dark mode' : 'Light mode'}
+          subtitle="Switch between a dark and light color theme."
+          right={
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.text}
+            />
+          }
+        />
 
-        <View style={[styles.row, styles.rowDivider]}>
-          <View style={styles.rowIconCircle}>
-            <Ionicons name="notifications-outline" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>Round reminders</Text>
-            <Text style={styles.rowHint}>
-              Alerts when a round opens, when it's about to close, when your result is ready, and a nudge if you
-              haven't played yet today.
-            </Text>
-          </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={handleToggleNotifications}
-            disabled={togglingNotifications}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={colors.text}
-          />
-        </View>
+        <ListItem
+          icon="bell-outline"
+          iconColor={colors.amber}
+          title="Round reminders"
+          subtitle="Alerts when a round opens, when it's about to close, when your result is ready, and a nudge if you haven't played yet today."
+          right={
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleToggleNotifications}
+              disabled={togglingNotifications}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.text}
+            />
+          }
+        />
 
-        <TouchableOpacity style={[styles.row, styles.rowDivider]} onPress={startTour} activeOpacity={0.7}>
-          <View style={styles.rowIconCircle}>
-            <Ionicons name="compass-outline" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>Take the guided tour</Text>
-            <Text style={styles.rowHint}>Replay the walkthrough of the app's main screens.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
+        <ListItem
+          icon="compass"
+          iconColor={colors.teal}
+          title="Take the guided tour"
+          subtitle="Replay the walkthrough of the app's main screens."
+          onPress={startTour}
+          showChevron
+        />
       </Card>
 
-      <Text style={styles.sectionTitle}>Support</Text>
-      <Card style={styles.section}>
+      <SectionHeader eyebrow="NEED A HAND?" title="Support" />
+      <Card tone="info" style={styles.section}>
         {loadingSupport ? (
-          <Text style={styles.rowHint}>Loading…</Text>
+          <View style={styles.supportRow}>
+            <IconBubble name="help" size={40} iconSize={20} color={colors.blue} />
+            <Text style={[styles.rowHint, styles.supportText]}>Loading…</Text>
+          </View>
         ) : supportContact ? (
           <>
-            {!!supportContact.message && <Text style={[styles.rowHint, { marginBottom: spacing.sm }]}>{supportContact.message}</Text>}
+            {!!supportContact.message && (
+              <Text style={[styles.rowHint, styles.supportMessage]}>{supportContact.message}</Text>
+            )}
             {!!supportContact.email && (
               <SupportRow
-                icon="mail-outline"
+                icon="mail"
                 label="Email"
                 value={supportContact.email}
                 onPress={() => Linking.openURL(`mailto:${supportContact.email}`)}
@@ -174,7 +172,7 @@ export default function ProfileScreen() {
             )}
             {!!supportContact.phone && (
               <SupportRow
-                icon="call-outline"
+                icon="phone"
                 label="Phone"
                 value={supportContact.phone}
                 onPress={() => Linking.openURL(`tel:${supportContact.phone}`)}
@@ -182,7 +180,7 @@ export default function ProfileScreen() {
             )}
             {!!supportContact.whatsapp && (
               <SupportRow
-                icon="logo-whatsapp"
+                icon="send"
                 label="WhatsApp"
                 value={supportContact.whatsapp}
                 onPress={() => Linking.openURL(`https://wa.me/${supportContact.whatsapp!.replace(/\D/g, '')}`)}
@@ -190,11 +188,16 @@ export default function ProfileScreen() {
             )}
           </>
         ) : (
-          <Text style={styles.rowHint}>Support contact isn't available yet — check back soon.</Text>
+          <View style={styles.supportRow}>
+            <IconBubble name="info" size={40} iconSize={20} color={colors.textMuted} />
+            <Text style={[styles.rowHint, styles.supportText]}>
+              Support contact isn't available yet — check back soon.
+            </Text>
+          </View>
         )}
       </Card>
 
-      <Button title="Log Out" variant="outline" onPress={logout} style={{ marginTop: spacing.xl }} />
+      <Button title="Log Out" variant="outline" icon="logout" onPress={logout} style={{ marginTop: spacing.xl }} />
 
       <Text style={styles.footer}>CrowdStock · v1.0.0</Text>
       {!!deviceId && (
@@ -212,7 +215,7 @@ function SupportRow({
   value,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   value: string;
   onPress: () => void;
@@ -220,57 +223,42 @@ function SupportRow({
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity style={[styles.row, styles.supportRow]} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.rowIconCircle}>
-        <Ionicons name={icon} size={18} color={colors.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        <Text style={styles.rowHint}>{value}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-    </TouchableOpacity>
+    <ListItem
+      icon={icon}
+      iconColor={colors.blue}
+      title={label}
+      subtitle={value}
+      onPress={onPress}
+      showChevron
+      style={styles.supportListItem}
+    />
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
-    profileCard: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.primaryTint, borderColor: colors.primary },
+    identityCard: { alignItems: 'center', paddingVertical: spacing.xl },
     avatar: {
-      width: 68,
-      height: 68,
-      borderRadius: 34,
+      width: 92,
+      height: 92,
+      borderRadius: 46,
       backgroundColor: colors.primary,
       borderWidth: 5,
-      borderColor: colors.surface,
+      borderColor: colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.md,
     },
-    avatarText: { ...typography.h1, color: colors.onPrimary },
-    name: { ...typography.h3, color: colors.text },
-    email: { ...typography.small, color: colors.textMuted, marginTop: 2 },
-    statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-    statCard: { flex: 1, alignItems: 'center' },
-    statValue: { ...typography.h3, color: colors.text },
-    statLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-    sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md },
+    avatarText: { ...typography.display, color: colors.onPrimary },
+    name: { ...typography.h2, color: colors.text, textAlign: 'center' },
+    email: { ...typography.small, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
+    identityIconsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+    tilesRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
     section: {},
-    row: { flexDirection: 'row', alignItems: 'center' },
-    rowText: { flex: 1, minWidth: 0, marginRight: spacing.md },
-    rowDivider: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-    supportRow: { marginTop: spacing.sm },
-    rowIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
-      backgroundColor: colors.primaryTint,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.md,
-    },
-    rowLabel: { ...typography.body, color: colors.text, fontWeight: '600' },
+    supportRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    supportText: { flex: 1, marginTop: 0 },
+    supportMessage: { marginBottom: spacing.sm },
+    supportListItem: { marginTop: spacing.sm },
     rowHint: { ...typography.tiny, color: colors.textDim, marginTop: 2 },
     footer: { ...typography.tiny, color: colors.textDim, textAlign: 'center', marginTop: spacing.xl },
     deviceId: { ...typography.tiny, color: colors.textDim, textAlign: 'center', marginTop: spacing.xs },

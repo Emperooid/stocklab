@@ -1,11 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
+import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
+import { IconBubble } from '../../components/IconBubble';
+import { PageHeader } from '../../components/Decor';
 import { Colors, spacing, typography, useColors } from '../../theme/theme';
+import { IconName } from '../../theme/icons';
 import { useAuthStore } from '../../store/authStore';
 
 /**
@@ -35,15 +38,29 @@ export default function NewsScreen() {
 
   return (
     <Screen>
+      <PageHeader
+        title="Alerts & news"
+        subtitle="What's happening on your account right now"
+        icon="megaphone"
+        color={colors.amber}
+      />
+
       {loading && !hasContent ? (
-        <Text style={styles.placeholder}>Loading…</Text>
+        <View style={styles.loadingRow}>
+          <IconBubble name="refresh" size={44} iconSize={22} color={colors.primary} />
+          <Text style={styles.placeholder}>Loading…</Text>
+        </View>
       ) : !hasContent ? (
-        <Card>
-          <EmptyState icon="megaphone-outline" title="Nothing here yet" message="Announcements and alerts will show up here." />
+        <Card tone="alt">
+          <EmptyState
+            illustration="empty"
+            title="Nothing here yet"
+            message="Announcements and alerts will show up here."
+          />
         </Card>
       ) : (
         <View style={{ gap: spacing.md }}>
-          {!!alertMessage && <MessageCard icon="alert-circle" tone="warning" label="Alert" message={alertMessage} />}
+          {!!alertMessage && <MessageCard icon="alert" tone="warning" label="Alert" message={alertMessage} />}
           {!!newsMessage && <MessageCard icon="megaphone" tone="info" label="News" message={newsMessage} />}
         </View>
       )}
@@ -57,7 +74,7 @@ function MessageCard({
   label,
   message,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   tone: 'warning' | 'info';
   label: string;
   message: string;
@@ -67,12 +84,19 @@ function MessageCard({
   const iconColor = tone === 'warning' ? colors.warning : colors.blue;
   const iconBg = tone === 'warning' ? colors.warningTint : colors.blueTint;
   return (
-    <Card>
+    <Card tone={tone === 'warning' ? 'amber' : 'info'}>
       <View style={styles.cardHeaderRow}>
-        <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
-          <Ionicons name={icon} size={18} color={iconColor} />
+        <IconBubble name={icon} size={46} iconSize={24} color={iconColor} background={iconBg} />
+        <View style={styles.cardHeaderText}>
+          <Text style={styles.cardLabel}>{label}</Text>
+          <Badge
+            label={tone === 'warning' ? 'Needs a look' : 'Good to know'}
+            tone={tone === 'warning' ? 'warning' : 'info'}
+            icon={tone === 'warning' ? 'alert' : 'info'}
+            size="sm"
+          />
         </View>
-        <Text style={styles.cardLabel}>{label}</Text>
+        <IconBubble name="sparkle" size={34} iconSize={18} />
       </View>
       <Text style={styles.cardBody}>{message}</Text>
     </Card>
@@ -81,10 +105,11 @@ function MessageCard({
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    placeholder: { ...typography.small, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xxl },
+    loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl },
+    placeholder: { ...typography.small, color: colors.textMuted },
     cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    cardHeaderText: { flex: 1, minWidth: 0, gap: spacing.xs },
     cardLabel: { ...typography.h3, color: colors.text },
-    cardBody: { ...typography.small, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 18 },
+    cardBody: { ...typography.small, color: colors.textMuted, marginTop: spacing.md, lineHeight: 19 },
   });
 }
