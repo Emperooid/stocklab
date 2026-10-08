@@ -62,6 +62,10 @@ export const TINTED_ICONS = {
   'bank-outline': require('../../assets/fun/bank-outline.png'),
   'shield-check': require('../../assets/fun/shield-check.png'),
   'wifi-off': require('../../assets/fun/wifi-off.png'),
+  // Card-game navbar set — gold-on-navy masks.
+  'home-outline': require('../../assets/fun/home-outline.png'),
+  'cards-outline': require('../../assets/fun/cards-outline.png'),
+  'trophy-outline': require('../../assets/fun/trophy-outline.png'),
 } as const;
 
 export const BRAND_ICONS = {
@@ -79,12 +83,21 @@ export const BRAND_ICONS = {
   bell: require('../../assets/fun/bell.png'),
   medal: require('../../assets/fun/medal.png'),
   sparkle: require('../../assets/fun/sparkle-star.png'),
+  crown: require('../../assets/fun/crown.png'),
+  pot: require('../../assets/fun/pot.png'),
+} as const;
+
+/** Card-duel artwork — non-square (100 x 140 units), so it renders via <PlayingCard>. */
+export const CARD_ART = {
+  back: require('../../assets/fun/card-back.png'),
+  face: require('../../assets/fun/card-face.png'),
 } as const;
 
 export const ILLUSTRATIONS = {
   hero: require('../../assets/fun/ill-hero.png'),
   win: require('../../assets/fun/ill-win.png'),
   empty: require('../../assets/fun/ill-empty.png'),
+  cards: require('../../assets/fun/ill-cards.png'),
 } as const;
 
 export type TintedIconName = keyof typeof TINTED_ICONS;
@@ -119,4 +132,6 @@ export const BRAND_TINT: Record<BrandIconName, string> = {
   bell: '#FFB020',
   medal: '#FFB020',
   sparkle: '#FF6B2C',
+  crown: '#F7B733',
+  pot: '#F7B733',
 };

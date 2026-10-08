@@ -97,6 +97,13 @@ export default function HomeScreen() {
           <Text style={styles.greetingSub}>Let's find today's lucky figure.</Text>
         </View>
         <View style={styles.headerActions}>
+          <Pressable
+            style={styles.bellButton}
+            onPress={() => stackNavigation?.navigate('GamePicker')}
+            accessibilityLabel="Switch game"
+          >
+            <AppIcon name="cards-outline" size={20} color={colors.primary} />
+          </Pressable>
           <Pressable style={styles.bellButton} onPress={() => stackNavigation?.navigate('News')}>
             <AppIcon name="bell-outline" size={20} color={colors.text} />
             {hasNews && <View style={styles.bellDot} />}
