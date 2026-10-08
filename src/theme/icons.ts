@@ -98,6 +98,13 @@ export const ILLUSTRATIONS = {
   win: require('../../assets/fun/ill-win.png'),
   empty: require('../../assets/fun/ill-empty.png'),
   cards: require('../../assets/fun/ill-cards.png'),
+  // Lobby artwork
+  wallet: require('../../assets/fun/ill-wallet.png'),
+  person: require('../../assets/fun/ill-person.png'),
+  phone: require('../../assets/fun/ill-phone.png'),
+  crowd: require('../../assets/fun/ill-crowd.png'),
+  cash: require('../../assets/fun/ill-cash.png'),
+  invite: require('../../assets/fun/ill-invite.png'),
 } as const;
 
 export type TintedIconName = keyof typeof TINTED_ICONS;

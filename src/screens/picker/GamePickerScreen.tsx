@@ -1,11 +1,10 @@
 import { useCallback, useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AppIcon, Illustration } from '../../components/AppIcon';
-import { Colors, radius, shadow, spacing, typography, useColors } from '../../theme/theme';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { AppIcon, Illustration, IllustrationName } from '../../components/AppIcon';
+import { Colors, lightColors, radius, shadow, spacing, typography, useColors, useIsLight } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
 import { computeCardStats, openCards, useCardsStore } from '../../store/cardsStore';
@@ -13,14 +12,22 @@ import { ROUND_SLOTS } from '../../lib/schedule';
 import { formatMoney } from '../../lib/format';
 import { MainStackParamList } from '../../navigation/types';
 
+/** The two game pills keep fixed brand faces so they stay loud in both themes. */
+const PILL_AMBER = '#FFC24B';
+const PILL_AMBER_DEEP = '#D98A05';
+const PILL_PINK = '#F0357F';
+const PILL_PINK_DEEP = '#B9155A';
+
 /**
- * The lobby. This is what you land on after signing in, and it deliberately has
- * **no navbar** — the only thing to do here is choose which game to play. Each
- * choice pushes that game's own space, which brings its own bar.
+ * The lobby — what you land on after signing in. Deliberately has **no navbar**:
+ * a profile strip, then two big pills, one per game. Choosing a pill pushes that
+ * game's own space, which brings its own bar. The invite banner at the bottom
+ * mirrors the referral push.
  */
 export default function GamePickerScreen() {
   const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const isLight = useIsLight();
+  const styles = useMemo(() => createStyles(colors, isLight), [colors, isLight]);
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
   const user = useAuthStore((s) => s.user);
@@ -45,295 +52,302 @@ export default function GamePickerScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.eyebrow}>WELCOME BACK</Text>
-            <Text style={styles.name} numberOfLines={1}>
-              {user?.name?.split(' ')[0] ?? 'Player'}
-            </Text>
+        <View style={styles.topBar}>
+          <View style={styles.wordmark}>
+            <AppIcon name="stock" size={26} />
+            <Text style={styles.wordmarkText}>CrowdStock</Text>
           </View>
-          <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('News')} accessibilityLabel="News and alerts">
-            <AppIcon name="bell-outline" size={19} color={colors.text} />
+          <Pressable
+            style={styles.topBtn}
+            onPress={() => navigation.navigate('News')}
+            accessibilityLabel="News and alerts"
+          >
+            <AppIcon name="bell-outline" size={19} color={colors.onPrimary} />
           </Pressable>
-          <Pressable style={styles.avatar} onPress={() => navigation.navigate('Withdrawal')} accessibilityLabel="Wallet">
-            <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? '?'}</Text>
-          </Pressable>
         </View>
 
-        <View style={styles.balanceStrip}>
-          <View style={styles.balanceItem}>
-            <Text style={styles.balanceLabel}>WALLET</Text>
-            <Text style={styles.balanceValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {formatMoney(balance)}
-            </Text>
-          </View>
-          <View style={styles.balanceDivider} />
-          <View style={styles.balanceItem}>
-            <Text style={styles.balanceLabel}>CARD TABLE</Text>
-            <Text style={styles.balanceValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {bankroll == null ? '—' : formatMoney(bankroll)}
-            </Text>
-          </View>
+        {/* ── profile strip ──────────────────────────────────────────────── */}
+        <View style={styles.infoCard}>
+          <InfoColumn
+            art="wallet"
+            label="Wallet Balance"
+            value={formatMoney(balance)}
+            styles={styles}
+            first
+          />
+          <View style={styles.infoDivider} />
+          <InfoColumn
+            art="person"
+            label="Name"
+            value={user?.name?.split(' ')[0] ?? 'Player'}
+            styles={styles}
+          />
+          <View style={styles.infoDivider} />
+          <InfoColumn art="phone" label="Phone" value={user?.phone ?? '—'} styles={styles} small />
         </View>
 
-        <View style={styles.hero}>
-          <Image source={require('../../../assets/fun/sparkle-star.png')} style={styles.heroSparkle} resizeMode="contain" />
-          <Text style={styles.heroTitle}>Pick your game</Text>
-          <Text style={styles.heroSub}>
-            Two different games, two different tables. Choose one and dive in — you can switch any time.
-          </Text>
-        </View>
+        <Text style={styles.prompt}>Pick a game and play</Text>
 
-        {/* ── Stock Rounds ─────────────────────────────────────────────── */}
-        <Pressable
+        {/* ── game 1 ─────────────────────────────────────────────────────── */}
+        <GamePill
+          art="crowd"
+          title="Stock Rounds"
+          subtitle="Play the hourly crowd pick"
+          meta={`${ROUND_SLOTS.length} rounds a day`}
+          face={PILL_AMBER}
+          deep={PILL_AMBER_DEEP}
+          textColor={lightColors.ink}
+          metaColor="rgba(42,27,18,0.62)"
+          styles={styles}
           onPress={() => navigation.navigate('RoundsGame')}
           accessibilityLabel="Play Stock Rounds"
-          style={({ pressed }) => [styles.tile, styles.tileRounds, pressed && styles.tilePressed]}
-        >
-          <View style={styles.tileGlowViolet} pointerEvents="none" />
-          <View style={styles.tileTop}>
-            <View style={styles.tileBadge}>
-              <Text style={styles.tileBadgeText}>GAME 1</Text>
-            </View>
-            <View style={styles.tileArtWrap}>
-              <Illustration name="hero" size={86} />
-            </View>
-          </View>
-          <Text style={styles.tileTitleLight}>Stock Rounds</Text>
-          <Text style={styles.tileBodyLight}>
-            Pick a number 1–5 each round. Land closest to the average and take the round.
-          </Text>
-          <View style={styles.tileFooter}>
-            <View style={styles.chipLight}>
-              <AppIcon name="calendar" size={14} />
-              <Text style={styles.chipTextLight}>{ROUND_SLOTS.length} rounds a day</Text>
-            </View>
-            <View style={styles.playPillLight}>
-              <Text style={styles.playPillTextLight}>Play</Text>
-              <AppIcon name="arrow-right" size={14} color={colors.primary} />
-            </View>
-          </View>
-        </Pressable>
+        />
 
-        {/* ── CrowdStock Cards ─────────────────────────────────────────── */}
-        <Pressable
+        {/* ── game 2 ─────────────────────────────────────────────────────── */}
+        <GamePill
+          art="cash"
+          title="CrowdStock Cards"
+          subtitle="Draft a card, instantly"
+          meta={
+            bankroll == null
+              ? `${playable} open`
+              : `${formatMoney(bankroll)} on the table · ${playable} open`
+          }
+          face={PILL_PINK}
+          deep={PILL_PINK_DEEP}
+          textColor="#FFFFFF"
+          metaColor="rgba(255,255,255,0.82)"
+          styles={styles}
           onPress={() => navigation.navigate('CardsGame')}
           accessibilityLabel="Play CrowdStock Cards"
-          style={({ pressed }) => [styles.tile, styles.tileCards, pressed && styles.tilePressed]}
+        />
+
+        {/* ── invite ─────────────────────────────────────────────────────── */}
+        <Pressable
+          style={({ pressed }) => [styles.invite, pressed && { opacity: 0.85 }]}
+          onPress={() => navigation.navigate('Invite')}
+          accessibilityLabel="Invite contacts and earn points"
         >
-          <View style={styles.tileGlowGold} pointerEvents="none" />
-          <View style={styles.tileTop}>
-            <View style={[styles.tileBadge, styles.tileBadgeGold]}>
-              <Text style={[styles.tileBadgeText, styles.tileBadgeTextGold]}>GAME 2 · NEW</Text>
-            </View>
-            <View style={styles.tileArtWrap}>
-              <Illustration name="cards" size={96} />
-            </View>
+          <View style={styles.inviteArt}>
+            <Illustration name="invite" size={132} />
           </View>
-          <Text style={styles.tileTitleGold}>CrowdStock Cards</Text>
-          <Text style={styles.tileBodyGold}>
-            Hide a figure and set a price. Someone matches it — or they don't. Winner takes 80% of the pot.
-          </Text>
-          <View style={styles.tileFooter}>
-            <View style={styles.chipGold}>
-              <AppIcon name="card" size={14} />
-              <Text style={styles.chipTextGold}>
-                {playable} {playable === 1 ? 'card' : 'cards'} open
-              </Text>
-            </View>
-            <View style={styles.playPillGold}>
-              <Text style={styles.playPillTextGold}>Play</Text>
-              <AppIcon name="arrow-right" size={14} color={cardGame.ink} />
-            </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.inviteTitle}>Invite contacts..</Text>
+            <Text style={styles.inviteHighlight}>and earn points</Text>
+            <Text style={styles.inviteMeta} numberOfLines={1}>
+              {cardStats.played > 0
+                ? `${formatMoney(cardStats.winnings)} won so far`
+                : 'Bring a friend, both of you earn'}
+            </Text>
+          </View>
+          <View style={styles.inviteChevron}>
+            <AppIcon name="chevron-right" size={20} color={PILL_AMBER} />
           </View>
         </Pressable>
 
-        {/* ── rewards teaser ───────────────────────────────────────────── */}
-        <View style={styles.teaser}>
-          <View style={styles.teaserBubble}>
-            <AppIcon name="medal" size={24} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.teaserTitle}>Your rewards</Text>
-            <Text style={styles.teaserBody} numberOfLines={2}>
-              {cardStats.played > 0
-                ? `${formatMoney(cardStats.winnings)} won across ${cardStats.played} card ${cardStats.played === 1 ? 'game' : 'games'} · ${cardStats.winRate}% win rate`
-                : 'Play your first card to start building a win record.'}
-            </Text>
-          </View>
-          <Pressable style={styles.teaserBtn} onPress={() => navigation.navigate('CardsGame')}>
-            <Text style={styles.teaserBtnText}>Open</Text>
-            <AppIcon name="chevron-right" size={13} color={colors.primary} />
-          </Pressable>
-        </View>
-
-        <View style={styles.linksRow}>
-          {([
-            { icon: 'wallet', label: 'Wallet', to: 'Withdrawal' },
-            { icon: 'gift', label: 'Invite', to: 'Invite' },
-            { icon: 'trophy', label: 'Results', to: 'RoundHistory' },
-            { icon: 'megaphone', label: 'News', to: 'News' },
-          ] as const).map((l) => (
-            <Pressable
-              key={l.label}
-              style={styles.linkTile}
-              onPress={() => navigation.navigate(l.to as never)}
-              accessibilityLabel={l.label}
-            >
-              <AppIcon name={l.icon} size={22} />
-              <Text style={styles.linkLabel}>{l.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
+        <View style={styles.spacer} />
         <Text style={styles.footnote}>Predict · Play · Win</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function createStyles(colors: Colors) {
-  return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.lg, paddingBottom: spacing.xxxl, width: '100%', maxWidth: 520, alignSelf: 'center' },
+function InfoColumn({
+  art,
+  label,
+  value,
+  styles,
+  first,
+  small,
+}: {
+  art: IllustrationName;
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+  first?: boolean;
+  small?: boolean;
+}) {
+  return (
+    <View style={styles.infoColumn}>
+      <Illustration name={art} size={52} />
+      <Text style={styles.infoLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text
+        style={[styles.infoValue, small && styles.infoValueSmall]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
 
-    headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    eyebrow: { ...typography.label, color: colors.textDim },
-    name: { ...typography.h1, color: colors.text, marginTop: 1 },
-    iconBtn: {
+function GamePill({
+  art,
+  title,
+  subtitle,
+  meta,
+  face,
+  deep,
+  textColor,
+  metaColor,
+  onPress,
+  accessibilityLabel,
+  styles,
+}: {
+  art: IllustrationName;
+  title: string;
+  subtitle: string;
+  meta: string;
+  face: string;
+  deep: string;
+  textColor: string;
+  metaColor: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={[styles.pillWrap, { paddingBottom: 6 }]}>
+      <View pointerEvents="none" style={[styles.pillBase, { backgroundColor: deep }]} />
+      <Pressable
+        onPress={onPress}
+        accessibilityLabel={accessibilityLabel}
+        style={({ pressed }) => [
+          styles.pill,
+          { backgroundColor: face },
+          pressed && { transform: [{ translateY: 4 }] },
+        ]}
+      >
+        <View style={styles.pillArt}>
+          <Illustration name={art} size={88} />
+        </View>
+        <View style={styles.pillText}>
+          <Text style={[styles.pillTitle, { color: textColor }]} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={[styles.pillSubtitle, { color: textColor }]} numberOfLines={2}>
+            {subtitle}
+          </Text>
+          <Text style={[styles.pillMeta, { color: metaColor }]} numberOfLines={1}>
+            {meta}
+          </Text>
+        </View>
+        <View style={[styles.pillChevron, { backgroundColor: deep }]}>
+          <AppIcon name="chevron-right" size={22} color="#FFFFFF" />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+function createStyles(colors: Colors, isLight: boolean) {
+  const pageBg = isLight ? colors.primary : '#1B1145';
+  const softWhite = isLight ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.12)';
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: pageBg },
+    content: {
+      padding: spacing.lg,
+      paddingBottom: spacing.xxxl,
+      width: '100%',
+      maxWidth: 520,
+      alignSelf: 'center',
+      // Lets the spacer below push the footnote to the bottom on tall screens.
+      flexGrow: 1,
+    },
+    spacer: { flex: 1, minHeight: spacing.lg },
+
+    topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    wordmark: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    wordmarkText: { ...typography.h2, color: colors.onPrimary, letterSpacing: -0.4 },
+    topBtn: {
       width: 42,
       height: 42,
       borderRadius: 16,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: softWhite,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatar: { width: 42, height: 42, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { ...typography.h3, color: colors.onPrimary },
 
-    balanceStrip: {
+    /* profile strip */
+    infoCard: {
       flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: spacing.lg,
+      alignItems: 'stretch',
       backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius: radius.xxl,
+      paddingVertical: spacing.lg,
+      marginTop: spacing.lg,
+      ...shadow.lg,
+    },
+    infoColumn: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
+    infoDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
+    infoLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 8, fontWeight: '700' },
+    infoValue: { ...typography.h3, color: colors.text, marginTop: 2, textAlign: 'center' },
+    infoValueSmall: { fontSize: typography.small.fontSize, marginTop: 4 },
+
+    prompt: {
+      ...typography.h2,
+      color: colors.onPrimary,
+      textAlign: 'center',
+      marginTop: spacing.xl,
+      marginBottom: spacing.md,
+    },
+
+    /* game pills */
+    pillWrap: { position: 'relative', marginBottom: spacing.md },
+    pillBase: { position: 'absolute', left: 0, right: 0, top: 6, bottom: 0, borderRadius: radius.pill },
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: radius.pill,
       paddingVertical: spacing.md,
-      ...shadow.sm,
+      paddingLeft: spacing.sm,
+      paddingRight: spacing.md,
+      gap: spacing.sm,
+      minHeight: 112,
     },
-    balanceItem: { flex: 1, paddingHorizontal: spacing.md },
-    balanceDivider: { width: 1, height: 32, backgroundColor: colors.border },
-    balanceLabel: { ...typography.label, color: colors.textDim },
-    balanceValue: { ...typography.h2, color: colors.text, marginTop: 2 },
-
-    hero: { marginTop: spacing.xl, marginBottom: spacing.lg },
-    heroSparkle: { position: 'absolute', right: 6, top: -10, width: 34, height: 34, opacity: 0.9 },
-    heroTitle: { ...typography.display, color: colors.text },
-    heroSub: { ...typography.body, color: colors.textMuted, marginTop: 6, lineHeight: 21, maxWidth: 380 },
-
-    tile: { borderRadius: radius.xxl, padding: spacing.lg, marginBottom: spacing.lg, overflow: 'hidden' },
-    tilePressed: { transform: [{ scale: 0.985 }] },
-    tileRounds: { backgroundColor: colors.primary },
-    tileCards: { backgroundColor: cardGame.tableDeep, borderWidth: 2, borderColor: cardGame.gold },
-    tileGlowViolet: { position: 'absolute', width: 190, height: 190, borderRadius: 95, top: -80, right: -60, backgroundColor: colors.accent, opacity: 0.5 },
-    tileGlowGold: { position: 'absolute', width: 190, height: 190, borderRadius: 95, top: -80, right: -60, backgroundColor: cardGame.gold, opacity: 0.22 },
-
-    tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-    tileBadge: {
-      backgroundColor: 'rgba(255,255,255,0.22)',
-      borderRadius: radius.pill,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      alignSelf: 'flex-start',
-    },
-    tileBadgeGold: { backgroundColor: 'rgba(247,183,51,0.18)' },
-    tileBadgeText: { ...typography.label, color: '#FFFFFF' },
-    tileBadgeTextGold: { color: cardGame.gold },
-    tileArtWrap: { marginTop: -6, marginRight: -4 },
-
-    tileTitleLight: { ...typography.h1, color: '#FFFFFF', marginTop: spacing.sm },
-    tileBodyLight: { ...typography.small, color: 'rgba(255,255,255,0.86)', marginTop: 6, lineHeight: 19 },
-    tileTitleGold: { ...typography.h1, color: cardGame.gold, marginTop: spacing.sm },
-    tileBodyGold: { ...typography.small, color: cardGame.textMuted, marginTop: 6, lineHeight: 19 },
-
-    tileFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, gap: spacing.sm },
-    chipLight: {
-      flexDirection: 'row',
+    pillArt: { width: 92, alignItems: 'center', justifyContent: 'center' },
+    pillText: { flex: 1, minWidth: 0 },
+    pillTitle: { ...typography.h2, letterSpacing: -0.3 },
+    pillSubtitle: { ...typography.small, fontWeight: '700', marginTop: 1, lineHeight: 17 },
+    pillMeta: { ...typography.tiny, fontWeight: '800', marginTop: 4 },
+    pillChevron: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       alignItems: 'center',
-      gap: 6,
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-      flexShrink: 1,
+      justifyContent: 'center',
     },
-    chipTextLight: { ...typography.tiny, color: '#FFFFFF', fontWeight: '800' },
-    chipGold: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: 'rgba(247,183,51,0.16)',
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-      borderWidth: 1,
-      borderColor: 'rgba(247,183,51,0.4)',
-      flexShrink: 1,
-    },
-    chipTextGold: { ...typography.tiny, color: cardGame.gold, fontWeight: '800' },
-    playPillLight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: colors.cream,
-      borderRadius: radius.pill,
-      paddingHorizontal: 16,
-      paddingVertical: 9,
-    },
-    playPillTextLight: { ...typography.small, color: colors.primary, fontWeight: '900' },
-    playPillGold: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: cardGame.gold,
-      borderRadius: cardRadius.pill,
-      paddingHorizontal: 16,
-      paddingVertical: 9,
-    },
-    playPillTextGold: { ...typography.small, color: cardGame.ink, fontWeight: '900' },
 
-    teaser: {
+    /* invite banner */
+    invite: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      backgroundColor: colors.amberTint,
-      borderRadius: radius.xl,
-      borderWidth: 1,
-      borderColor: 'rgba(255,176,32,0.35)',
-      padding: spacing.md,
-    },
-    teaserBubble: { width: 46, height: 46, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-    teaserTitle: { ...typography.body, color: colors.text, fontWeight: '900' },
-    teaserBody: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
-    teaserBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    teaserBtnText: { ...typography.small, color: colors.primary, fontWeight: '900' },
-
-    linksRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-    linkTile: {
-      flex: 1,
-      alignItems: 'center',
-      gap: 6,
+      marginTop: spacing.xl,
       paddingVertical: spacing.md,
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
     },
-    linkLabel: { ...typography.tiny, color: colors.textMuted, fontWeight: '800' },
+    inviteArt: { width: 118, alignItems: 'center', justifyContent: 'center' },
+    inviteTitle: { ...typography.h2, color: colors.onPrimary },
+    inviteHighlight: { ...typography.h2, color: PILL_AMBER, marginTop: -2 },
+    inviteMeta: { ...typography.tiny, color: 'rgba(255,255,255,0.72)', marginTop: 6, fontWeight: '700' },
+    inviteChevron: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: softWhite,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-    footnote: { ...typography.label, color: colors.textDim, textAlign: 'center', marginTop: spacing.xl },
+    footnote: {
+      ...typography.label,
+      color: 'rgba(255,255,255,0.6)',
+      textAlign: 'center',
+      marginTop: spacing.lg,
+    },
   });
 }
