@@ -83,6 +83,9 @@ export function Button({
   const skin = skinFor(colors, variant);
   const depth = DEPTH[size];
   const isDisabled = disabled || loading;
+  // Only solid faces get the 3-D base — on a transparent face the base would
+  // show straight through and read as a muddy filled button.
+  const hasBase = variant !== 'outline' && variant !== 'ghost';
   const push = useRef(new Animated.Value(0)).current;
 
   function handlePressIn(e: GestureResponderEvent) {
@@ -95,11 +98,19 @@ export function Button({
     onPressOut?.(e);
   }
 
-  const translateY = push.interpolate({ inputRange: [0, 1], outputRange: [0, depth] });
+  const translateY = push.interpolate({ inputRange: [0, 1], outputRange: [0, hasBase ? depth : 0] });
 
   return (
-    <View style={[styles.wrap, { paddingBottom: isDisabled ? 0 : depth }, fullWidth && styles.full, isDisabled && styles.disabled, style]}>
-      {!isDisabled && (
+    <View
+      style={[
+        styles.wrap,
+        { paddingBottom: isDisabled || !hasBase ? 0 : depth },
+        fullWidth && styles.full,
+        isDisabled && styles.disabled,
+        style,
+      ]}
+    >
+      {!isDisabled && hasBase && (
         <View
           pointerEvents="none"
           style={[
