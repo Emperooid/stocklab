@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import { DepositModal } from '../../components/DepositModal';
 import { formatMoney } from '../../lib/format';
 import { MainStackParamList } from '../../navigation/types';
 import { useWalletStore } from '../../store/walletStore';
+import { refreshAppData } from '../../lib/refresh';
 import { spacing, typography, useColors } from '../../theme/theme';
 
 export default function LobbyWalletScreen() {
@@ -27,9 +28,27 @@ export default function LobbyWalletScreen() {
     }, [refresh])
   );
 
+  // Outside Screen, so this page carries its own pull.
+  const [pulling, setPulling] = useState(false);
+  const handleRefresh = useCallback(() => {
+    setPulling(true);
+    refreshAppData().finally(() => setPulling(false));
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={pulling}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <View style={styles.header}>
           <Pressable
             onPress={() => navigation.goBack()}

@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
 import { computeCardStats, useCardsStore } from '../../store/cardsStore';
 import { ROUND_SLOTS } from '../../lib/schedule';
+import { refreshAppData } from '../../lib/refresh';
 import { formatMoney } from '../../lib/format';
 import { MainStackParamList } from '../../navigation/types';
 
@@ -47,11 +48,32 @@ export default function GamePickerScreen() {
     }, [ensureSeeded, settleDue, refreshWallet])
   );
 
+  // The picker is outside Screen, so it carries its own pull. It reloads the
+  // same set as everywhere else, plus this screen's own card bookkeeping.
+  const [pulling, setPulling] = useState(false);
+  const handleRefresh = useCallback(() => {
+    setPulling(true);
+    ensureSeeded();
+    settleDue();
+    refreshAppData().finally(() => setPulling(false));
+  }, [ensureSeeded, settleDue]);
+
   const cardStats = computeCardStats(cards);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={pulling}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <View style={styles.topBar}>
           <View style={styles.wordmark}>
             <Ionicons name="trending-up" size={26} color={colors.primary} />
