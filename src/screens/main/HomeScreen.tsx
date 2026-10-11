@@ -22,12 +22,12 @@ import { DailyRound, RoundStatus, WalletTransaction } from '../../types';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { ROUND_CARD_PALETTES } from '../../theme/theme';
 
-// Red on the GREEN hero, with no chip behind it. A light red is hopeless there —
-// `danger` (#F87171) is 1.15:1 against colors.primary, and white is the ceiling
-// for anything light at 3.17:1. So the loss uses the darkest red that still
-// reads as red: 3.82:1. On the DARK result card plain `danger` is 6.55:1, so it
-// needs no special treatment there.
-const LOSS_TEXT_ON_GREEN = '#6B1414';
+// The hero is the brand green, and red cannot work on it: `danger` is 1.15:1,
+// and the darkest red that stays legible (3.82:1) reads as a shadow inside the
+// green's own tone range rather than as a warning. White is the most legible
+// option on this card at 3.17:1, so gain and loss are both white and the
+// direction is carried by the arrow and the sign instead of by hue.
+// (On the DARK result card plain `danger` is 6.55:1, so red stays there.)
 
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
@@ -129,14 +129,9 @@ export default function HomeScreen() {
               <Ionicons
                 name={isProfitPositive ? 'trending-up' : 'trending-down'}
                 size={12}
-                color={isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN}
+                color={colors.onPrimary}
               />
-              <Text
-                style={[
-                  styles.profitPillText,
-                  { color: isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN },
-                ]}
-              >
+              <Text style={[styles.profitPillText, { color: colors.onPrimary }]}>
                 {formatPercent(totalProfitPercent)}
               </Text>
             </View>
@@ -148,16 +143,9 @@ export default function HomeScreen() {
             <Ionicons
               name={isProfitPositive ? 'arrow-up' : 'arrow-down'}
               size={13}
-              color={isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN}
+              color={colors.onPrimary}
             />
-            <Text
-              style={[
-                styles.profit,
-                { color: isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN },
-              ]}
-            >
-              {formatSigned(totalProfit)} today
-            </Text>
+            <Text style={styles.profit}>{formatSigned(totalProfit)} today</Text>
           </View>
         </Card>
 
