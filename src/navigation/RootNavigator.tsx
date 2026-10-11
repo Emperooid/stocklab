@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from '@react-navigation/native';
 import { AuthNavigator } from './AuthNavigator';
 import { MainStack } from './MainStack';
+import { SplashScreen } from '../components/SplashScreen';
 import { OnboardingCarousel } from '../components/OnboardingCarousel';
 import { AlertPopup } from '../components/AlertPopup';
 import { useAuthStore } from '../store/authStore';
@@ -40,6 +41,15 @@ export function RootNavigator() {
   const mode = useThemeStore((s) => s.mode);
   const navTheme = useMemo(() => buildNavTheme(colors, mode), [colors, mode]);
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // Hold the splash for a beat even once the session has hydrated. Without it a
+  // warm start resolves in well under a frame and the splash strobes rather than
+  // reads. Cold starts are slower than this anyway, so it costs nothing there.
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSplashDone(true), 1300);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (hasHydrated && user) {
@@ -93,13 +103,9 @@ export function RootNavigator() {
     return () => subscription.remove();
   }, [user]);
 
-  if (!hasHydrated) {
-    return (
-      <View style={styles.splash}>
-        <Image source={require('../../assets/icon.png')} style={styles.splashLogo} resizeMode="contain" />
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
+  if (!hasHydrated || !splashDone) {
+    // SplashScreen brings its own full-bleed background — no wrapper needed.
+    return <SplashScreen />;
   }
 
   // CONFIRMED live cause of "Could not reach the server" on an installed
@@ -137,7 +143,6 @@ export function RootNavigator() {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     splash: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-    splashLogo: { width: 96, height: 96, borderRadius: 22, marginBottom: spacing.xl },
     configTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
     configBody: { ...typography.small, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
   });
