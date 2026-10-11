@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, layout, spacing, typography, useColors } from '../theme/theme';
 import { navigationRef } from '../lib/navigationRef';
+import { refreshAppData } from '../lib/refresh';
+import { useAuthStore } from '../store/authStore';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -11,6 +13,7 @@ interface ScreenProps {
   style?: ViewStyle;
   refreshing?: boolean;
   onRefresh?: () => void;
+  /** Pull-to-refresh. Omit it and the pull reloads every cached store instead. */
   /** Hides the "Other Games" strip — only for screens that come before a game is picked (auth). */
   hideGameSwitcher?: boolean;
 }
@@ -40,11 +43,32 @@ function GameSwitcherBar({ colors }: { colors: Colors }) {
 export function Screen({ children, scroll = true, style, refreshing, onRefresh, hideGameSwitcher }: ScreenProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const hasSession = useAuthStore((s) => !!s.user);
+  const [pullBusy, setPullBusy] = useState(false);
 
-  const refreshControl =
-    onRefresh != null ? (
-      <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
-    ) : undefined;
+  // Every screen pulls to refresh, not just the handful that wired their own.
+  // Without an onRefresh the pull reloads everything the app caches from the
+  // backend — see refreshAppData — so a page with nothing specific to reload
+  // still fetches real data rather than spinning for nothing.
+  const handleRefresh = useCallback(() => {
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
+    setPullBusy(true);
+    refreshAppData().finally(() => setPullBusy(false));
+  }, [onRefresh]);
+
+  // The auth screens have no session, so there is nothing to pull for.
+  const canPull = onRefresh != null || hasSession;
+  const refreshControl = canPull ? (
+    <RefreshControl
+      refreshing={!!(refreshing || pullBusy)}
+      onRefresh={handleRefresh}
+      tintColor={colors.primary}
+      colors={[colors.primary]}
+    />
+  ) : undefined;
 
   if (!scroll) {
     return (
