@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 import { useAutoPlayStore } from '../store/autoPlayStore';
+import { getErrorMessage } from '../lib/validation';
 
 /**
  * Per-round Auto Play row — a toggle, and the figure it is armed with.
@@ -56,7 +57,14 @@ export function RoundAutoPlayControl({
         </View>
         <Switch
           value={config.enabled}
-          onValueChange={(v) => setSlotEnabled(roundId, v).catch(() => {})}
+          onValueChange={(v) =>
+            setSlotEnabled(roundId, v).catch((e) =>
+              // This used to be swallowed, so a rejected A1/UU looked exactly like
+              // a successful save until the next A2 quietly put the toggle back —
+              // which reads as "Auto Play turns itself off", with no reason shown.
+              Alert.alert('Could not save Auto Play', getErrorMessage(e, 'Please try again.'))
+            )
+          }
           disabled={disabled}
           trackColor={{
             false: vibrant ? 'rgba(255,255,255,0.3)' : colors.border,

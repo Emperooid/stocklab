@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AutoPlaySlotConfig } from '../types';
 import { api } from '../api';
 import { ROUND_SLOTS } from '../lib/schedule';
@@ -41,7 +43,9 @@ interface AutoPlayState {
  * whatever local optimistic-update bookkeeping the toggle UI needs — no
  * submission tracking or "missed" guards to maintain anymore.
  */
-export const useAutoPlayStore = create<AutoPlayState>((set, get) => ({
+export const useAutoPlayStore = create<AutoPlayState>()(
+  persist(
+    (set, get) => ({
   loaded: false,
   slots: {},
 
@@ -108,4 +112,19 @@ export const useAutoPlayStore = create<AutoPlayState>((set, get) => ({
       throw e;
     }
   },
-}));
+    }),
+    {
+      name: 'crowdstock-autoplay',
+      storage: createJSONStorage(() => AsyncStorage),
+      // Cached so a reload paints the rounds you armed instead of blanking every
+      // toggle to "off" while A2 is in flight — and so a failed A2 no longer
+      // reads as "my Auto Play settings were lost", which is exactly what an
+      // empty fallback map looked like.
+      //
+      // A cache, never a source of truth: loadFromServer() replaces it the moment
+      // the server answers. `loaded` is deliberately excluded so the toggle UI
+      // still waits for the real fetch.
+      partialize: (state) => ({ slots: state.slots }) as any,
+    }
+  )
+);

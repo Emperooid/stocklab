@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
 import { Card } from './Card';
 import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { useAutoPlayStore } from '../store/autoPlayStore';
+import { getErrorMessage } from '../lib/validation';
 import { ROUND_SLOTS } from '../lib/schedule';
 
 /**
@@ -31,7 +32,14 @@ export function MasterAutoPlayToggle() {
       </View>
       <Switch
         value={allEnabled}
-        onValueChange={(v) => setAllEnabled(v).catch(() => {})}
+        onValueChange={(v) =>
+            setAllEnabled(v).catch((e) =>
+              // This used to be swallowed, so a rejected A1/UU looked exactly like
+              // a successful save until the next A2 quietly put the toggle back —
+              // which reads as "Auto Play turns itself off", with no reason shown.
+              Alert.alert('Could not save Auto Play', getErrorMessage(e, 'Please try again.'))
+            )
+          }
         trackColor={{ false: colors.border, true: colors.primary }}
         thumbColor={colors.text}
       />
