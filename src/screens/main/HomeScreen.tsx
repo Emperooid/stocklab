@@ -22,6 +22,13 @@ import { DailyRound, RoundStatus, WalletTransaction } from '../../types';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { ROUND_CARD_PALETTES } from '../../theme/theme';
 
+// A loss has to be RED, and the palette can't do that on the brand green:
+// `danger` (#F87171) measures 1.15:1 against colors.primary — invisible. Red
+// text on a dark-red chip reads as red and clears contrast (5.75:1), so that is
+// what a loss gets, here and on the result card. The arrow carries direction too.
+const LOSS_CHIP = '#781616';
+const LOSS_TEXT = '#FCA5A5';
+
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
   withdrawal: 'arrow-up-circle',
@@ -86,12 +93,6 @@ export default function HomeScreen() {
   const closedToday = rounds.filter((r) => getSlotStatus(r.slot, now) === 'settled').length;
   const latestResult = [...rounds].reverse().find((r) => r.result);
   const isProfitPositive = totalProfit >= 0;
-  // A loss has to be RED on a green card, and the palette can't do that: `danger`
-  // (#F87171) measures 1.15:1 against colors.primary — effectively invisible.
-  // Red text on a dark-red chip reads as red and clears contrast (5.75:1), so
-  // that is what a loss gets. The arrow still carries the direction.
-  const LOSS_CHIP = '#781616';
-  const LOSS_TEXT = '#FCA5A5';
   const upcomingRounds = rounds
     .filter((r) => getSlotStatus(r.slot, now) !== 'settled')
     .sort((a, b) => a.slot.index - b.slot.index)
@@ -344,20 +345,61 @@ function LatestResultCard({ round }: { round: DailyRound }) {
   const gainPositive = result.finalOutcome ? result.finalOutcome === 'gain' : (result.valueGained ?? 0) >= 0;
 
   return (
-    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.success : colors.danger }]}>
+    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.primary : LOSS_CHIP }]}>
       <View style={styles.resultHeaderRow}>
-        <Text style={styles.resultTitle}>Latest Result · Round {round.slot.index}</Text>
-        <View style={[styles.resultPill, { backgroundColor: gainPositive ? colors.successTint : colors.dangerTint }]}>
-          <Text style={[styles.resultPillText, { color: gainPositive ? colors.success : colors.danger }]}>
+        <View style={styles.resultHeaderText}>
+          <Text style={styles.resultEyebrow}>LATEST RESULT</Text>
+          <Text style={styles.resultTitle} numberOfLines={1}>
+            Round {round.slot.index} · {formatTime12h(round.slot.submitTime)}
+          </Text>
+        </View>
+        <View style={[styles.resultPill, { backgroundColor: gainPositive ? colors.successTint : LOSS_CHIP }]}>
+          <Ionicons
+            name={gainPositive ? 'trending-up' : 'trending-down'}
+            size={14}
+            color={gainPositive ? colors.success : LOSS_TEXT}
+          />
+          <Text
+            style={[styles.resultPillText, { color: gainPositive ? colors.success : LOSS_TEXT }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
             {formatSigned(result.valueGained ?? 0)}
           </Text>
         </View>
       </View>
-      <Text style={styles.resultSubtitle}>
-        You picked {result.userPrediction ?? '—'} · Avg Pick {result.average != null ? result.average.toFixed(2) : '—'} ·
-        Deviation {result.distance != null ? result.distance.toFixed(2) : '—'}
+
+      {/* Three plain figures. It used to read "Avg Pick 0.00 · Deviation 3.00",
+          which says nothing unless you already know how scoring works. */}
+      <View style={styles.resultStats}>
+        <ResultStat label="You picked" value={result.userPrediction ?? '—'} />
+        <ResultStat
+          label="Crowd average"
+          value={result.average != null ? result.average.toFixed(2) : '—'}
+        />
+        <ResultStat label="You were off by" value={result.distance != null ? result.distance.toFixed(2) : '—'} />
+      </View>
+
+      <Text style={styles.resultHint}>
+        Scoring follows the crowd's average pick — the closer your number, the more you keep.
       </Text>
     </Card>
+  );
+}
+
+function ResultStat({ label, value }: { label: string; value: string | number }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.resultStatCell}>
+      <Text style={styles.resultStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {value}
+      </Text>
+      <Text style={styles.resultStatLabel} numberOfLines={2}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -431,11 +473,46 @@ function createStyles(colors: Colors) {
     banner: { width: '100%', height: '100%' },
     countdownWrap: { marginTop: spacing.lg },
     resultCard: { marginTop: spacing.lg, borderWidth: 1.5 },
-    resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    resultTitle: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
-    resultPill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-    resultPillText: { ...typography.small, fontWeight: '800' },
-    resultSubtitle: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.xs },
+    resultHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    resultHeaderText: { flex: 1, minWidth: 0 },
+    resultEyebrow: { ...typography.tiny, color: colors.textDim, fontWeight: '800', letterSpacing: 1 },
+    resultTitle: { ...typography.body, color: colors.text, fontWeight: '800', marginTop: 2 },
+    resultPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 5,
+    },
+    resultPillText: { ...typography.small, fontWeight: '900' },
+    resultStats: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+    // three across: 30% basis each so they wrap rather than squeeze on a narrow phone
+    resultStatCell: {
+      flexGrow: 1,
+      flexBasis: '30%',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: 4,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    resultStatValue: { ...typography.h2, color: colors.text, fontWeight: '900' },
+    resultStatLabel: {
+      ...typography.tiny,
+      color: colors.textMuted,
+      fontWeight: '700',
+      marginTop: 2,
+      textAlign: 'center',
+    },
+    resultHint: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 16 },
     ctaCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceRaised },
     ctaIconCircle: {
       width: 44,
