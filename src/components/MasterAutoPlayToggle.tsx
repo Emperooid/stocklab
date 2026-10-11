@@ -9,9 +9,11 @@ import { ROUND_SLOTS } from '../lib/schedule';
 /**
  * Master "turn every round's Auto Play on/off at once" toggle, via
  * UU_Universal — sits above the per-round RoundAutoPlayControl list.
- * Reflects ON only when every round is currently enabled: a plain Switch
- * has no honest way to show a partial/mixed state, so "all on" is the only
- * state that reads as ON here, matching a standard "select all" checkbox.
+ * Reflects ON only when every tracked round is enabled: a plain Switch has no
+ * honest way to show a partial/mixed state, so "all on" is the only state that
+ * reads as ON here, matching a standard "select all" checkbox. "Tracked" means
+ * the rounds the backend returns an Auto Play record for — see the note on
+ * `allEnabled` for why counting all 24 was wrong.
  */
 export function MasterAutoPlayToggle() {
   const colors = useColors();
@@ -22,7 +24,14 @@ export function MasterAutoPlayToggle() {
 
   if (!loaded) return null;
 
-  const allEnabled = ROUND_SLOTS.every((slot) => slots[slot.id]?.enabled);
+  // Count only the rounds the backend actually tracks. A2 returns one record per
+  // round it can play — live, that is 8..23 (round 18 absent), and 0..7 have no
+  // record at all because they settled before Auto Play was ever armed. Demanding
+  // all 24 made this read OFF with every armed round genuinely on, which is the
+  // whole of "Auto Play turns itself off after a refresh" — the settings were
+  // saved and returned correctly the entire time; this switch was lying.
+  const tracked = ROUND_SLOTS.filter((slot) => slots[slot.id] != null);
+  const allEnabled = tracked.length > 0 && tracked.every((slot) => slots[slot.id]?.enabled);
 
   return (
     <Card style={styles.card}>
