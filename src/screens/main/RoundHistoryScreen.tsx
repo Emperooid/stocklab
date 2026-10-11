@@ -235,9 +235,17 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
           {entry.rounds.map((r) => (
             <View key={r.slot.id} style={styles.detailRow}>
               <Text style={styles.detailLabel}>Round {r.slot.index}</Text>
+              {/* Both figures the round is judged on, and always both shown: what the
+                  player picked, and the crowd value they had to be near. It used to
+                  read "picked 3 · Avg 2.40" — "Avg" meant nothing, and the crowd
+                  value vanished from the row when the backend didn't send it. */}
               <Text style={styles.detailInfo}>
-                {r.prediction ? `picked ${r.prediction.value}` : 'no stock pick'}
-                {r.result?.average != null ? ` · Avg ${r.result.average.toFixed(2)}` : ''}
+                Picked <Text style={styles.detailValue}>{r.prediction ? r.prediction.value : '—'}</Text>
+                {'   ·   '}
+                Crowd value{' '}
+                <Text style={styles.detailValue}>
+                  {r.result?.average != null ? r.result.average.toFixed(2) : '—'}
+                </Text>
               </Text>
               <Text
                 style={[
@@ -299,6 +307,7 @@ function createStyles(colors: Colors) {
     detailRow: { flexDirection: 'row', alignItems: 'center' },
     detailLabel: { ...typography.small, color: colors.textMuted, width: 64 },
     detailInfo: { ...typography.small, color: colors.text, flex: 1 },
+    detailValue: { color: colors.text, fontWeight: '900' },
     detailGain: { ...typography.small, fontWeight: '700', width: 90, textAlign: 'right' },
     modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
     modalSheet: {
