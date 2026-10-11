@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -10,9 +10,15 @@ import { EmptyState } from '../../components/EmptyState';
 import { DepositModal } from '../../components/DepositModal';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
+import { useRoundsStore } from '../../store/roundsStore';
+import { api } from '../../api';
+import { localDateKey } from '../../lib/schedule';
 import { WalletPeriodTotals, WalletTransaction } from '../../types';
 import { computeGainPercent, formatMoney, formatPercent, formatSigned } from '../../lib/format';
 import { MainStackParamList } from '../../navigation/types';
+
+/** What a round row can be joined to: the number played, and the crowd value. */
+type RoundFigures = { picked?: number; crowd?: number };
 
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
@@ -37,6 +43,40 @@ export default function WalletScreen() {
 
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [totalsPeriod, setTotalsPeriod] = useState<'today' | 'month'>('today');
+
+  // A transaction row only carries an amount, so the number played and the crowd
+  // value have to be joined back on from the round's own record. Today's rounds
+  // are already in the store; the rest of the month comes from G14, because the
+  // wallet lists the month but the store only ever holds today.
+  const rounds = useRoundsStore((s) => s.rounds);
+  const [monthFigures, setMonthFigures] = useState<Record<string, RoundFigures>>({});
+
+  useEffect(() => {
+    const now = new Date();
+    api.rounds
+      .getHistory(now.getFullYear(), now.getMonth())
+      .then((entries) => {
+        const map: Record<string, RoundFigures> = {};
+        for (const entry of entries) {
+          for (const r of entry.rounds) {
+            if (r.prediction?.value == null && r.result?.average == null) continue;
+            map[`${entry.date}:${r.slot.index}`] = { picked: r.prediction?.value, crowd: r.result?.average };
+          }
+        }
+        setMonthFigures(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  const figures = useMemo(() => {
+    const map: Record<string, RoundFigures> = { ...monthFigures };
+    const todayKey = localDateKey(new Date());
+    for (const r of rounds) {
+      if (r.prediction?.value == null && r.result?.average == null) continue;
+      map[`${todayKey}:${r.slot.index}`] = { picked: r.prediction?.value, crowd: r.result?.average };
+    }
+    return map;
+  }, [monthFigures, rounds]);
 
   useFocusEffect(
     useCallback(() => {
@@ -84,7 +124,7 @@ export default function WalletScreen() {
         ListEmptyComponent={
           <EmptyState icon="receipt-outline" title="No transactions yet" message="Deposits, withdrawals, and round results will show up here." />
         }
-        renderItem={({ item }) => <TransactionRow tx={item} />}
+        renderItem={({ item }) => <TransactionRow tx={item} figures={figures} />}
       />
 
       <DepositModal visible={depositModalOpen} onClose={() => setDepositModalOpen(false)} />
@@ -168,10 +208,24 @@ function TotalStat({ label, value, tone }: { label: string; value: number; tone?
   );
 }
 
-function TransactionRow({ tx }: { tx: WalletTransaction }) {
+function TransactionRow({
+  tx,
+  figures,
+}: {
+  tx: WalletTransaction;
+  figures: Record<string, RoundFigures>;
+}) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const isPositive = tx.amount >= 0;
+
+  // Match on the day AND the slot: round 9 exists on every day of the month.
+  const created = new Date(tx.createdAt);
+  const played =
+    tx.roundIndex != null && !Number.isNaN(created.getTime())
+      ? figures[`${localDateKey(created)}:${tx.roundIndex}`]
+      : undefined;
+
   return (
     <Card style={styles.txCard}>
       <View style={[styles.txIconCircle, { backgroundColor: isPositive ? colors.successTint : colors.dangerTint }]}>
@@ -181,6 +235,12 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
         <Text style={styles.txDescription} numberOfLines={2}>
           {tx.description}
         </Text>
+        {tx.roundIndex != null && (
+          <Text style={styles.txFigures}>
+            Picked {played?.picked ?? '—'} · Crowd value{' '}
+            {played?.crowd != null ? played.crowd.toFixed(2) : '—'}
+          </Text>
+        )}
         <View style={styles.txMetaRow}>
           <Text style={styles.txDate}>{new Date(tx.createdAt).toLocaleString()}</Text>
           {tx.status === 'pending' && <Badge label="Pending" tone="warning" />}
@@ -245,6 +305,9 @@ function createStyles(colors: Colors) {
     gainPercentText: { ...typography.small, fontWeight: '600' },
     txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
     txIconCircle: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    // Sits between the row's title and its timestamp: the figures matter more
+    // than when it happened.
+    txFigures: { ...typography.small, color: colors.textMuted, marginTop: 2, fontWeight: '600' },
     txDescription: { ...typography.body, color: colors.text },
     txMetaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: spacing.sm },
     txDate: { ...typography.tiny, color: colors.textMuted },

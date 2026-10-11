@@ -1051,6 +1051,13 @@ function mapResult(roundId: string, raw: any) {
 function mapTransaction(raw: any): WalletTransaction {
   const labelId = raw.LabelID;
   const amount = Number(raw.Amount ?? 0);
+  // Round categories put the slot index in `Label`; deposits/withdrawals put a
+  // word there ("DEPOSIT"), so only keep it when it really is a number.
+  const parsedLabel = Number(raw.Label);
+  const roundIndex =
+    labelId === 'D' || labelId === 'W' || raw.Label == null || !Number.isFinite(parsedLabel)
+      ? undefined
+      : parsedLabel;
   const createdAt = `${raw.Datein ?? ''}T${raw.Timein ?? '00:00:00'}`;
 
   let type: WalletTransaction['type'];
@@ -1076,6 +1083,7 @@ function mapTransaction(raw: any): WalletTransaction {
     amount,
     createdAt,
     description,
+    roundIndex,
   };
 }
 

@@ -63,6 +63,8 @@ export interface WalletTransaction {
   amount: number;
   createdAt: string;
   description: string;
+  /** Round rows only: RoundSlot.index, so the row can be joined to its figures. */
+  roundIndex?: number;
   status?: TransactionStatus; // deposits/withdrawals only; round entries are always final
 }
 
