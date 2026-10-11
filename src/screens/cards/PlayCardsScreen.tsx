@@ -64,7 +64,7 @@ export default function PlayCardsScreen() {
 
       <Text style={styles.subtitle}>
         Someone has hidden a figure behind each of these. Match the stake, pick your number, and if it lands
-        on theirs you take 80% of the pot.
+        on theirs you win.
       </Text>
 
       {playable.length > 0 && (
@@ -144,7 +144,7 @@ export default function PlayCardsScreen() {
           <Ionicons name="bulb-outline" size={16} color={colors.primary} />
           <Text style={styles.tipText}>
             Every figure is equally likely, so there's no clever pick — only a confident one. A match pays
-            back 80% of the two stakes combined.
+            out.
           </Text>
         </View>
       </CardPanel>

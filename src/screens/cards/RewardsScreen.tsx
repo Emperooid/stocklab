@@ -223,7 +223,6 @@ export default function RewardsScreen() {
             const won = iWon(card);
             const pot = potFor(card.amount);
             const payout = card.payout ?? payoutFor(card.amount);
-            const fee = pot - payout;
             return (
               <CardPanel key={card.id} tone={won ? 'gold' : 'deep'} style={styles.resultPanel}>
                 <View style={styles.resultRow}>
@@ -262,7 +261,7 @@ export default function RewardsScreen() {
 
                     <View style={styles.resultFoot}>
                       <Text style={styles.potLine} numberOfLines={1}>
-                        Pot {formatMoney(pot)} · fee {formatMoney(fee)}
+                        Pot {formatMoney(pot)}
                       </Text>
                       <Text style={styles.dateLine} numberOfLines={1}>
                         {formatResultDate(card.createdAt)}
@@ -293,7 +292,7 @@ export default function RewardsScreen() {
         <View style={styles.footnoteRow}>
           <Ionicons name="information-circle-outline" size={15} color={colors.blue} />
           <Text style={styles.footnoteText}>
-            Winners take 80% of the combined pot. The remaining 20% is the platform fee.
+            Match a card to win — every card is settled the moment it is answered.
           </Text>
         </View>
       </CardPanel>

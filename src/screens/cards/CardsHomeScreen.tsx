@@ -271,7 +271,7 @@ export default function CardsHomeScreen() {
         <View style={styles.rules}>
           <Ionicons name="bulb" size={20} color={colors.primary} />
           <Text style={styles.rulesText}>
-            Match the originator&apos;s figure to win 80% of the pot.
+            Match the originator&apos;s figure to win.
           </Text>
         </View>
       </CardPanel>

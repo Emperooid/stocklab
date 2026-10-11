@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, radius, useColors } from '../../theme/theme';
 import { formatMoney } from '../../lib/format';
-import { PLATFORM_SHARE, WINNER_SHARE, payoutFor, potFor } from '../../store/cardsStore';
+import { payoutFor, potFor } from '../../store/cardsStore';
 
 interface PotBreakdownProps {
   amount: number;
@@ -18,13 +18,12 @@ interface PotBreakdownProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Total pot → winner's 80% → the house's 20%. */
+/** Total pot → what the winner is paid. No fee line: the split isn't disclosed. */
 export function PotBreakdown({ amount, won, payout: reported, style }: PotBreakdownProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const pot = potFor(amount);
   const payout = reported ?? payoutFor(amount);
-  const fee = pot - payout;
 
   return (
     <View style={[styles.wrap, style]}>
@@ -33,19 +32,10 @@ export function PotBreakdown({ amount, won, payout: reported, style }: PotBreakd
       <Row
         colors={colors}
         styles={styles}
-        label={`Winner gets (${Math.round(WINNER_SHARE * 100)}%)`}
+        label="Winner gets"
         value={formatMoney(payout)}
         icon="trophy"
         highlight={won === true ? 'win' : won === false ? 'lose' : undefined}
-      />
-      <View style={styles.divider} />
-      <Row
-        colors={colors}
-        styles={styles}
-        label={`Platform fee (${Math.round(PLATFORM_SHARE * 100)}%)`}
-        value={formatMoney(fee)}
-        icon="business-outline"
-        muted
       />
     </View>
   );
@@ -56,7 +46,6 @@ function Row({
   value,
   icon,
   highlight,
-  muted,
   colors,
   styles,
 }: {
@@ -64,7 +53,6 @@ function Row({
   value: string;
   icon: keyof typeof Ionicons.glyphMap;
   highlight?: 'win' | 'lose';
-  muted?: boolean;
   colors: Colors;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -72,12 +60,12 @@ function Row({
   return (
     <View style={styles.row}>
       <View style={styles.iconWrap}>
-        <Ionicons name={icon} size={16} color={muted ? colors.textDim : colors.warning} />
+        <Ionicons name={icon} size={16} color={colors.warning} />
       </View>
-      <Text style={[styles.label, muted && styles.labelMuted]} numberOfLines={1}>
+      <Text style={styles.label} numberOfLines={1}>
         {label}
       </Text>
-      <Text style={[styles.value, { color: colour }, muted && styles.labelMuted]} numberOfLines={1}>
+      <Text style={[styles.value, { color: colour }]} numberOfLines={1}>
         {value}
       </Text>
     </View>
@@ -93,7 +81,6 @@ function createStyles(colors: Colors) {
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
     iconWrap: { width: 22, alignItems: 'center' },
     label: { color: colors.textMuted, fontSize: 13, fontWeight: '700', flex: 1 },
-    labelMuted: { color: colors.textDim },
     value: { fontSize: 15, fontWeight: '900' },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   });
