@@ -58,12 +58,28 @@ export function AutoPlayFigureOverview({ rounds }: { rounds: DailyRound[] }) {
 
   return (
     <Card style={styles.card}>
-      <TouchableOpacity style={styles.header} onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.title}>Figure per Round</Text>
-          <Text style={styles.subtitle}>Set a different Auto Play figure for each round, all from one place.</Text>
+      <TouchableOpacity
+        style={styles.header}
+        onPress={() => setExpanded((v) => !v)}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Auto set daily figure per round"
+        accessibilityState={{ expanded }}
+      >
+        <View style={styles.headerIcon}>
+          <Ionicons name="options-outline" size={18} color={colors.primary} />
         </View>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Auto Set Daily Figure</Text>
+          <Text style={styles.subtitle}>Set every round's Auto Play figure for the day, all in one place.</Text>
+          <View style={styles.tapHint}>
+            <Text style={styles.tapHintText}>{expanded ? 'Tap to close' : 'Tap to set'}</Text>
+            <Ionicons name="arrow-forward" size={12} color={colors.primary} />
+          </View>
+        </View>
+        <View style={styles.chevronCircle}>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+        </View>
       </TouchableOpacity>
 
       {expanded && (
@@ -126,9 +142,44 @@ export function AutoPlayFigureOverview({ rounds }: { rounds: DailyRound[] }) {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     card: { marginTop: spacing.lg },
-    header: { flexDirection: 'row', alignItems: 'center' },
-    title: { ...typography.body, color: colors.text, fontWeight: '700' },
+    // Reads as a button rather than a label: tinted fill, primary border, its own
+    // icon, and the chevron inset in a circle. Before it was a bare row with a
+    // small grey chevron, so nothing suggested it could be tapped.
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.sm + 2,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryTint,
+    },
+    headerIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    headerText: { flex: 1, minWidth: 0 },
+    chevronCircle: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    title: { ...typography.body, color: colors.text, fontWeight: '800' },
     subtitle: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
+    tapHint: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
+    tapHintText: { ...typography.tiny, color: colors.primary, fontWeight: '900' },
     list: { gap: spacing.sm, marginTop: spacing.md },
     row: {
       flexDirection: 'row',
