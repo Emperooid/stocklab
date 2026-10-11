@@ -114,13 +114,27 @@ export default function HomeScreen() {
       <Card style={styles.balanceCard}>
           <View style={styles.balanceTopRow}>
             <Text style={styles.balanceLabel}>Your Balance</Text>
-            <View style={[styles.profitPill, { backgroundColor: isProfitPositive ? colors.successTint : colors.dangerTint }]}>
+            {/* Don't hue-code on the green hero: `success` IS colors.primary, so a
+                profit used to render in the card's own background colour — invisible —
+                and the loss red clashed with it. Solid chips instead: white for a gain,
+                ink for a loss, both far past the contrast the tints managed. */}
+            <View
+              style={[
+                styles.profitPill,
+                { backgroundColor: isProfitPositive ? colors.onPrimary : colors.ink },
+              ]}
+            >
               <Ionicons
                 name={isProfitPositive ? 'trending-up' : 'trending-down'}
                 size={12}
-                color={isProfitPositive ? colors.success : colors.danger}
+                color={isProfitPositive ? colors.primaryDark : colors.onPrimary}
               />
-              <Text style={[styles.profitPillText, { color: isProfitPositive ? colors.success : colors.danger }]}>
+              <Text
+                style={[
+                  styles.profitPillText,
+                  { color: isProfitPositive ? colors.primaryDark : colors.onPrimary },
+                ]}
+              >
                 {formatPercent(totalProfitPercent)}
               </Text>
             </View>
@@ -128,9 +142,15 @@ export default function HomeScreen() {
           <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
           {formatMoney(balance)}
         </Text>
-          <Text style={[styles.profit, { color: isProfitPositive ? colors.success : colors.danger }]}>
-            {formatSigned(totalProfit)} today
-          </Text>
+          <View style={styles.profitRow}>
+            <Ionicons
+              name={isProfitPositive ? 'arrow-up' : 'arrow-down'}
+              size={13}
+              color={colors.onPrimary}
+            />
+            {/* White, like the balance above it — the arrow carries the direction. */}
+            <Text style={styles.profit}>{formatSigned(totalProfit)} today</Text>
+          </View>
         </Card>
 
       <Pressable
@@ -375,7 +395,8 @@ function createStyles(colors: Colors) {
     profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
     profitPillText: { ...typography.tiny, fontWeight: '700' },
     balance: { ...typography.h1, color: colors.onPrimary, marginTop: spacing.xs },
-    profit: { ...typography.small, marginTop: 4, fontWeight: '600', color: colors.onPrimary },
+    profitRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+    profit: { ...typography.small, fontWeight: '700', color: colors.onPrimary },
     bannerWrap: { marginTop: spacing.lg },
     // The radius lives on a clipping wrapper, not on the Image: borderRadius +
     // overflow on a raster <Image> is unreliable on iOS and Android, so the
