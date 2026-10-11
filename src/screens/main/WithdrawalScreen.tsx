@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
@@ -9,13 +10,6 @@ import { FormError } from '../../components/FormError';
 import { Badge, BadgeTone } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
 import { BankPickerModal } from '../../components/BankPickerModal';
-import { AppIcon } from '../../components/AppIcon';
-import { IconBubble } from '../../components/IconBubble';
-import { ListItem } from '../../components/ListItem';
-import { SectionHeader } from '../../components/SectionHeader';
-import { StatTile } from '../../components/StatTile';
-import { PageHeader } from '../../components/Decor';
-import { IconName } from '../../theme/icons';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
 import { useAuthStore } from '../../store/authStore';
@@ -116,18 +110,27 @@ export default function WithdrawalScreen() {
 
   return (
     <Screen>
-      <PageHeader title="Withdraw" subtitle="Send your balance straight to your bank" icon="withdraw" color={colors.accent} />
-
       <View style={styles.statsRow}>
-        <StatTile icon="wallet" label="Total Balance" value={formatMoney(balance)} color={colors.teal} />
-        <StatTile icon="withdraw" label="Total Withdrawn" value={formatMoney(totalWithdrawn)} color={colors.accent} />
+        <Card style={styles.statCard}>
+          <Ionicons name="wallet-outline" size={18} color={colors.primary} style={{ marginBottom: 6 }} />
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+            {formatMoney(balance)}
+          </Text>
+          <Text style={styles.statLabel}>Total Balance</Text>
+        </Card>
+        <Card style={styles.statCard}>
+          <Ionicons name="arrow-up-circle-outline" size={18} color={colors.primary} style={{ marginBottom: 6 }} />
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+            {formatMoney(totalWithdrawn)}
+          </Text>
+          <Text style={styles.statLabel}>Total Withdrawn</Text>
+        </Card>
       </View>
 
       <BankAccountCard />
 
-      <Card tone="primary" style={styles.formCard}>
-        <SectionHeader title="Withdraw" eyebrow="AMOUNT" style={styles.formHeader} />
-
+      <Card style={styles.formCard}>
+        <Text style={styles.sectionTitle}>Withdraw</Text>
         <Input
           value={amount}
           onChangeText={(t) => {
@@ -137,18 +140,14 @@ export default function WithdrawalScreen() {
           keyboardType="number-pad"
           placeholder="Amount to withdraw (₦)"
           editable={!otpSent}
-          leftIcon="coin"
+          style={{ marginTop: spacing.sm }}
         />
-
-        <Card tone="amber" padded={false} style={styles.limitStrip}>
-          <View style={styles.limitRow}>
-            <AppIcon name="info" size={17} color={colors.warning} style={styles.limitIcon} />
-            <Text style={styles.limitText}>Available: {formatMoney(balance)}</Text>
-            <Text style={styles.maxLink} onPress={() => setAmount(String(Math.floor(balance)))}>
-              Use Max
-            </Text>
-          </View>
-        </Card>
+        <View style={styles.availableRow}>
+          <Text style={styles.availableText}>Available: {formatMoney(balance)}</Text>
+          <Text style={styles.maxLink} onPress={() => setAmount(String(Math.floor(balance)))}>
+            Use Max
+          </Text>
+        </View>
 
         {otpSent && (
           <>
@@ -157,16 +156,14 @@ export default function WithdrawalScreen() {
               onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
               keyboardType="number-pad"
               placeholder="Verification code"
-              leftIcon="lock"
-              containerStyle={styles.fieldGap}
+              style={{ marginTop: spacing.sm }}
             />
             <Input
               value={password}
               onChangeText={setPassword}
               placeholder="Your login password"
               secureTextEntry
-              leftIcon="shield-check"
-              containerStyle={styles.fieldGap}
+              style={{ marginTop: spacing.sm }}
             />
             <Text style={styles.resendLink} onPress={handleSendOtp}>
               Resend code
@@ -179,32 +176,25 @@ export default function WithdrawalScreen() {
         {!otpSent ? (
           <Button
             title="Send Code"
-            icon="send"
             onPress={handleSendOtp}
             loading={sendingOtp}
             disabled={!linkedBankAccount}
             style={{ marginTop: spacing.md }}
           />
         ) : (
-          <Button
-            title="Confirm Withdrawal"
-            icon="check"
-            onPress={handleSubmit}
-            loading={submitting}
-            style={{ marginTop: spacing.md }}
-          />
+          <Button title="Confirm Withdrawal" onPress={handleSubmit} loading={submitting} style={{ marginTop: spacing.md }} />
         )}
       </Card>
 
-      <SectionHeader title="Withdrawal History" eyebrow="PAST REQUESTS" />
+      <Text style={[styles.sectionTitle, styles.historyTitle]}>Withdrawal History</Text>
       {loadingHistory ? (
         <Text style={styles.bankPlaceholder}>Loading…</Text>
       ) : withdrawalHistory.length === 0 ? (
         <Card>
-          <EmptyState illustration="empty" title="No withdrawal requests yet" message="Requests you make will show up here." />
+          <EmptyState icon="time-outline" title="No withdrawal requests yet" message="Requests you make will show up here." />
         </Card>
       ) : (
-        <View style={styles.historyList}>
+        <View style={{ gap: spacing.sm }}>
           {withdrawalHistory.map((entry) => (
             <WithdrawalHistoryRow key={entry.id} entry={entry} />
           ))}
@@ -372,15 +362,9 @@ function BankAccountCard() {
   }
 
   return (
-    <Card tone="info" style={styles.bankCard}>
+    <Card style={styles.bankCard}>
       <View style={styles.bankCardHeader}>
-        <View style={styles.bankCardTitleRow}>
-          <IconBubble name="bank" size={44} iconSize={22} color={colors.blue} />
-          <View style={styles.bankCardTitleText}>
-            <Text style={styles.eyebrow}>PAYOUT ACCOUNT</Text>
-            <Text style={styles.sectionTitle}>Payout account</Text>
-          </View>
-        </View>
+        <Text style={styles.sectionTitle}>Payout account</Text>
         {step === 'view' && !!linkedBankAccount && (
           <Text style={styles.changeLink} onPress={startReset}>
             Change
@@ -392,15 +376,15 @@ function BankAccountCard() {
         (loadingBank ? (
           <Text style={styles.bankPlaceholder}>Loading…</Text>
         ) : linkedBankAccount ? (
-          <View style={styles.bankDetailList}>
-            <BankDetailRow icon="bank-outline" tint={colors.blue} label="Bank" value={linkedBankAccount.bankName} />
-            <BankDetailRow icon="card" tint={colors.primary} label="Account" value={linkedBankAccount.accountNumber} />
-            <BankDetailRow icon="user-outline" tint={colors.teal} label="Name" value={linkedBankAccount.fullName} />
-          </View>
+          <>
+            <BankDetailRow label="Bank" value={linkedBankAccount.bankName} />
+            <BankDetailRow label="Account" value={linkedBankAccount.accountNumber} />
+            <BankDetailRow label="Name" value={linkedBankAccount.fullName} />
+          </>
         ) : (
           <>
             <Text style={styles.bankPlaceholder}>Add a bank account to withdraw to.</Text>
-            <Button title="Add Bank Account" icon="plus" size="sm" onPress={startAdd} style={{ marginTop: spacing.md }} />
+            <Button title="Add Bank Account" size="sm" onPress={startAdd} style={{ marginTop: spacing.md }} />
           </>
         ))}
 
@@ -412,47 +396,32 @@ function BankAccountCard() {
             onChangeText={(t) => setAccountNumber(t.replace(/[^0-9]/g, '').slice(0, 10))}
             keyboardType="number-pad"
             placeholder="10-digit account number"
-            leftIcon="card"
-            containerStyle={styles.fieldGap}
+            style={{ marginTop: spacing.sm }}
           />
           <AccountVerificationStatus verifying={verifying} verifiedName={verifiedAccountName} error={verifyError} />
           {!!error && <FormError message={error} />}
           <View style={styles.stepActions}>
-            <View style={styles.stepAction}>
-              <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
-            </View>
-            <View style={styles.stepAction}>
-              <Button
-                title="Save Payout Details"
-                icon="check"
-                size="sm"
-                loading={saving}
-                disabled={!verifiedAccountName}
-                onPress={handleSave}
-              />
-            </View>
+            <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
+            <Button
+              title="Save Payout Details"
+              size="sm"
+              loading={saving}
+              disabled={!verifiedAccountName}
+              onPress={handleSave}
+            />
           </View>
         </View>
       )}
 
       {step === 'reset' && !otpSent && (
         <View>
-          <Card tone="amber" padded={false} style={styles.infoStrip}>
-            <View style={styles.infoRow}>
-              <IconBubble name="shield" size={36} iconSize={18} color={colors.amber} />
-              <Text style={styles.infoText}>
-                Changing your payout account needs a verification code sent to your phone, plus your login password.
-              </Text>
-            </View>
-          </Card>
+          <Text style={styles.bankPlaceholder}>
+            Changing your payout account needs a verification code sent to your phone, plus your login password.
+          </Text>
           {!!error && <FormError message={error} />}
           <View style={styles.stepActions}>
-            <View style={styles.stepAction}>
-              <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
-            </View>
-            <View style={styles.stepAction}>
-              <Button title="Send Code" icon="send" size="sm" loading={sendingOtp} onPress={handleSendOtp} />
-            </View>
+            <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
+            <Button title="Send Code" size="sm" loading={sendingOtp} onPress={handleSendOtp} />
           </View>
         </View>
       )}
@@ -464,24 +433,21 @@ function BankAccountCard() {
             onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
             keyboardType="number-pad"
             placeholder="Verification code"
-            leftIcon="lock"
           />
           <Input
             value={password}
             onChangeText={setPassword}
             placeholder="Your login password"
             secureTextEntry
-            leftIcon="shield-check"
-            containerStyle={styles.fieldGap}
+            style={{ marginTop: spacing.sm }}
           />
-          <BankSelectField value={bankName} onPress={() => setBankPickerOpen(true)} placeholder="New bank" style={styles.fieldGap} />
+          <BankSelectField value={bankName} onPress={() => setBankPickerOpen(true)} placeholder="New bank" style={{ marginTop: spacing.sm }} />
           <Input
             value={accountNumber}
             onChangeText={(t) => setAccountNumber(t.replace(/[^0-9]/g, '').slice(0, 10))}
             keyboardType="number-pad"
             placeholder="New 10-digit account number"
-            leftIcon="card"
-            containerStyle={styles.fieldGap}
+            style={{ marginTop: spacing.sm }}
           />
           <AccountVerificationStatus verifying={verifying} verifiedName={verifiedAccountName} error={verifyError} />
           {!!error && <FormError message={error} />}
@@ -489,19 +455,14 @@ function BankAccountCard() {
             Resend code
           </Text>
           <View style={styles.stepActions}>
-            <View style={styles.stepAction}>
-              <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
-            </View>
-            <View style={styles.stepAction}>
-              <Button
-                title="Confirm Change"
-                icon="check"
-                size="sm"
-                loading={saving}
-                disabled={!verifiedAccountName}
-                onPress={handleConfirmReset}
-              />
-            </View>
+            <Button title="Cancel" variant="ghost" size="sm" onPress={() => setStep('view')} />
+            <Button
+              title="Confirm Change"
+              size="sm"
+              loading={saving}
+              disabled={!verifiedAccountName}
+              onPress={handleConfirmReset}
+            />
           </View>
         </View>
       )}
@@ -533,17 +494,10 @@ function BankSelectField({
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable
-      style={({ pressed }) => [styles.bankSelectField, style, pressed && styles.pressed]}
-      onPress={onPress}
-      accessibilityRole="button"
-    >
-      <IconBubble name="bank" size={36} iconSize={18} color={colors.blue} />
-      <Text style={[styles.bankSelectText, value ? styles.bankSelectValue : styles.bankSelectPlaceholder]} numberOfLines={1}>
-        {value || placeholder}
-      </Text>
-      <AppIcon name="chevron-down" size={18} color={colors.textMuted} />
-    </Pressable>
+    <TouchableOpacity style={[styles.bankSelectField, style]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={value ? styles.bankSelectValue : styles.bankSelectPlaceholder}>{value || placeholder}</Text>
+      <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
@@ -559,7 +513,7 @@ function AccountVerificationStatus({ verifying, verifiedName, error }: { verifyi
 
   if (verifying) {
     return (
-      <View style={[styles.verifyBox, styles.verifyBoxPending]}>
+      <View style={[styles.verifyBox, { marginTop: spacing.sm }]}>
         <ActivityIndicator size="small" color={colors.primary} />
         <Text style={styles.verifyingText}>Verifying account…</Text>
       </View>
@@ -567,8 +521,8 @@ function AccountVerificationStatus({ verifying, verifiedName, error }: { verifyi
   }
   if (verifiedName) {
     return (
-      <View style={[styles.verifyBox, styles.verifyBoxSuccess]}>
-        <AppIcon name="check" size={16} color={colors.success} />
+      <View style={[styles.verifyBox, styles.verifyBoxSuccess, { marginTop: spacing.sm }]}>
+        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
         <Text style={styles.verifiedNameText} numberOfLines={1}>
           {verifiedName}
         </Text>
@@ -577,8 +531,8 @@ function AccountVerificationStatus({ verifying, verifiedName, error }: { verifyi
   }
   if (error) {
     return (
-      <View style={[styles.verifyBox, styles.verifyBoxError]}>
-        <AppIcon name="alert" size={16} color={colors.danger} />
+      <View style={[styles.verifyBox, styles.verifyBoxError, { marginTop: spacing.sm }]}>
+        <Ionicons name="alert-circle" size={16} color={colors.danger} />
         <Text style={styles.verifyErrorText}>{error}</Text>
       </View>
     );
@@ -586,10 +540,15 @@ function AccountVerificationStatus({ verifying, verifiedName, error }: { verifyi
   return null;
 }
 
-function BankDetailRow({ label, value, icon, tint }: { label: string; value: string; icon: IconName; tint: string }) {
+function BankDetailRow({ label, value }: { label: string; value: string }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return <ListItem icon={icon} iconColor={tint} title={value} subtitle={label} style={styles.bankRow} />;
+  return (
+    <View style={styles.bankRow}>
+      <Text style={styles.bankRowLabel}>{label}</Text>
+      <Text style={styles.bankRowValue}>{value}</Text>
+    </View>
+  );
 }
 
 const STATUS_META: Record<WithdrawalHistoryEntry['status'], { label: string; tone: BadgeTone }> = {
@@ -604,18 +563,15 @@ function WithdrawalHistoryRow({ entry }: { entry: WithdrawalHistoryEntry }) {
   return (
     <Card style={styles.historyCard}>
       <View style={styles.historyHeaderRow}>
-        <View style={styles.historyTitleRow}>
-          <IconBubble name="withdraw" size={40} iconSize={20} color={colors.accent} />
-          <Text style={styles.historyDate}>{new Date(entry.dateRequested).toLocaleString()}</Text>
-        </View>
+        <Text style={styles.historyDate}>{new Date(entry.dateRequested).toLocaleString()}</Text>
         <Badge label={label} tone={tone} />
       </View>
       <View style={styles.historyStatsRow}>
-        <View style={styles.historyStat}>
+        <View>
           <Text style={styles.historyStatLabel}>Balance Before</Text>
           <Text style={styles.historyStatValue}>{formatMoney(entry.balanceBefore)}</Text>
         </View>
-        <View style={styles.historyStat}>
+        <View>
           <Text style={styles.historyStatLabel}>Balance After</Text>
           <Text style={styles.historyStatValue}>{formatMoney(entry.balanceAfter)}</Text>
         </View>
@@ -629,91 +585,70 @@ function WithdrawalHistoryRow({ entry }: { entry: WithdrawalHistoryEntry }) {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    eyebrow: { ...typography.label, color: colors.textDim },
-    sectionTitle: { ...typography.h3, color: colors.text, marginTop: 2 },
-
-    statsRow: { flexDirection: 'row', gap: spacing.md },
-    formHeader: { marginTop: 0, marginBottom: spacing.md },
-    fieldGap: { marginTop: spacing.sm },
-
-    bankCard: { marginTop: spacing.xl },
-    bankCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
-    bankCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1, minWidth: 0 },
-    bankCardTitleText: { flex: 1, minWidth: 0 },
-    changeLink: { ...typography.small, color: colors.primary, fontWeight: '800' },
-    bankPlaceholder: { ...typography.small, color: colors.textMuted, lineHeight: 18, marginTop: spacing.sm },
-
-    bankDetailList: { marginTop: spacing.md },
-    bankRow: { borderBottomWidth: 0, paddingVertical: spacing.sm },
-
-    pressed: { opacity: 0.7 },
+    sectionTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+    statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+    statCard: { flex: 1, alignItems: 'center' },
+    statValue: { ...typography.h3, color: colors.text },
+    statLabel: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
+    bankCard: { marginTop: spacing.lg },
+    bankCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    changeLink: { ...typography.small, color: colors.primary, fontWeight: '700' },
+    resendLink: { ...typography.small, color: colors.primary, fontWeight: '700', marginTop: spacing.sm, alignSelf: 'flex-end' },
+    bankPlaceholder: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+    bankRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    bankRowLabel: { ...typography.small, color: colors.textMuted },
+    bankRowValue: { ...typography.small, color: colors.text, fontWeight: '600' },
     bankSelectField: {
       flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      gap: spacing.sm,
-      backgroundColor: colors.surfaceRaised,
+      backgroundColor: colors.surfaceAlt,
       borderWidth: 1.5,
       borderColor: colors.border,
-      borderRadius: radius.lg,
+      borderRadius: radius.md,
       paddingHorizontal: spacing.md,
-      height: 60,
-      marginTop: spacing.md,
+      height: 50,
     },
-    bankSelectText: { ...typography.body, flex: 1, fontWeight: '600' },
-    bankSelectValue: { color: colors.text },
-    bankSelectPlaceholder: { color: colors.textDim },
-
+    bankSelectValue: { ...typography.body, color: colors.text },
+    bankSelectPlaceholder: { ...typography.body, color: colors.textDim },
     verifyBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      gap: spacing.xs,
       borderRadius: radius.md,
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm + 2,
+      paddingVertical: spacing.sm,
       backgroundColor: colors.surfaceAlt,
-      marginTop: spacing.sm,
     },
-    verifyBoxPending: { backgroundColor: colors.primaryTint },
-    verifyingText: { ...typography.small, color: colors.textMuted, fontWeight: '600' },
+    verifyingText: { ...typography.small, color: colors.textMuted },
     verifyBoxSuccess: { backgroundColor: colors.successTint },
-    verifiedNameText: { ...typography.small, color: colors.success, fontWeight: '800', flex: 1, flexShrink: 1 },
+    verifiedNameText: { ...typography.small, color: colors.success, fontWeight: '700', flex: 1, flexShrink: 1 },
     verifyBoxError: { backgroundColor: colors.dangerTint },
-    verifyErrorText: { ...typography.small, color: colors.danger, fontWeight: '600', flex: 1, flexShrink: 1 },
-
-    infoStrip: { marginTop: spacing.md, borderRadius: radius.lg },
-    infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-    infoText: { ...typography.small, color: colors.text, flex: 1, lineHeight: 19 },
-
-    stepActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-    stepAction: { flex: 1 },
-
-    formCard: { marginTop: spacing.xl },
-    limitStrip: { marginTop: spacing.sm, borderRadius: radius.md },
-    limitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
-    limitIcon: { marginRight: 2 },
-    limitText: { ...typography.tiny, color: colors.text, fontWeight: '700', flex: 1 },
-    maxLink: {
-      ...typography.tiny,
-      color: colors.ink,
-      fontWeight: '800',
-      backgroundColor: colors.amber,
-      borderRadius: radius.pill,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 5,
-      overflow: 'hidden',
+    verifyErrorText: { ...typography.small, color: colors.danger, flex: 1, flexShrink: 1 },
+    stepActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
+    formCard: { marginTop: spacing.lg },
+    availableRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.xs,
     },
-
-    resendLink: { ...typography.small, color: colors.primary, fontWeight: '800', marginTop: spacing.md, alignSelf: 'flex-end' },
-
-    historyList: { gap: spacing.md },
-    historyCard: { borderRadius: radius.xl },
-    historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
-    historyTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-    historyDate: { ...typography.small, color: colors.text, fontWeight: '700', flexShrink: 1 },
-    historyStatsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-    historyStat: { flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.md },
+    availableText: { ...typography.tiny, color: colors.textMuted },
+    maxLink: { ...typography.tiny, color: colors.primary, fontWeight: '700' },
+    historyTitle: { marginTop: spacing.xl },
+    historyCard: {},
+    historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    historyDate: { ...typography.small, color: colors.text, fontWeight: '600' },
+    historyStatsRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.sm },
     historyStatLabel: { ...typography.tiny, color: colors.textMuted },
-    historyStatValue: { ...typography.small, color: colors.text, fontWeight: '700', marginTop: 2 },
-    historyCredited: { ...typography.tiny, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
+    historyStatValue: { ...typography.small, color: colors.text, fontWeight: '600', marginTop: 2 },
+    historyCredited: { ...typography.tiny, color: colors.success, marginTop: spacing.sm },
   });
 }

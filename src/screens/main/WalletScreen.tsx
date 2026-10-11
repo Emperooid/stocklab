@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
@@ -7,49 +8,26 @@ import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
 import { DepositModal } from '../../components/DepositModal';
-import { AppIcon } from '../../components/AppIcon';
-import { IconBubble } from '../../components/IconBubble';
-import { ListItem } from '../../components/ListItem';
-import { SectionHeader } from '../../components/SectionHeader';
-import { SegmentedControl } from '../../components/SegmentedControl';
-import { PageHeader } from '../../components/Decor';
-import { withAlpha } from '../../lib/color';
-import { Colors, glow, radius, shadow, spacing, typography, useColors } from '../../theme/theme';
-import { IconName } from '../../theme/icons';
+import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
 import { useWalletStore } from '../../store/walletStore';
 import { WalletPeriodTotals, WalletTransaction } from '../../types';
 import { computeGainPercent, formatMoney, formatPercent, formatSigned } from '../../lib/format';
 import { MainStackParamList } from '../../navigation/types';
 
-const TX_ICON: Record<WalletTransaction['type'], IconName> = {
-  deposit: 'deposit',
-  withdrawal: 'withdraw',
-  round_stake: 'stock',
-  round_gain: 'trend-up',
-  round_loss: 'trend-down',
+const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
+  deposit: 'arrow-down-circle',
+  withdrawal: 'arrow-up-circle',
+  round_stake: 'game-controller-outline',
+  round_gain: 'trending-up',
+  round_loss: 'trending-down',
 };
-
-/** Which palette colour each transaction type's bubble uses (money in = teal, money out = accent). */
-const TX_TINT: Record<WalletTransaction['type'], keyof Colors> = {
-  deposit: 'teal',
-  withdrawal: 'accent',
-  round_stake: 'purple',
-  round_gain: 'success',
-  round_loss: 'danger',
-};
-
-const QUICK_ACTIONS: { key: 'deposit' | 'withdrawal'; icon: IconName; label: string }[] = [
-  { key: 'deposit', icon: 'deposit', label: 'Deposit' },
-  { key: 'withdrawal', icon: 'withdraw', label: 'Withdraw' },
-];
 
 /**
- * Deposits are virtual-account only: every user gets (or already has) a
- * dedicated account via BB_getBankAccountProfile/VV_generateVirtualAccount
- * — they transfer any amount to it themselves, and the balance updates once
- * the backend credits it. The previous card-checkout (PAY) path was removed
- * entirely per explicit product decision, not kept as a fallback — see
- * httpApi.ts's top-of-file doc for the full reasoning.
+ * Deposits run through Flutterwave: DepositModal collects an amount, asks the
+ * gateway to initialize a payment (theKey "PAY") and opens the hosted checkout
+ * link it returns; the backend credits the wallet by webhook, and the modal
+ * confirms via "UPS". The virtual-account (BB/VV) flow is retained in the API
+ * and store for reference but is no longer what the deposit sheet uses.
  */
 export default function WalletScreen() {
   const colors = useColors();
@@ -69,72 +47,42 @@ export default function WalletScreen() {
 
   return (
     <Screen scroll={false}>
+      <Text style={styles.title}>Wallet</Text>
+
       <FlatList
         data={transactions}
         keyExtractor={(t) => t.id}
         refreshing={isLoading}
         onRefresh={refresh}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
         ListHeaderComponent={
           <>
-            <PageHeader title="Wallet" subtitle="Your balance, totals and history" icon="wallet" color={colors.accent} />
+            <Card style={styles.balanceCard}>
+              <Text style={styles.balanceLabel}>Available Balance</Text>
+              <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatMoney(balance)}
+              </Text>
 
-            <View style={styles.heroShadow}>
-              <View style={styles.heroCard}>
-                <View pointerEvents="none" style={[styles.heroBlob, styles.heroBlobTop]} />
-                <View pointerEvents="none" style={[styles.heroBlob, styles.heroBlobBottom]} />
-                <AppIcon name="sparkle" size={20} style={styles.heroSparkle} />
+              <View style={styles.quickActions}>
+                <QuickAction icon="arrow-down-circle" label="Deposit" active={false} onPress={() => setDepositModalOpen(true)} />
+                <QuickAction icon="arrow-up-circle" label="Withdraw" active={false} onPress={() => navigation.navigate('Withdrawal')} />
+              </View>
+            </Card>
 
-                <View style={styles.heroTopRow}>
-                  <Text style={styles.balanceLabel}>Available Balance</Text>
-                  <View style={styles.heroArt}>
-                    <AppIcon name="wallet" size={28} />
-                  </View>
-                </View>
-
-                <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                  {formatMoney(balance)}
-                </Text>
+            <View style={styles.totalsHeaderRow}>
+              <Text style={styles.totalsSectionTitle}>Your Totals</Text>
+              <View style={styles.periodSwitch}>
+                <PeriodTab label="Today" active={totalsPeriod === 'today'} onPress={() => setTotalsPeriod('today')} />
+                <PeriodTab label="This Month" active={totalsPeriod === 'month'} onPress={() => setTotalsPeriod('month')} />
               </View>
             </View>
-
-            <View style={styles.quickActions}>
-              {QUICK_ACTIONS.map((action) => (
-                <QuickAction
-                  key={action.key}
-                  icon={action.icon}
-                  label={action.label}
-                  active={false}
-                  tint={action.key === 'deposit' ? colors.teal : colors.accent}
-                  onPress={() => {
-                    if (action.key === 'deposit') setDepositModalOpen(true);
-                    else navigation.navigate('Withdrawal');
-                  }}
-                />
-              ))}
-            </View>
-
-            <SectionHeader title="Your Totals" eyebrow="PERIOD TOTALS" />
-            <SegmentedControl
-              options={[
-                { key: 'today', label: 'Today' },
-                { key: 'month', label: 'This Month' },
-              ]}
-              value={totalsPeriod}
-              onChange={setTotalsPeriod}
-            />
             <TotalsCard totals={totalsPeriod === 'today' ? dailyTotals : monthlyTotals} />
 
-            <SectionHeader title="Transaction History" eyebrow="RECENT ACTIVITY" />
+            <Text style={styles.sectionTitle}>Transaction History</Text>
           </>
         }
         ListEmptyComponent={
-          <EmptyState
-            illustration="empty"
-            title="No transactions yet"
-            message="Deposits, withdrawals, and round results will show up here."
-          />
+          <EmptyState icon="receipt-outline" title="No transactions yet" message="Deposits, withdrawals, and round results will show up here." />
         }
         renderItem={({ item }) => <TransactionRow tx={item} />}
       />
@@ -148,27 +96,32 @@ function QuickAction({
   icon,
   label,
   active,
-  tint,
   onPress,
 }: {
-  icon: IconName;
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   active: boolean;
-  tint: string;
   onPress: () => void;
 }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable
-      style={({ pressed }) => [styles.quickActionBtn, active && styles.quickActionBtnActive, pressed && styles.pressed]}
-      onPress={onPress}
-    >
-      <IconBubble name={icon} size={52} iconSize={26} color={tint} />
+    <TouchableOpacity style={[styles.quickActionBtn, active && styles.quickActionBtnActive]} onPress={onPress} activeOpacity={0.8}>
+      <Ionicons name={icon} size={18} color={active ? colors.onPrimary : colors.primary} />
       <Text style={[styles.quickActionText, active && { color: colors.onPrimary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </Text>
-    </Pressable>
+    </TouchableOpacity>
+  );
+}
+
+function PeriodTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={[styles.periodTab, active && styles.periodTabActive]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[styles.periodTabText, active && { color: colors.onPrimary }]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -183,23 +136,16 @@ function TotalsCard({ totals }: { totals: WalletPeriodTotals }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const gainPercent = computeGainPercent(totals.gains, totals.plays);
   const isPositive = gainPercent >= 0;
-  const gainsUp = totals.gains >= 0;
   return (
-    <Card tone="amber" style={styles.totalsCard}>
+    <Card style={styles.totalsCard}>
       <View style={styles.totalsGrid}>
-        <TotalStat icon="deposit" tint={colors.teal} label="Deposits" value={totals.deposits} />
-        <TotalStat icon="withdraw" tint={colors.accent} label="Withdrawals" value={totals.withdrawals} />
-        <TotalStat icon="stock" tint={colors.primary} label="Plays" value={totals.plays} />
-        <TotalStat
-          icon={gainsUp ? 'trend-up' : 'trend-down'}
-          tint={gainsUp ? colors.success : colors.danger}
-          label="Gains"
-          value={totals.gains}
-          tone={gainsUp ? 'positive' : 'negative'}
-        />
+        <TotalStat label="Deposits" value={totals.deposits} />
+        <TotalStat label="Withdrawals" value={totals.withdrawals} />
+        <TotalStat label="Plays" value={totals.plays} />
+        <TotalStat label="Gains" value={totals.gains} tone={totals.gains >= 0 ? 'positive' : 'negative'} />
       </View>
       <View style={styles.gainPercentRow}>
-        <AppIcon name={isPositive ? 'trend-up' : 'trend-down'} size={15} color={isPositive ? colors.success : colors.danger} />
+        <Ionicons name={isPositive ? 'trending-up' : 'trending-down'} size={14} color={isPositive ? colors.success : colors.danger} />
         <Text style={[styles.gainPercentText, { color: isPositive ? colors.success : colors.danger }]}>
           {formatPercent(gainPercent)} return on plays
         </Text>
@@ -208,31 +154,16 @@ function TotalsCard({ totals }: { totals: WalletPeriodTotals }) {
   );
 }
 
-function TotalStat({
-  label,
-  value,
-  tone,
-  icon,
-  tint,
-}: {
-  label: string;
-  value: number;
-  tone?: 'positive' | 'negative';
-  icon: IconName;
-  tint: string;
-}) {
+function TotalStat({ label, value, tone }: { label: string; value: number; tone?: 'positive' | 'negative' }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const color = tone === 'positive' ? colors.success : tone === 'negative' ? colors.danger : colors.text;
   return (
     <View style={styles.totalStat}>
-      <IconBubble name={icon} size={36} iconSize={18} color={tint} />
-      <View style={styles.totalStatText}>
-        <Text style={styles.totalStatLabel}>{label}</Text>
-        <Text style={[styles.totalStatValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-          {formatMoney(value)}
-        </Text>
-      </View>
+      <Text style={styles.totalStatLabel}>{label}</Text>
+      <Text style={[styles.totalStatValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {formatMoney(value)}
+      </Text>
     </View>
   );
 }
@@ -242,108 +173,81 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const isPositive = tx.amount >= 0;
   return (
-    <ListItem
-      style={styles.txCard}
-      icon={TX_ICON[tx.type]}
-      iconColor={colors[TX_TINT[tx.type]]}
-      title={tx.description}
-      subtitle={new Date(tx.createdAt).toLocaleString()}
-      right={
-        <View style={styles.txRight}>
-          <Text
-            style={[styles.txAmount, { color: isPositive ? colors.success : colors.danger }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {formatSigned(tx.amount)}
-          </Text>
-          {tx.status === 'pending' && <Badge label="Pending" tone="warning" size="sm" />}
-          {tx.status === 'failed' && <Badge label="Failed" tone="danger" size="sm" />}
+    <Card style={styles.txCard}>
+      <View style={[styles.txIconCircle, { backgroundColor: isPositive ? colors.successTint : colors.dangerTint }]}>
+        <Ionicons name={TX_ICON[tx.type]} size={18} color={isPositive ? colors.success : colors.danger} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.txDescription} numberOfLines={2}>
+          {tx.description}
+        </Text>
+        <View style={styles.txMetaRow}>
+          <Text style={styles.txDate}>{new Date(tx.createdAt).toLocaleString()}</Text>
+          {tx.status === 'pending' && <Badge label="Pending" tone="warning" />}
+          {tx.status === 'failed' && <Badge label="Failed" tone="danger" />}
         </View>
-      }
-    />
+      </View>
+      <Text style={[styles.txAmount, { color: isPositive ? colors.success : colors.danger }]}>{formatSigned(tx.amount)}</Text>
+    </Card>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    listContent: { paddingBottom: spacing.xxl },
-
-    heroShadow: { borderRadius: radius.xxl, ...glow(colors.primary) },
-    heroCard: {
-      borderRadius: radius.xxl,
-      padding: spacing.xl,
-      backgroundColor: colors.heroFrom,
-      overflow: 'hidden',
-    },
-    heroBlob: { position: 'absolute', borderRadius: 999 },
-    heroBlobTop: { width: 210, height: 210, top: -95, right: -70, backgroundColor: colors.heroTo, opacity: 0.9 },
-    heroBlobBottom: { width: 140, height: 140, bottom: -75, left: -45, backgroundColor: colors.accent, opacity: 0.4 },
-    heroSparkle: { position: 'absolute', top: spacing.lg, right: 82, opacity: 0.9 },
-    heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-    heroArt: {
-      width: 48,
-      height: 48,
-      borderRadius: 17,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: withAlpha(colors.cream, 0.24),
-    },
-    balanceLabel: { ...typography.label, color: withAlpha(colors.cream, 0.82), flexShrink: 1 },
-    balance: { ...typography.display, color: colors.cream, marginTop: spacing.md },
-
-    quickActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+    balanceCard: { marginHorizontal: spacing.lg, backgroundColor: colors.primary, borderColor: colors.primary, shadowColor: colors.primary },
+    balanceLabel: { ...typography.small, color: 'rgba(255,255,255,0.78)' },
+    balance: { ...typography.h1, color: colors.onPrimary, marginTop: 4 },
+    quickActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
     quickActionBtn: {
       flex: 1,
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingVertical: spacing.lg,
-      paddingHorizontal: spacing.sm,
-      borderRadius: radius.xl,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      ...shadow.md,
-    },
-    quickActionBtnActive: { backgroundColor: colors.primary },
-    quickActionText: { ...typography.h3, color: colors.text },
-    pressed: { opacity: 0.75 },
-
-    totalsCard: { marginTop: spacing.md },
-    totalsGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-    totalStat: {
-      width: '50%',
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      paddingVertical: spacing.sm,
+      justifyContent: 'center',
+      gap: spacing.xs,
+      height: 44,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.borderLight,
+      backgroundColor: colors.surface,
     },
-    totalStatText: { flex: 1, minWidth: 0 },
+    quickActionBtnActive: { backgroundColor: colors.primary },
+    quickActionText: { ...typography.small, color: colors.primary, fontWeight: '700' },
+    sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
+    totalsHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.xl,
+      marginBottom: spacing.md,
+      paddingHorizontal: spacing.lg,
+      gap: spacing.sm,
+    },
+    totalsSectionTitle: { ...typography.h3, color: colors.text, flexShrink: 1 },
+    periodSwitch: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, padding: 3 },
+    periodTab: { paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.pill },
+    periodTabActive: { backgroundColor: colors.primary },
+    periodTabText: { ...typography.tiny, color: colors.textMuted, fontWeight: '700' },
+    totalsCard: { marginHorizontal: spacing.lg },
+    totalsGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    totalStat: { width: '50%', paddingVertical: spacing.sm },
     totalStatLabel: { ...typography.tiny, color: colors.textMuted },
-    totalStatValue: { ...typography.body, fontWeight: '800', marginTop: 1 },
+    totalStatValue: { ...typography.body, fontWeight: '700', marginTop: 2 },
     gainPercentRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
       marginTop: spacing.sm,
-      paddingTop: spacing.md,
+      paddingTop: spacing.sm,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
-    gainPercentText: { ...typography.small, fontWeight: '700' },
-
-    txCard: {
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      paddingVertical: spacing.sm + 2,
-      paddingHorizontal: spacing.md,
-      marginBottom: spacing.sm,
-      ...shadow.sm,
-    },
-    txRight: { alignItems: 'flex-end', gap: 3 },
+    gainPercentText: { ...typography.small, fontWeight: '600' },
+    txCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+    txIconCircle: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    txDescription: { ...typography.body, color: colors.text },
+    txMetaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: spacing.sm },
+    txDate: { ...typography.tiny, color: colors.textMuted },
     txAmount: { ...typography.h3 },
   });
 }

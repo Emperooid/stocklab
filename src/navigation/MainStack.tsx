@@ -6,12 +6,13 @@ import RoundHistoryScreen from '../screens/main/RoundHistoryScreen';
 import WithdrawalScreen from '../screens/main/WithdrawalScreen';
 import NewsScreen from '../screens/main/NewsScreen';
 import InviteScreen from '../screens/main/InviteScreen';
+import LobbyWalletScreen from '../screens/main/LobbyWalletScreen';
 import SetCardScreen from '../screens/cards/SetCardScreen';
 import UnveilCardScreen from '../screens/cards/UnveilCardScreen';
 import CardResultScreen from '../screens/cards/CardResultScreen';
+import CardHistoryScreen from '../screens/cards/CardHistoryScreen';
 import { MainStackParamList } from './types';
 import { typography, useColors } from '../theme/theme';
-import { cardGame } from '../theme/cardsTheme';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -50,7 +51,7 @@ export function MainStack() {
       <Stack.Screen
         name="CardsGame"
         component={CardsTabs}
-        options={{ headerShown: false, contentStyle: { backgroundColor: cardGame.background } }}
+        options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
 
       {/* stock-rounds details */}
@@ -58,22 +59,32 @@ export function MainStack() {
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} options={{ title: 'Withdraw' }} />
       <Stack.Screen name="News" component={NewsScreen} options={{ title: 'News & Alerts' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Increase Payout' }} />
+      <Stack.Screen
+        name="LobbyWallet"
+        component={LobbyWalletScreen}
+        options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      />
 
       {/* card-duel flow — these draw their own navy headers */}
       <Stack.Screen
         name="SetCard"
         component={SetCardScreen}
-        options={{ headerShown: false, contentStyle: { backgroundColor: cardGame.background } }}
+        options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
       <Stack.Screen
         name="UnveilCard"
         component={UnveilCardScreen}
-        options={{ headerShown: false, contentStyle: { backgroundColor: cardGame.background } }}
+        options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
       <Stack.Screen
         name="CardResult"
         component={CardResultScreen}
-        options={{ headerShown: false, contentStyle: { backgroundColor: cardGame.background } }}
+        options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      />
+      <Stack.Screen
+        name="CardHistory"
+        component={CardHistoryScreen}
+        options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
     </Stack.Navigator>
   );

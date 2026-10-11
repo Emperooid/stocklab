@@ -1,8 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { ActivityIndicator, Animated, GestureResponderEvent, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { AppIcon } from '../AppIcon';
-import { IconName } from '../../theme/icons';
-import { cardGame, cardRadius, goldGlow } from '../../theme/cardsTheme';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, radius, useColors, glow } from '../../theme/theme';
 
 type CardButtonVariant = 'gold' | 'magenta' | 'cream' | 'outline' | 'ghost';
 
@@ -11,7 +10,7 @@ interface CardButtonProps {
   onPress?: () => void;
   variant?: CardButtonVariant;
   size?: 'lg' | 'md' | 'sm';
-  icon?: IconName;
+  icon?: keyof typeof Ionicons.glyphMap;
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
@@ -19,18 +18,10 @@ interface CardButtonProps {
   accessibilityLabel?: string;
 }
 
-const SKINS: Record<CardButtonVariant, { face: string; base: string; text: string; border: string; icon: string }> = {
-  gold: { face: cardGame.gold, base: cardGame.goldDeep, text: cardGame.ink, border: cardGame.goldDeep, icon: cardGame.ink },
-  magenta: { face: cardGame.magenta, base: cardGame.magentaDeep, text: '#FFFFFF', border: cardGame.magentaDeep, icon: '#FFFFFF' },
-  cream: { face: cardGame.cream, base: cardGame.creamDeep, text: cardGame.ink, border: cardGame.creamDeep, icon: cardGame.ink },
-  outline: { face: 'transparent', base: 'rgba(247,183,51,0.22)', text: cardGame.gold, border: cardGame.gold, icon: cardGame.gold },
-  ghost: { face: 'transparent', base: 'transparent', text: cardGame.gold, border: 'transparent', icon: cardGame.gold },
-};
-
 const DEPTH = { lg: 5, md: 4, sm: 3 } as const;
 const HEIGHT = { lg: 58, md: 52, sm: 44 } as const;
 
-/** The card game's own 3-D pressable — gold on the felt, not the app's violet. */
+/** The card game's own 3-D pressable — themed with the app's primary accent. */
 export function CardButton({
   title,
   onPress,
@@ -43,9 +34,28 @@ export function CardButton({
   style,
   accessibilityLabel,
 }: CardButtonProps) {
-  const skin = SKINS[variant];
-  const depth = DEPTH[size];
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const SKINS: Record<CardButtonVariant, { face: string; base: string; text: string; border: string; icon: string }> = useMemo(
+    () => ({
+      gold: { face: colors.primary, base: colors.primaryDark, text: colors.ink, border: colors.primaryDark, icon: colors.ink },
+      magenta: { face: colors.purple, base: colors.purple, text: '#FFFFFF', border: colors.purple, icon: '#FFFFFF' },
+      cream: { face: colors.cream, base: colors.cream, text: colors.ink, border: colors.cream, icon: colors.ink },
+      outline: { face: 'transparent', base: colors.primaryTint, text: colors.primary, border: colors.primary, icon: colors.primary },
+      ghost: { face: 'transparent', base: 'transparent', text: colors.primary, border: 'transparent', icon: colors.primary },
+    }),
+    [colors]
+  );
+
   const isDisabled = disabled || loading;
+  // Disabled reads as a distinct neutral state, not just a faded version of
+  // the colorful variant — CONFIRMED low-contrast complaint: the "gold"
+  // variant's dark ink text, faded to 45% opacity along with the green face,
+  // made "Pick a figure to play" nearly unreadable against the dark page.
+  const skin = isDisabled
+    ? { face: colors.surfaceAlt, base: colors.surfaceAlt, text: colors.textDim, border: colors.border, icon: colors.textDim }
+    : SKINS[variant];
+  const depth = DEPTH[size];
   // Only solid faces get the 3-D base — on a transparent face the base would
   // show straight through and read as a muddy filled button.
   const hasBase = variant === 'gold' || variant === 'magenta' || variant === 'cream';
@@ -62,16 +72,10 @@ export function CardButton({
 
   return (
     <View
-      style={[
-        styles.wrap,
-        { paddingBottom: isDisabled || !hasBase ? 0 : depth },
-        fullWidth && styles.full,
-        isDisabled && styles.disabled,
-        style,
-      ]}
+      style={[styles.wrap, { paddingBottom: isDisabled || !hasBase ? 0 : depth }, fullWidth && styles.full, style]}
     >
       {!isDisabled && hasBase && (
-        <View pointerEvents="none" style={[styles.base, { top: depth, backgroundColor: skin.base, borderRadius: cardRadius.card + 2 }]} />
+        <View pointerEvents="none" style={[styles.base, { top: depth, backgroundColor: skin.base, borderRadius: radius.lg + 2 }]} />
       )}
       <Animated.View style={{ transform: [{ translateY }] }}>
         <Pressable
@@ -83,7 +87,7 @@ export function CardButton({
           style={[
             styles.face,
             { height: HEIGHT[size], backgroundColor: skin.face, borderColor: skin.border },
-            variant === 'gold' && goldGlow(0.3),
+            !isDisabled && variant === 'gold' && glow(colors.primary),
             variant === 'ghost' && styles.ghostFace,
           ]}
         >
@@ -91,7 +95,7 @@ export function CardButton({
             <ActivityIndicator color={skin.text} />
           ) : (
             <>
-              {!!icon && <AppIcon name={icon} size={size === 'sm' ? 16 : 18} color={skin.icon} style={{ marginRight: 8 }} />}
+              {!!icon && <Ionicons name={icon} size={size === 'sm' ? 16 : 18} color={skin.icon} style={{ marginRight: 8 }} />}
               <Text style={[styles.text, { color: skin.text, fontSize: size === 'sm' ? 13.5 : 16 }]} numberOfLines={1}>
                 {title}
               </Text>
@@ -103,19 +107,20 @@ export function CardButton({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { width: '100%' },
-  full: { alignSelf: 'stretch' },
-  disabled: { opacity: 0.45 },
-  base: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  face: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: cardRadius.card + 2,
-    borderWidth: 2,
-    paddingHorizontal: 16,
-  },
-  ghostFace: { borderWidth: 0 },
-  text: { fontWeight: '900' },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    wrap: { width: '100%' },
+    full: { alignSelf: 'stretch' },
+    base: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+    face: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.lg + 2,
+      borderWidth: 2,
+      paddingHorizontal: 16,
+    },
+    ghostFace: { borderWidth: 0 },
+    text: { fontWeight: '900' },
+  });
+}

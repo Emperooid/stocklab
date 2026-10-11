@@ -1,68 +1,171 @@
-import { Image, Pressable, StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
-import { AppIcon } from '../AppIcon';
-import { CARD_ART } from '../../theme/icons';
-import { cardGame, cardRadius, goldGlow } from '../../theme/cardsTheme';
+import { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Colors, radius, useColors, glow } from '../../theme/theme';
+import { shade } from '../../lib/colorMath';
 import { formatMoney } from '../../lib/format';
 
-/** Portrait ratio of the card artwork (100 x 140 units). */
+/** Portrait ratio of a playing card (5 : 7). */
 export const CARD_RATIO = 1.4;
+
+/**
+ * hidden   — someone else's card: the figure is a secret, shown as "?"
+ * picked   — YOUR card, still unanswered: you know the figure, so it is shown
+ * revealed — both figures are public after the reveal
+ */
+type CardState = 'hidden' | 'picked' | 'revealed';
 
 interface PlayingCardProps {
   amount: number;
   /** Card width in points; height is derived. */
   size?: number;
-  /** Face up, showing the figure. */
+  /** Face up with the figure revealed to everyone. */
   revealed?: boolean;
+  /** The figure to show when `revealed`. */
   figure?: number;
+  /**
+   * YOUR hidden pick. Shows the number (only you can see it) instead of a "?".
+   * Ignored when `revealed` is set.
+   */
+  picked?: number;
   selected?: boolean;
   dimmed?: boolean;
   onPress?: () => void;
   /** Caption under the card, e.g. "Figure 1". */
   caption?: string;
+  /**
+   * Overrides the state chip. On the reveal BOTH cards are face-up, but they
+   * mean different things: the originator STORED a figure, the answering player
+   * REVEALED their guess. Same face, different role.
+   */
+  chipLabel?: string;
+  chipIcon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
- * One card. Face down it's the navy artwork with the stake printed across the
- * bottom; face up it flips to cream and shows the figure.
+ * A single card, drawn to read like a real one: gradient stock, a hairline
+ * inner frame, corner pips and a centre medallion. The stake is always printed
+ * across the bottom, and the figure appears in the middle — as "?" when it's
+ * somebody else's secret, or as the number once it's yours or revealed.
  */
 export function PlayingCard({
   amount,
   size = 92,
   revealed = false,
   figure,
+  picked,
   selected = false,
   dimmed = false,
   onPress,
   caption,
+  chipLabel,
+  chipIcon,
   style,
 }: PlayingCardProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const height = size * CARD_RATIO;
+
+  // Figures are 1-5, so a 0 (or a missing one) means "not known" — e.g. cards
+  // created before the hidden figure was remembered locally. Treat it as hidden
+  // rather than printing a bogus 0 on the card face.
+  const known = (n?: number) => (typeof n === 'number' && n > 0 ? n : undefined);
+  const state: CardState = revealed ? 'revealed' : known(picked) != null ? 'picked' : 'hidden';
+  const shown = state === 'revealed' ? known(figure) : known(picked);
+  const faceUp = state !== 'hidden';
+  // Corner pips and the status chip need room; below this the card is a chip.
+  const roomy = size >= 72;
+
+  const tone = state === 'revealed' ? colors.primary : state === 'picked' ? colors.blue : colors.primary;
+  const chip =
+    chipLabel != null
+      ? { label: chipLabel, icon: chipIcon ?? ('eye' as keyof typeof Ionicons.glyphMap) }
+      : state === 'revealed'
+        ? { label: 'REVEALED', icon: 'eye' as const }
+        : state === 'picked'
+          ? { label: 'YOUR PICK', icon: 'lock-closed' as const }
+          : { label: 'HIDDEN', icon: 'help' as const };
+
+  // Small cards can't fit "₦1,000.00" — drop the decimals rather than truncate.
+  const stakeLabel = roomy ? formatMoney(amount) : `₦${Math.round(amount).toLocaleString()}`;
+
+  const pipText = <Text style={[styles.pipNum, { fontSize: size * 0.155, color: tone }]}>{shown ?? '?'}</Text>;
 
   const body = (
     <View
       style={[
         styles.card,
-        { width: size, height },
-        revealed ? styles.cardUp : styles.cardDown,
+        { width: size, height, paddingBottom: size * (roomy ? 0.26 : 0.2) },
         selected && styles.cardSelected,
         dimmed && styles.cardDimmed,
       ]}
     >
-      {revealed ? (
+      <LinearGradient
+        colors={faceUp ? [colors.cream, shade(colors.cream, -0.08)] : [colors.surfaceRaised, shade(colors.surface, -0.05)]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.7, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* hairline frame, inset like a printed card border */}
+      <View
+        pointerEvents="none"
+        style={[styles.innerFrame, { borderRadius: Math.max(6, radius.lg - 5), borderColor: tone + (faceUp ? '2E' : '26') }]}
+      />
+
+      {roomy && (
         <>
-          <Text style={[styles.figure, { fontSize: size * 0.46 }]}>{figure ?? '—'}</Text>
-          <View style={styles.captionRow}>
-            <AppIcon name="check" size={11} color={cardGame.goldDeep} />
+          <View style={[styles.pip, styles.pipTL]}>
+            {pipText}
+            <View style={[styles.pipDot, { backgroundColor: tone }]} />
+          </View>
+          <View style={[styles.pip, styles.pipBR, { bottom: size * 0.21 + 12 }]}>
+            <Text style={[styles.pipNum, { fontSize: size * 0.155, color: tone, transform: [{ rotate: '180deg' }] }]}>
+              {shown ?? '?'}
+            </Text>
+            <View style={[styles.pipDot, { backgroundColor: tone }]} />
           </View>
         </>
-      ) : (
-        <Image source={CARD_ART.back} style={StyleSheet.absoluteFill} resizeMode="stretch" />
       )}
 
-      <View style={[styles.amountBar, revealed && styles.amountBarUp]}>
-        <Text style={[styles.amountText, { fontSize: size * 0.135 }, revealed && styles.amountTextUp]} numberOfLines={1}>
-          {formatMoney(amount)}
+      <View style={styles.center}>
+        <View
+          style={[
+            styles.medallion,
+            { width: size * 0.54, height: size * 0.54, borderRadius: size * 0.27 },
+            faceUp
+              ? { backgroundColor: colors.surface, borderColor: tone, borderWidth: 2.5 }
+              : { backgroundColor: colors.primaryTint, borderColor: colors.primary, borderWidth: 2 },
+          ]}
+        >
+          {faceUp ? (
+            <Text style={[styles.figure, { fontSize: size * 0.34, color: tone }]}>{shown ?? '—'}</Text>
+          ) : (
+            <Text style={[styles.figure, { fontSize: size * 0.32, color: colors.primary }]}>?</Text>
+          )}
+        </View>
+
+        {roomy && (
+          <View
+            style={[
+              styles.chip,
+              { borderColor: tone + '55', backgroundColor: faceUp ? colors.surface : colors.primaryTint },
+            ]}
+          >
+            <Ionicons name={chip.icon} size={Math.max(9, size * 0.078)} color={tone} />
+            <Text style={[styles.chipText, { color: tone, fontSize: Math.max(8, size * 0.08) }]}>{chip.label}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={[styles.amountBar, { backgroundColor: faceUp ? colors.ink : colors.overlay }]}>
+        <Text
+          style={[styles.amountText, { fontSize: Math.max(9, size * 0.13), color: faceUp ? colors.cream : colors.primary }]}
+          numberOfLines={1}
+        >
+          {stakeLabel}
         </Text>
       </View>
     </View>
@@ -88,32 +191,58 @@ export function PlayingCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: cardRadius.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  cardDown: { backgroundColor: cardGame.table, borderWidth: 2, borderColor: cardGame.gold, ...goldGlow(0.22) },
-  cardUp: { backgroundColor: cardGame.cream, borderWidth: 2, borderColor: cardGame.gold },
-  cardSelected: { borderColor: cardGame.cyan, borderWidth: 3, ...goldGlow(0.3) },
-  cardDimmed: { opacity: 0.45 },
-  figure: { color: cardGame.goldDeep, fontWeight: '900', includeFontPadding: false },
-  captionRow: { position: 'absolute', top: 8, right: 8 },
-  amountBar: {
-    position: 'absolute',
-    left: 6,
-    right: 6,
-    bottom: 6,
-    borderRadius: cardRadius.chip,
-    paddingVertical: 5,
-    alignItems: 'center',
-    backgroundColor: 'rgba(21,14,54,0.82)',
-  },
-  amountBarUp: { backgroundColor: cardGame.ink },
-  amountText: { color: cardGame.gold, fontWeight: '900' },
-  amountTextUp: { color: cardGame.cream },
-  withCaption: { alignItems: 'center' },
-  caption: { marginTop: 8, color: cardGame.textMuted, fontSize: 12, fontWeight: '800' },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    card: {
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+      ...glow(colors.primary),
+    },
+    cardSelected: { borderColor: colors.blue, borderWidth: 3 },
+    cardDimmed: { opacity: 0.45 },
+
+    innerFrame: { position: 'absolute', top: 6, left: 6, right: 6, bottom: 6, borderWidth: 1 },
+
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    medallion: { alignItems: 'center', justifyContent: 'center' },
+    figure: { fontWeight: '900', includeFontPadding: false },
+
+    pip: { position: 'absolute', alignItems: 'center', gap: 2 },
+    pipTL: { top: 8, left: 9 },
+    // The stake bar spans the bottom, so the lower pip is lifted just clear of it.
+    pipBR: { right: 9 },
+    pipNum: { fontWeight: '900', includeFontPadding: false },
+    pipDot: { width: 4, height: 4, borderRadius: 2, opacity: 0.7 },
+
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderWidth: 1,
+      borderRadius: radius.pill,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      marginTop: 8,
+    },
+    chipText: { fontWeight: '900', letterSpacing: 0.6 },
+
+    amountBar: {
+      position: 'absolute',
+      left: 6,
+      right: 6,
+      bottom: 6,
+      borderRadius: radius.sm,
+      paddingVertical: 5,
+      alignItems: 'center',
+    },
+    amountText: { fontWeight: '900' },
+
+    withCaption: { alignItems: 'center' },
+    caption: { marginTop: 8, color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  });
+}

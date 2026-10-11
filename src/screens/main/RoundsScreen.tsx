@@ -1,25 +1,23 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ColorValue, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { Badge, BadgeTone } from '../../components/Badge';
-import { AppIcon } from '../../components/AppIcon';
-import { IconBubble } from '../../components/IconBubble';
-import { SectionHeader } from '../../components/SectionHeader';
-import { StatTile } from '../../components/StatTile';
-import { Button } from '../../components/Button';
+import { BadgeTone } from '../../components/Badge';
+import { AnalogClock } from '../../components/AnalogClock';
 import { PredictionControl } from '../../components/PredictionControl';
 import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
-import { withAlpha } from '../../lib/color';
-import { Colors, layout, moderateScale, radius, ROUND_CARD_PALETTES, shadow, spacing, typography, useColors } from '../../theme/theme';
+import { Colors, layout, moderateScale, radius, ROUND_CARD_PALETTES, spacing, typography, useColors } from '../../theme/theme';
 import { computeTodayProfit, useRoundsStore } from '../../store/roundsStore';
 import { useWalletStore } from '../../store/walletStore';
 import { useAuthStore } from '../../store/authStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus, slotSettleAt, formatCountdown } from '../../lib/schedule';
 import { formatMoney, formatPercent, formatSigned, formatTime12h } from '../../lib/format';
+import { shade } from '../../lib/colorMath';
 import { DailyRound, RoundStatus } from '../../types';
 import { MainStackParamList } from '../../navigation/types';
 
@@ -53,80 +51,57 @@ export default function RoundsScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Card variant="sticker" tone="hero" style={styles.heroWrap}>
-        <View pointerEvents="none" style={[styles.heroGlow, { backgroundColor: colors.accent, ...shadow.lg }]} />
-        <View style={styles.heroTopRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[styles.eyebrow, { color: withAlpha(colors.cream, 0.82) }]}>YOUR BALANCE</Text>
-            <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-              {formatMoney(balance)}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerLabel}>Your Balance</Text>
+          <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {formatMoney(balance)}
+          </Text>
+          <View style={styles.profitPill}>
+            <Ionicons
+              name={isProfitPositive ? 'trending-up' : 'trending-down'}
+              size={11}
+              color={isProfitPositive ? colors.success : colors.danger}
+            />
+            <Text style={[styles.profitPillText, { color: isProfitPositive ? colors.success : colors.danger }]}>
+              {formatPercent(netTodayPercent)}
             </Text>
-            <View
-              style={[
-                styles.profitPill,
-                { backgroundColor: withAlpha(isProfitPositive ? colors.success : colors.danger, 0.24) },
-              ]}
-            >
-              <AppIcon name={isProfitPositive ? 'trend-up' : 'trend-down'} size={13} color={colors.cream} />
-              <Text style={[styles.profitPillText, { color: colors.cream }]}>{formatPercent(netTodayPercent)}</Text>
-              <Text style={[styles.profitPillText, { color: withAlpha(colors.cream, 0.78) }]}>today</Text>
-            </View>
           </View>
-          <IconBubble
-            name="sparkle"
-            size={54}
-            iconSize={30}
-            background={withAlpha(colors.cream, 0.2)}
-            style={styles.heroBubble}
-          />
         </View>
-        <Button
-          title="All results"
-          icon="trophy"
-          variant="cream"
-          size="sm"
-          onPress={() => navigation.navigate('RoundHistory')}
-        />
+        <TouchableOpacity onPress={() => navigation.navigate('RoundHistory')} style={styles.historyLink}>
+          <Text style={styles.historyLinkText}>All Results</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      <Card style={styles.summaryCard}>
+        <SummaryStat label="Settled" value={`${settled.length}/${rounds.length}`} colors={colors} />
+        <View style={styles.summaryDivider} />
+        <SummaryStat label="Gains Today" value={formatSigned(totalGains)} color={colors.success} colors={colors} />
+        <View style={styles.summaryDivider} />
+        <SummaryStat label="Losses Today" value={formatSigned(totalLosses)} color={colors.danger} colors={colors} />
+        <View style={styles.summaryDivider} />
+        <SummaryStat label="Net" value={formatSigned(netToday)} color={netToday >= 0 ? colors.success : colors.danger} colors={colors} />
       </Card>
 
-      <SectionHeader title="Today at a glance" eyebrow="TODAY'S TALLY" />
-      <View style={styles.tilesRow}>
-        <StatTile
-          icon="stock"
-          label="Rounds settled"
-          value={`${settled.length}/${rounds.length}`}
-          color={colors.blue}
-        />
-        <StatTile icon="trend-up" label="Gains today" value={formatSigned(totalGains)} color={colors.success} />
-      </View>
-      <View style={styles.tilesRow}>
-        <StatTile icon="trend-down" label="Losses today" value={formatSigned(totalLosses)} color={colors.danger} />
-        <StatTile
-          icon="coin"
-          label="Net today"
-          value={formatSigned(netToday)}
-          color={netToday >= 0 ? colors.success : colors.danger}
-        />
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Today's Rounds</Text>
       </View>
 
-      <SectionHeader title="Today's Rounds" eyebrow="ROUND BY ROUND" />
       <View style={{ gap: spacing.md }}>
         {rounds.map((round) => (
           <RoundCard key={round.slot.id} round={round} now={now} />
         ))}
       </View>
 
-      <Card tone="info" style={styles.noteCard}>
-        <IconBubble name="info" size={38} iconSize={19} color={colors.blue} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.noteTitle, { color: colors.text }]}>How payouts work</Text>
-          <Text style={styles.noteText}>
-            Every round accepts a stock pick right up until its own close time — you don't have to wait for its hour
-            to arrive, but you can only play each round once. Once a round settles, results are based on the
-            average pick across all players that round — the closer your number was to the average, the higher
-            your gain; the farther away, the bigger the loss.
-          </Text>
-        </View>
+      <Card style={styles.noteCard}>
+        <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+        <Text style={styles.noteText}>
+          Every round accepts a stock pick right up until its own close time — you don't have to wait for its hour
+          to arrive, but you can only play each round once. Once a round settles, results are based on the
+          average pick across all players that round — the closer your number was to the average, the higher
+          your gain; the farther away, the bigger the loss.
+        </Text>
       </Card>
     </Screen>
   );
@@ -141,79 +116,69 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
   const result = round.result;
   const gainPositive = result?.finalOutcome ? result.finalOutcome === 'gain' : (result?.valueGained ?? 0) >= 0;
   const isSettled = !!result;
-  // slot.index is 0-based (it matches the hour), so index directly — the old
-  // `(index - 1) % length` produced -1 for the midnight round, and palette[-1]
-  // is undefined, which crashed the whole Rounds screen. (Pre-existing bug.)
   const palette = ROUND_CARD_PALETTES[round.slot.index % ROUND_CARD_PALETTES.length];
-  const tint = (alpha: number): ColorValue => withAlpha(palette.accent, alpha);
-  const rule = withAlpha(palette.ink, 0.14);
 
   // A round accepts input from right now until ITS OWN close time — no
   // waiting for its nominal submit time to arrive. "Upcoming" is gone as a
   // locked state: a round not yet in its submit window is treated the same
   // as "Open" for input purposes. It locks the moment its close time hits.
   const isOpen = status === 'upcoming' || status === 'open';
-  const { tone, label } = isOpen ? STATUS_META.open : STATUS_META[status];
-  const { tone: darkTone, label: darkLabel } = STATUS_META[status];
+  const { label } = isOpen ? STATUS_META.open : STATUS_META[status];
 
   const countdownTarget = isOpen ? slotSettleAt(round.slot, now) : null;
-  const countdownLabel = 'Closes in';
   const countdownMs = countdownTarget ? countdownTarget.getTime() - now.getTime() : 0;
 
+  const [hh] = round.slot.submitTime.split(':').map(Number);
+  const timeLabel = formatTime12h(round.slot.submitTime);
+  const [timeDigits, timePeriod] = timeLabel.split(' ');
+
   return (
-    <Card style={[styles.roundCard, { backgroundColor: palette.background, borderColor: palette.border }]}>
-      <View style={styles.roundHeaderRow}>
-        <View style={styles.roundTitleWrap}>
-          <View style={[styles.roundIndexChip, { backgroundColor: palette.accent }]}>
-            <Text style={styles.roundIndexText}>{String(round.slot.index).padStart(2, '0')}</Text>
+    <LinearGradient
+      colors={[shade(palette.accent, 0.12), palette.accent, shade(palette.accent, -0.14)]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.roundCard}
+    >
+      <View style={styles.vibrantHeaderRow}>
+        <AnalogClock hour={hh} ringColor={palette.accent} />
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          <View style={styles.statusPill}>
+            <Text style={styles.statusPillText}>{label}</Text>
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[styles.roundTitle, { color: palette.ink }]} numberOfLines={1}>
-              Round {round.slot.index}
-            </Text>
-            <View style={styles.roundTimeRow}>
-              <AppIcon name="clock" size={12} color={palette.ink} opacity={0.66} />
-              <Text style={[styles.roundTime, { color: palette.ink }]} numberOfLines={1}>
-                {formatTime12h(round.slot.submitTime)} - {formatTime12h(round.slot.settleTime)}
-              </Text>
-            </View>
+          <View style={styles.timePill}>
+            <Text style={styles.timePillDigits}>{timeDigits}</Text>
+            <Text style={styles.timePillPeriod}>{timePeriod}</Text>
           </View>
         </View>
-        <Badge label={darkLabel} tone={darkTone} size="sm" />
       </View>
 
+      <Text style={styles.vibrantHeadline}>
+        Round {round.slot.index}{'\n'}
+        <Text style={styles.vibrantHeadlineAccent}>pick your figure</Text>
+      </Text>
+
       {countdownTarget && (
-        <View style={[styles.countdownRow, { backgroundColor: tint(0.1), borderColor: rule }]}>
-          <IconBubble
-            name="bolt"
-            size={32}
-            iconSize={17}
-            color={palette.accent}
-            background={withAlpha('#FFFFFF', 0.7)}
-          />
-          <Text style={[styles.countdownLabel, { color: palette.ink }]}>{countdownLabel}</Text>
-          <Text style={[styles.countdownValue, { color: palette.accent }]}>{formatCountdown(countdownMs)}</Text>
+        <View style={styles.vPanel}>
+          <Text style={styles.vPanelLabel}>CLOSES IN</Text>
+          <Text style={styles.countdownValue}>{formatCountdown(countdownMs)}</Text>
         </View>
       )}
 
       {result && (
-        <View style={[styles.resultRow, { borderTopColor: rule }]}>
-          <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} colors={colors} ink={palette.ink} />
-          <MiniStat label="Avg Pick" value={result.average != null ? result.average.toFixed(2) : '—'} colors={colors} ink={palette.ink} />
-          <MiniStat label="Deviation" value={result.distance != null ? result.distance.toFixed(2) : '—'} colors={colors} ink={palette.ink} />
-          <View style={styles.resultValueWrap}>
-            <Text style={[styles.miniStatLabel, { color: palette.ink, opacity: 0.72 }]}>Value</Text>
-            <View
-              style={[
-                styles.valuePill,
-                { backgroundColor: withAlpha(gainPositive ? colors.success : colors.danger, 0.16) },
-              ]}
-            >
-              <Text style={[styles.valuePillText, { color: gainPositive ? colors.success : colors.danger }]}>
+        <View style={styles.vPanel}>
+          <View style={styles.resultRow}>
+            <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} />
+            <MiniStat label="Avg Pick" value={result.average != null ? result.average.toFixed(2) : '—'} />
+            <MiniStat label="Deviation" value={result.distance != null ? result.distance.toFixed(2) : '—'} />
+          </View>
+          <View style={styles.resultValueRow}>
+            <Text style={styles.vPanelLabel}>VALUE</Text>
+            <View style={[styles.valuePill, { backgroundColor: gainPositive ? 'rgba(52,217,155,0.26)' : 'rgba(255,107,126,0.26)' }]}>
+              <Text style={[styles.valuePillText, { color: gainPositive ? '#34D99B' : '#FF6B7E' }]}>
                 {formatSigned(result.valueGained ?? 0)}
               </Text>
             </View>
-            <Text style={[styles.changeText, { color: gainPositive ? colors.success : colors.danger }]}>
+            <Text style={[styles.changeText, { color: gainPositive ? '#34D99B' : '#FF6B7E' }]}>
               {formatPercent(result.changePercent ?? 0)}
             </Text>
           </View>
@@ -221,9 +186,9 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       )}
 
       {!isSettled && !isOpen && (
-        <View style={[styles.pendingRow, { borderTopColor: rule }]}>
-          <AppIcon name={round.prediction ? 'clock' : 'help'} size={16} color={palette.ink} opacity={0.8} />
-          <Text style={[styles.pendingText, { color: palette.ink }]}>
+        <View style={[styles.vPanel, styles.pendingRow]}>
+          <Ionicons name={round.prediction ? 'time-outline' : 'help-circle-outline'} size={16} color="#FFFFFF" />
+          <Text style={styles.pendingText}>
             {round.prediction
               ? `You picked ${round.prediction.value} — waiting for the result`
               : 'Round closed — no stock was submitted'}
@@ -232,26 +197,45 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       )}
 
       {isOpen && (
-        <View style={[styles.predictBox, { borderTopColor: rule }]}>
-          <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
+        <>
+          <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} vibrant />
           <PredictionControl
             roundId={round.slot.id}
             currentValue={round.prediction?.value}
             slotAmount={slotAmount}
             onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
+            vibrant
           />
-        </View>
+        </>
       )}
-    </Card>
+    </LinearGradient>
   );
 }
 
-function MiniStat({ label, value, colors, ink }: { label: string; value: string; colors: Colors; ink?: string }) {
-  const styles = useMemo(() => createStyles(colors), [colors]);
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ alignItems: 'flex-start', flexShrink: 1 }}>
-      <Text style={[styles.miniStatLabel, ink ? { color: ink, opacity: 0.72 } : null]}>{label}</Text>
-      <Text style={[styles.miniStatValue, ink ? { color: ink } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+      <Text style={miniStatStyles.label}>{label}</Text>
+      <Text style={miniStatStyles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+const miniStatStyles = StyleSheet.create({
+  label: { ...typography.tiny, color: 'rgba(255,255,255,0.75)' },
+  value: { ...typography.h3, color: '#FFFFFF', marginTop: 2 },
+});
+
+function SummaryStat({ label, value, color, colors }: { label: string; value: string; color?: string; colors: Colors }) {
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={styles.summaryLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[styles.summaryValue, color ? { color } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
         {value}
       </Text>
     </View>
@@ -267,87 +251,92 @@ const STATUS_META: Record<RoundStatus, { label: string; tone: BadgeTone }> = {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    heroWrap: { paddingBottom: 0 },
-    heroGlow: {
-      position: 'absolute',
-      width: 210,
-      height: 210,
-      borderRadius: 105,
-      top: -90,
-      right: -70,
-      opacity: 0.5,
-    },
-    heroTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-    heroBubble: { borderRadius: 18 },
-    eyebrow: { ...typography.label },
-    balance: { ...typography.h1, color: colors.cream, marginTop: 3 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    headerLabel: { ...typography.small, color: colors.textMuted },
+    balance: { ...typography.h1, color: colors.text, marginTop: 2 },
     profitPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'flex-start',
       gap: 4,
-      borderRadius: radius.pill,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 5,
-      marginTop: spacing.sm,
+      marginTop: spacing.xs,
+      alignSelf: 'flex-start',
     },
-    profitPillText: { ...typography.small, fontWeight: '800' },
-    tilesRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
-    roundCard: { overflow: 'hidden', borderWidth: 1.5, padding: spacing.lg, borderRadius: radius.xl },
-    roundHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
-    roundTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, flex: 1 },
-    roundIndexChip: {
-      width: 42,
-      height: 42,
-      borderRadius: radius.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    roundIndexText: { ...typography.h3, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
-    roundTitle: { ...typography.h3, fontSize: moderateScale(17) },
-    roundTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-    roundTime: { ...typography.tiny, opacity: 0.72 },
-    countdownRow: {
+    profitPillText: { ...typography.small, fontWeight: '700' },
+    historyLink: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: spacing.xs },
+    historyLinkText: { ...typography.small, color: colors.primary, fontWeight: '700' },
+    summaryCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      marginTop: spacing.md,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      padding: spacing.sm,
+      marginTop: spacing.lg,
+      backgroundColor: colors.surfaceAlt,
+      // Four columns + three dividers is tight on narrow phones (<360px) —
+      // tighter horizontal padding buys the stat values more room before
+      // adjustsFontSizeToFit has to kick in.
+      paddingHorizontal: layout.isSmallDevice ? spacing.sm : spacing.lg,
     },
-    countdownLabel: { ...typography.small, fontWeight: '700', flex: 1, opacity: 0.72 },
-    countdownValue: { ...typography.h3, fontVariant: ['tabular-nums'] },
-    resultRow: {
+    summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
+    summaryLabel: { ...typography.tiny, color: colors.textMuted },
+    summaryValue: { ...typography.h3, color: colors.text, marginTop: 2 },
+    sectionHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-end',
-      marginTop: spacing.md,
-      paddingTop: spacing.md,
-      borderTopWidth: 1,
-    },
-    resultValueWrap: { alignItems: 'flex-end' },
-    miniStatLabel: { ...typography.tiny, color: colors.textMuted },
-    miniStatValue: { ...typography.h3, color: colors.text, marginTop: 2 },
-    valuePill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3, marginTop: 2 },
-    valuePillText: { ...typography.small, fontWeight: '800' },
-    changeText: { ...typography.tiny, fontWeight: '700', marginTop: 3 },
-    pendingRow: {
-      flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
-      marginTop: spacing.md,
-      paddingTop: spacing.md,
-      borderTopWidth: 1,
+      marginTop: spacing.xl,
+      marginBottom: spacing.md,
     },
-    pendingText: { ...typography.small, color: colors.textDim, flex: 1, fontWeight: '600' },
-    predictBox: {
-      marginTop: spacing.md,
-      paddingTop: spacing.md,
-      borderTopWidth: 1,
+    sectionTitle: { ...typography.h3, color: colors.text },
+    roundCard: {
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 6,
     },
-    noteCard: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, borderRadius: radius.xl },
-    noteTitle: { ...typography.h3, marginBottom: 3 },
-    noteText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+    vibrantHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
+    statusPill: {
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 3,
+    },
+    statusPillText: { ...typography.tiny, color: '#FFFFFF', fontWeight: '800' },
+    timePill: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 4,
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    timePillDigits: { fontSize: 24, fontWeight: '900', color: '#FFFFFF' },
+    timePillPeriod: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
+    vibrantHeadline: { fontSize: moderateScale(21), fontWeight: '800', color: '#FFFFFF', lineHeight: 28, marginBottom: spacing.lg },
+    vibrantHeadlineAccent: { color: '#FFE86B' },
+    vPanel: {
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    vPanelLabel: { ...typography.tiny, color: 'rgba(255,255,255,0.75)', fontWeight: '800', letterSpacing: 0.5 },
+    countdownValue: { ...typography.h2, color: '#FFFFFF', fontVariant: ['tabular-nums'], marginTop: 2 },
+    resultRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    resultValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+    valuePill: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+    valuePillText: { ...typography.small, fontWeight: '800' },
+    changeText: { ...typography.small, fontWeight: '700' },
+    pendingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 0 },
+    pendingText: { ...typography.small, color: '#FFFFFF', flex: 1, lineHeight: 18 },
+    noteCard: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.xl,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.lg,
+    },
+    noteText: { ...typography.small, color: colors.textMuted, lineHeight: 18, flex: 1 },
   });
 }

@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { AppIcon } from '../AppIcon';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, radius, useColors } from '../../theme/theme';
 
 interface CardFlowHeaderProps {
   title: string;
@@ -9,12 +10,17 @@ interface CardFlowHeaderProps {
   onBack?: () => void;
   /** Replaces the back button — e.g. a close button on a result screen. */
   closeIcon?: 'chevron-left' | 'close';
-  /** Small gold text action on the right. */
+  /** Small accent text action on the right. */
   actionLabel?: string;
   onAction?: () => void;
 }
 
-/** Navy header used by the card game's pushed flow screens. */
+const CLOSE_ICONS: Record<NonNullable<CardFlowHeaderProps['closeIcon']>, keyof typeof Ionicons.glyphMap> = {
+  'chevron-left': 'chevron-back',
+  close: 'close',
+};
+
+/** Header used by the card game's pushed flow screens. */
 export function CardFlowHeader({
   title,
   step,
@@ -23,6 +29,9 @@ export function CardFlowHeader({
   actionLabel,
   onAction,
 }: CardFlowHeaderProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -31,7 +40,7 @@ export function CardFlowHeader({
         accessibilityLabel="Go back"
         style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
       >
-        <AppIcon name={closeIcon} size={19} color={cardGame.gold} />
+        <Ionicons name={CLOSE_ICONS[closeIcon]} size={19} color={colors.primary} />
       </Pressable>
 
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -50,20 +59,22 @@ export function CardFlowHeader({
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  back: {
-    width: 42,
-    height: 42,
-    borderRadius: cardRadius.chip,
-    borderWidth: 1.5,
-    borderColor: cardGame.rim,
-    backgroundColor: cardGame.tableDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  step: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: cardGame.text, fontSize: 20, fontWeight: '900', marginTop: 1 },
-  action: { paddingVertical: 6, paddingHorizontal: 4 },
-  actionText: { color: cardGame.gold, fontSize: 13, fontWeight: '900' },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+    back: {
+      width: 42,
+      height: 42,
+      borderRadius: radius.sm,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    step: { color: colors.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
+    title: { color: colors.text, fontSize: 20, fontWeight: '900', marginTop: 1 },
+    action: { paddingVertical: 6, paddingHorizontal: 4 },
+    actionText: { color: colors.primary, fontSize: 13, fontWeight: '900' },
+  });
+}

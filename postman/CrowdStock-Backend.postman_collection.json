@@ -1,0 +1,2000 @@
+{
+  "info": {
+    "name": "CrowdStock Backend Endpoints",
+    "description": "Every backend endpoint the CrowdStock app calls, against the live StockLab gateway (theKey/myhandler pattern). Run \"1. Get Bearer Token\" and \"2. Login\" once at the start of a session \u2014 every other request auto-mints its own single-use session token via the collection Pre-request Script, so you can just hit Send on any of them after that. Environment: CrowdStock-Backend.postman_environment.json (import alongside this collection and select it).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-mints session credentials so every request below \"just works\" on Send.",
+          "// Bearer tokens last ~1000h (cached); trans_token (refID) is SINGLE-USE per",
+          "// the app's own backendClient.ts, so it is re-minted before every call that",
+          "// declares a refID header.",
+          "",
+          "function needsSession() {",
+          "    return pm.request.headers.has(\"refID\");",
+          "}",
+          "",
+          "function mintBearer() {",
+          "    return new Promise((resolve) => {",
+          "        pm.sendRequest({",
+          "            url: pm.environment.get(\"base_url\") + \"/st/AuthSP\",",
+          "            method: \"POST\",",
+          "            header: { \"Content-Type\": \"application/json\" },",
+          "            body: { mode: \"raw\", raw: JSON.stringify({",
+          "                userId: pm.environment.get(\"auth_user_id\"),",
+          "                secretKey: pm.environment.get(\"auth_secret_key\"),",
+          "            }) },",
+          "        }, (err, res) => {",
+          "            if (!err && res.code === 200) {",
+          "                const json = res.json();",
+          "                if (json && json.token) pm.environment.set(\"bearer_token\", json.token);",
+          "            }",
+          "            resolve();",
+          "        });",
+          "    });",
+          "}",
+          "",
+          "function mintTransToken() {",
+          "    return new Promise((resolve) => {",
+          "        pm.sendRequest({",
+          "            url: pm.environment.get(\"base_url\") + \"/st/myhandler\",",
+          "            method: \"POST\",",
+          "            header: {",
+          "                \"Content-Type\": \"application/json\",",
+          "                \"Authorization\": \"Bearer \" + pm.environment.get(\"bearer_token\"),",
+          "            },",
+          "            body: { mode: \"raw\", raw: JSON.stringify({",
+          "                theKey: \"G1001\",",
+          "                sessionToken: pm.environment.get(\"session_id\"),",
+          "                phone: pm.environment.get(\"phone\"),",
+          "                deviceId: pm.environment.get(\"device_id\"),",
+          "            }) },",
+          "        }, (err, res) => {",
+          "            if (!err && res.code === 200) {",
+          "                const json = res.json();",
+          "                if (json && json.trans_token) pm.environment.set(\"ref_id\", json.trans_token);",
+          "            }",
+          "            resolve();",
+          "        });",
+          "    });",
+          "}",
+          "",
+          "(async () => {",
+          "    if (!pm.environment.get(\"bearer_token\")) {",
+          "        await mintBearer();",
+          "    }",
+          "    if (needsSession()) {",
+          "        if (!pm.environment.get(\"session_id\")) {",
+          "            console.warn(\"No session_id yet \u2014 run 'Login (G22)' in the Auth folder first.\");",
+          "        } else {",
+          "            await mintTransToken();",
+          "        }",
+          "    }",
+          "})();"
+        ]
+      }
+    }
+  ],
+  "variable": [],
+  "item": [
+    {
+      "name": "0. Auth & Session",
+      "item": [
+        {
+          "name": "1. Get Bearer Token (AuthSP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{auth_user_id}}\",\n  \"secretKey\": \"{{auth_secret_key}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/AuthSP",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "AuthSP"
+              ]
+            },
+            "description": "Bootstrap credential for the app itself (not per-user). Response: {status, message, token}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test(\"status is success\", () => pm.expect(json.status).to.eql(\"success\"));",
+                  "if (json.token) pm.environment.set(\"bearer_token\", json.token);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "2. Login (G22)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G22\",\n  \"PhoneNo\": \"{{phone}}\",\n  \"PinCode\": \"{{password}}\",\n  \"DeviceID\": \"{{device_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Real password, not a numeric PIN, despite the PinCode field name. Response: {IsValid, SessionID, SlotAmount, WBalance, Profile:{...}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test(\"IsValid is true\", () => pm.expect(json.IsValid).to.eql(true));",
+                  "if (json.SessionID) pm.environment.set(\"session_id\", json.SessionID);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "3. Mint Fresh Token (G1001) \u2014 manual/inspect",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G1001\",\n  \"sessionToken\": \"{{session_id}}\",\n  \"phone\": \"{{phone}}\",\n  \"deviceId\": \"{{device_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Mints a fresh, single-use trans_token from the SessionID. Response: {success, trans_token}."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test(\"success is true\", () => pm.expect(json.success).to.eql(true));",
+                  "if (json.trans_token) pm.environment.set(\"ref_id\", json.trans_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Profile (G24)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G24\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Canonical profile refresh. WBalance here is stale \u2014 use G25 for real-time balance."
+          },
+          "response": []
+        },
+        {
+          "name": "Request Password Reset OTP (G20)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G20\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Session-exempt. Sends a reset OTP to the phone."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Password Reset (G21)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G21\",\n  \"Phone\": \"{{phone}}\",\n  \"OTP\": \"REPLACE_WITH_REAL_OTP\",\n  \"NewPassword\": \"newpassword123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Support Contact (G19)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G19\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "CONFIRMED to currently return {success:false} regardless of input \u2014 not configured server-side yet."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Rounds & Predictions",
+      "item": [
+        {
+          "name": "Get Today's Rounds (G13, phone+date)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G13\",\n  \"phone\": \"{{phone}}\",\n  \"date\": \"2026-09-20\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Round Results by Date (G13, explicit date)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G13\",\n  \"phone\": \"{{phone}}\",\n  \"date\": \"2026-09-19\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Swap the date field to any YYYY-MM-DD to inspect a specific day's settlement \u2014 this is the endpoint behind the \"gain not showing\" bug: check every record's GLN vs Gain vs Loss fields."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Prediction / Play a Round (G12)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G12\",\n  \"slot\": \"{{test_round}}\",\n  \"phone\": \"{{phone}}\",\n  \"predfigure\": \"{{test_figure}}\",\n  \"SlotAmount\": \"{{test_amount}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "CAUTION: this is a REAL play \u2014 it stakes test_amount from the live balance on test_round. Only run against a round that is actually open."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Play History (G14)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G14\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "CONFIRMED live backend bug as of last check: fails with \"Unable to convert MySQL date/time value to System.DateTime\" even with the correct request shape."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Played Round Indices Today (G15, Code P)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\",\n  \"Code\": \"P\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Auto Play",
+      "item": [
+        {
+          "name": "Get Auto Play Config, All 24 Rounds (A2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"A2\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Set One Round's Auto Play (A1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"A1\",\n  \"Phone\": \"{{phone}}\",\n  \"Round\": \"{{test_round}}\",\n  \"Status\": 1,\n  \"Figure\": \"{{test_figure}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Status 0 = OFF (omit Figure entirely when turning off \u2014 the backend keeps the existing Figure). Status 1 = ON (Figure required)."
+          },
+          "response": []
+        },
+        {
+          "name": "Turn OFF One Round's Auto Play (A1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"A1\",\n  \"Phone\": \"{{phone}}\",\n  \"Round\": \"{{test_round}}\",\n  \"Status\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Master Toggle \u2014 All Rounds (UU)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"UU\",\n  \"Phone\": \"{{phone}}\",\n  \"Status\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Status 1 = all on, 0 = all off. Does not change each round's stored Figure."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Wallet & History",
+      "item": [
+        {
+          "name": "Get Balance (G25)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G25\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Canonical real-time balance \u2014 used everywhere in the app instead of G22/G24's WBalance."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Deposits (G15, Code D)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\",\n  \"Code\": \"D\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Withdrawals (G15, Code W)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\",\n  \"Code\": \"W\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Game Outcomes \u2014 Gain/Loss/Neutral (G15, Code G)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\",\n  \"Code\": \"G\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "CONFIRMED live 2026-09-20: Code \"G\" returns LabelID IN (G,L,N), not gains only. THE BUG: every record with GLN=\"G\" seen so far still has Gain=0.000000 with the real magnitude sitting in Loss instead, even when GLN claims a gain \u2014 check the settlement job that populates the Gain field specifically."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Plays (G15, Code P)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\",\n  \"Code\": \"P\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Monthly Totals (G15B)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15B\",\n  \"Year\": \"2026\",\n  \"Month\": \"09\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Pre-summed {D,W,G,P} for the month. Cross-check this \"G\" total against summing Code=G records above by hand."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Today's Totals (G15C)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G15C\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Same as G15B but scoped to today."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Deposit",
+      "item": [
+        {
+          "name": "Get Bank Profile \u2014 Deposit + Payout Accounts (BB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"BB\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Generate/Fetch Virtual Deposit Account (VV)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"VV\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Idempotent \u2014 returns the existing virtual account if one exists, otherwise creates one."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Withdrawal",
+      "item": [
+        {
+          "name": "Verify Bank Account Name (AAA)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"AAA\",\n  \"bankCode\": \"{{bank_code}}\",\n  \"accNumber\": \"{{bank_account_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Third-party (VigiPay-style) name enquiry. Response nests under responseData.accountName."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Payout Bank Details, First Time (PP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"PP\",\n  \"phone\": \"{{phone}}\",\n  \"outbankname\": \"REPLACE_BANK_NAME\",\n  \"BankCode\": \"{{bank_code}}\",\n  \"outbankcode\": \"{{bank_code}}\",\n  \"outbankaccountno\": \"{{bank_account_number}}\",\n  \"outaccountname\": \"REPLACE_VERIFIED_NAME\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Can only be set once per account per Mr Yemi's doc. Sends BankCode under two field names (BankCode + outbankcode) \u2014 CONFIRMED live that PP only persists outbankcode; BankCode alone is silently dropped."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Withdrawal Security OTP (G20)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"G20\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Same G20 as password reset \u2014 reused purely as an OTP-delivery mechanism, no password is actually changed by this flow."
+          },
+          "response": []
+        },
+        {
+          "name": "Reset/Change Payout Bank Details (RBP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"RBP\",\n  \"Phone\": \"{{phone}}\",\n  \"OTP\": \"REPLACE_WITH_REAL_OTP\",\n  \"PinCode\": \"{{password}}\",\n  \"outbankname\": \"REPLACE_BANK_NAME\",\n  \"BankCode\": \"{{bank_code}}\",\n  \"outbankcode\": \"{{bank_code}}\",\n  \"outbankaccountno\": \"{{bank_account_number}}\",\n  \"outaccountname\": \"REPLACE_VERIFIED_NAME\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Requires the OTP from G20 above plus the account's real login password as PinCode."
+          },
+          "response": []
+        },
+        {
+          "name": "Request Withdrawal (IP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"IP\",\n  \"Phone\": \"{{phone}}\",\n  \"Amount\": \"{{test_amount}}\",\n  \"OTP\": \"REPLACE_WITH_REAL_OTP\",\n  \"PinCode\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "CAUTION: real money movement. CONFIRMED live as of the last UAT round: consistently fails with PAYOUT_FAILED regardless of input \u2014 likely a Sling-sandbox issue on the backend, not a request-format problem. Re-test this one specifically."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Invite",
+      "item": [
+        {
+          "name": "Get My Invite Stats (B3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"B3\",\n  \"Phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Check If a Phone Is Registered (B2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"B2\",\n  \"Phone\": \"08000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "Swap the phone number in the body to check any contact. A false/not-registered result also comes back as IsValid:false \u2014 that's expected here, not a session error."
+          },
+          "response": []
+        },
+        {
+          "name": "Log an Invite Sent (B1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"B1\",\n  \"Phone\": \"{{phone}}\",\n  \"Receiver\": \"08000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Card Game (UNCONFIRMED)",
+      "item": [
+        {
+          "name": "Set Card (C1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"C1\",\n  \"phone\": \"{{phone}}\",\n  \"figure\": \"3\",\n  \"stake\": \"500\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "UNCONFIRMED \u2014 field names are a best guess following this collection's existing conventions; no live backend exists for C1-C6 yet. Correct this request once a real response is seen. Creates a card with a hidden figure (1-5) and a stake (100-1000)."
+          },
+          "response": []
+        },
+        {
+          "name": "Answer Card (C2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"C2\",\n  \"phone\": \"{{phone}}\",\n  \"cardId\": \"REPLACE_WITH_CARD_ID\",\n  \"figure\": \"3\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "UNCONFIRMED \u2014 field names are a best guess following this collection's existing conventions; no live backend exists for C1-C6 yet. Correct this request once a real response is seen. Pays the stake, submits the answering figure; reveal+scoring assumed to happen in this same call."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Cards (C3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"C3\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "UNCONFIRMED \u2014 field names are a best guess following this collection's existing conventions; no live backend exists for C1-C6 yet. Correct this request once a real response is seen. All cards the current user created, any status. Unclear whether this also includes cards they answered."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Card Results (C4)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"C4\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "UNCONFIRMED \u2014 field names are a best guess following this collection's existing conventions; no live backend exists for C1-C6 yet. Correct this request once a real response is seen. Global results feed, not scoped to a phone. Not consumed by any app screen yet."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Card Results By Phone (C5)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"C5\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "UNCONFIRMED \u2014 field names are a best guess following this collection's existing conventions; no live backend exists for C1-C6 yet. Correct this request once a real response is seen. Results filtered by a phone number."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Open Cards (C6)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              },
+              {
+                "key": "refID",
+                "value": "{{ref_id}}"
+              },
+              {
+                "key": "phone",
+                "value": "{{phone}}"
+              },
+              {
+                "key": "deviceid",
+                "value": "{{device_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theKey\": \"C6\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/st/myhandler",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "st",
+                "myhandler"
+              ]
+            },
+            "description": "UNCONFIRMED \u2014 field names are a best guess following this collection's existing conventions; no live backend exists for C1-C6 yet. Correct this request once a real response is seen. Browsable open/unmatched cards from other users \u2014 must never include a figure field in the real response."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

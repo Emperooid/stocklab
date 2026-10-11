@@ -2,12 +2,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { AppIcon, Illustration } from '../../components/AppIcon';
+import { Ionicons } from '@expo/vector-icons';
 import { CardButton } from '../../components/cards/CardButton';
 import { CardPanel } from '../../components/cards/CardPanel';
-import { CardTableScreen } from '../../components/cards/CardTableScreen';
+import { Screen } from '../../components/Screen';
 import { PlayingCard } from '../../components/cards/PlayingCard';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { Colors, radius, useColors } from '../../theme/theme';
 import {
   computeCardStats,
   iWon,
@@ -42,6 +42,8 @@ interface MetricTileProps {
 }
 
 function MetricTile({ label, value, color }: MetricTileProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.metricTile}>
       <Text
@@ -63,6 +65,8 @@ function MetricTile({ label, value, color }: MetricTileProps) {
  * just the wins or just the losses.
  */
 export default function RewardsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const tabNavigation = useNavigation<BottomTabNavigationProp<CardsTabParamList>>();
 
   const cards = useCardsStore((s) => s.cards);
@@ -110,7 +114,7 @@ export default function RewardsScreen() {
   };
 
   const noGames = stats.played === 0;
-  const netColor = stats.net >= 0 ? cardGame.success : cardGame.danger;
+  const netColor = stats.net >= 0 ? colors.success : colors.danger;
 
   const emptyCopy =
     filter === 'wins'
@@ -120,12 +124,12 @@ export default function RewardsScreen() {
         : { title: 'No results yet', body: 'Play a card and the reveal is recorded here the moment it settles.' };
 
   return (
-    <CardTableScreen refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       {/* ── Winnings hero ─────────────────────────────────────────────── */}
       <CardPanel tone="gold" style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.heroBadge}>
-            <AppIcon name="trophy" size={30} />
+            <Ionicons name="trophy" size={30} color={colors.primary} />
           </View>
           <View style={styles.heroHeadline}>
             <Text style={styles.heroEyebrow}>YOUR REWARDS</Text>
@@ -144,11 +148,11 @@ export default function RewardsScreen() {
 
         <View style={styles.heroMetaRow}>
           <View style={styles.heroMetaChip}>
-            <AppIcon name="trend-up" size={14} color={cardGame.success} />
+            <Ionicons name="trending-up" size={14} color={colors.success} />
             <Text style={styles.heroMetaText}>{formatPercent(stats.winRate)} win rate</Text>
           </View>
           <View style={styles.heroMetaChip}>
-            <AppIcon name="card" size={14} color={cardGame.gold} />
+            <Ionicons name="albums" size={14} color={colors.primary} />
             <Text style={styles.heroMetaText}>
               {stats.played} {stats.played === 1 ? 'game' : 'games'} played
             </Text>
@@ -163,12 +167,12 @@ export default function RewardsScreen() {
           <MetricTile
             label="Wins"
             value={noGames ? '—' : String(stats.wins)}
-            color={cardGame.success}
+            color={colors.success}
           />
           <MetricTile
             label="Losses"
             value={noGames ? '—' : String(stats.losses)}
-            color={cardGame.danger}
+            color={colors.danger}
           />
           <MetricTile
             label="Net"
@@ -238,10 +242,10 @@ export default function RewardsScreen() {
                       <View
                         style={[styles.outcomeChip, won ? styles.outcomeChipWin : styles.outcomeChipLoss]}
                       >
-                        <AppIcon
-                          name={won ? 'check' : 'close'}
+                        <Ionicons
+                          name={won ? 'checkmark' : 'close'}
                           size={11}
-                          color={won ? cardGame.success : cardGame.danger}
+                          color={won ? colors.success : colors.danger}
                         />
                         <Text
                           style={[styles.outcomeText, won ? styles.outcomeTextWin : styles.outcomeTextLoss]}
@@ -272,12 +276,12 @@ export default function RewardsScreen() {
         </>
       ) : (
         <CardPanel tone="deep" style={styles.emptyPanel}>
-          <Illustration name="empty" size={130} />
+          <Ionicons name="file-tray-outline" size={130} color={colors.textDim} />
           <Text style={styles.emptyTitle}>{emptyCopy.title}</Text>
           <Text style={styles.emptyBody}>{emptyCopy.body}</Text>
           <CardButton
             title="Play a card"
-            icon="card"
+            icon="albums"
             onPress={() => tabNavigation.navigate('Play')}
             style={styles.emptyButton}
           />
@@ -287,182 +291,184 @@ export default function RewardsScreen() {
       {/* ── Fine print ────────────────────────────────────────────────── */}
       <CardPanel tone="deep" style={styles.footnote}>
         <View style={styles.footnoteRow}>
-          <AppIcon name="info" size={15} color={cardGame.cyan} />
+          <Ionicons name="information-circle-outline" size={15} color={colors.blue} />
           <Text style={styles.footnoteText}>
             Winners take 80% of the combined pot. The remaining 20% is the platform fee.
           </Text>
         </View>
       </CardPanel>
-    </CardTableScreen>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  /* hero */
-  hero: { marginBottom: 14 },
-  heroTop: { flexDirection: 'row', alignItems: 'center' },
-  heroBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: cardRadius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(21,14,54,0.4)',
-    borderWidth: 1,
-    borderColor: 'rgba(247,183,51,0.45)',
-  },
-  heroHeadline: { flex: 1, minWidth: 0, marginLeft: 12 },
-  heroEyebrow: {
-    color: cardGame.gold,
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  heroTitle: { color: cardGame.text, fontSize: 17, fontWeight: '900', marginTop: 2 },
-  heroAmount: {
-    color: cardGame.gold,
-    fontSize: 40,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    marginTop: 12,
-    includeFontPadding: false,
-  },
-  heroMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  heroMetaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: cardRadius.pill,
-    backgroundColor: 'rgba(21,14,54,0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(247,183,51,0.28)',
-  },
-  heroMetaText: { color: cardGame.textMuted, fontSize: 12, fontWeight: '800' },
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    /* hero */
+    hero: { marginBottom: 14 },
+    heroTop: { flexDirection: 'row', alignItems: 'center' },
+    heroBadge: {
+      width: 46,
+      height: 46,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    heroHeadline: { flex: 1, minWidth: 0, marginLeft: 12 },
+    heroEyebrow: {
+      color: colors.primary,
+      fontSize: 10.5,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+    },
+    heroTitle: { color: colors.text, fontSize: 17, fontWeight: '900', marginTop: 2 },
+    heroAmount: {
+      color: colors.primary,
+      fontSize: 40,
+      fontWeight: '900',
+      letterSpacing: -0.5,
+      marginTop: 12,
+      includeFontPadding: false,
+    },
+    heroMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+    heroMetaChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    heroMetaText: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
 
-  /* stat tiles */
-  statsPanel: { marginBottom: 14 },
-  statsRow: { flexDirection: 'row', gap: 6 },
-  metricTile: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderRadius: cardRadius.chip,
-    backgroundColor: 'rgba(21,14,54,0.5)',
-  },
-  metricValue: { color: cardGame.text, fontSize: 16, fontWeight: '900' },
-  metricLabel: {
-    color: cardGame.textDim,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    marginTop: 4,
-    textTransform: 'uppercase',
-  },
+    /* stat tiles */
+    statsPanel: { marginBottom: 14 },
+    statsRow: { flexDirection: 'row', gap: 6 },
+    metricTile: {
+      flex: 1,
+      minWidth: 0,
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceAlt,
+    },
+    metricValue: { color: colors.text, fontSize: 16, fontWeight: '900' },
+    metricLabel: {
+      color: colors.textDim,
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.6,
+      marginTop: 4,
+      textTransform: 'uppercase',
+    },
 
-  /* filter switcher */
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-    padding: 5,
-    borderRadius: cardRadius.pill,
-    backgroundColor: cardGame.tableDeep,
-    borderWidth: 1,
-    borderColor: cardGame.rimSoft,
-  },
-  filterPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: cardRadius.pill,
-  },
-  filterPillActive: { backgroundColor: cardGame.gold },
-  filterLabel: { color: cardGame.textMuted, fontSize: 13.5, fontWeight: '900' },
-  filterLabelActive: { color: cardGame.ink },
-  filterCount: {
-    minWidth: 22,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: cardRadius.pill,
-    alignItems: 'center',
-    backgroundColor: 'rgba(247,183,51,0.16)',
-  },
-  filterCountActive: { backgroundColor: 'rgba(21,14,54,0.22)' },
-  filterCountText: { color: cardGame.gold, fontSize: 11, fontWeight: '900' },
-  filterCountTextActive: { color: cardGame.ink },
+    /* filter switcher */
+    filterRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 14,
+      padding: 5,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    filterPill: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 9,
+      borderRadius: radius.pill,
+    },
+    filterPillActive: { backgroundColor: colors.primary },
+    filterLabel: { color: colors.textMuted, fontSize: 13.5, fontWeight: '900' },
+    filterLabelActive: { color: colors.ink },
+    filterCount: {
+      minWidth: 22,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      backgroundColor: colors.primaryTint,
+    },
+    filterCountActive: { backgroundColor: 'rgba(0,0,0,0.18)' },
+    filterCountText: { color: colors.primary, fontSize: 11, fontWeight: '900' },
+    filterCountTextActive: { color: colors.ink },
 
-  /* section header */
-  sectionHead: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingHorizontal: 2,
-  },
-  sectionTitle: { color: cardGame.text, fontSize: 15, fontWeight: '900' },
-  sectionCount: { color: cardGame.textDim, fontSize: 11.5, fontWeight: '800' },
+    /* section header */
+    sectionHead: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+      paddingHorizontal: 2,
+    },
+    sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '900' },
+    sectionCount: { color: colors.textDim, fontSize: 11.5, fontWeight: '800' },
 
-  /* result rows */
-  resultPanel: { marginBottom: 10 },
-  resultRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  resultBody: { flex: 1, minWidth: 0, marginLeft: 12 },
-  resultHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  figuresLine: { flexShrink: 1, color: cardGame.text, fontSize: 13, fontWeight: '900' },
-  outcomeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 0,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: cardRadius.pill,
-    borderWidth: 1,
-  },
-  outcomeChipWin: {
-    backgroundColor: 'rgba(61,220,151,0.16)',
-    borderColor: 'rgba(61,220,151,0.5)',
-  },
-  outcomeChipLoss: {
-    backgroundColor: 'rgba(255,91,127,0.16)',
-    borderColor: 'rgba(255,91,127,0.5)',
-  },
-  outcomeText: { fontSize: 11, fontWeight: '900' },
-  outcomeTextWin: { color: cardGame.success },
-  outcomeTextLoss: { color: cardGame.danger },
-  playersLine: { color: cardGame.textMuted, fontSize: 12, fontWeight: '700', marginTop: 5 },
-  resultFoot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginTop: 6,
-  },
-  potLine: { flexShrink: 1, color: cardGame.gold, fontSize: 11.5, fontWeight: '800' },
-  dateLine: { flexShrink: 0, color: cardGame.textDim, fontSize: 11, fontWeight: '700' },
+    /* result rows */
+    resultPanel: { marginBottom: 10 },
+    resultRow: { flexDirection: 'row', alignItems: 'flex-start' },
+    resultBody: { flex: 1, minWidth: 0, marginLeft: 12 },
+    resultHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    figuresLine: { flexShrink: 1, color: colors.text, fontSize: 13, fontWeight: '900' },
+    outcomeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      flexShrink: 0,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+    },
+    outcomeChipWin: {
+      backgroundColor: colors.successTint,
+      borderColor: colors.success,
+    },
+    outcomeChipLoss: {
+      backgroundColor: colors.dangerTint,
+      borderColor: colors.danger,
+    },
+    outcomeText: { fontSize: 11, fontWeight: '900' },
+    outcomeTextWin: { color: colors.success },
+    outcomeTextLoss: { color: colors.danger },
+    playersLine: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 5 },
+    resultFoot: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      marginTop: 6,
+    },
+    potLine: { flexShrink: 1, color: colors.primary, fontSize: 11.5, fontWeight: '800' },
+    dateLine: { flexShrink: 0, color: colors.textDim, fontSize: 11, fontWeight: '700' },
 
-  /* empty state */
-  emptyPanel: { alignItems: 'center', paddingVertical: 24 },
-  emptyTitle: { color: cardGame.text, fontSize: 16, fontWeight: '900', marginTop: 10 },
-  emptyBody: {
-    color: cardGame.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 18,
-    paddingHorizontal: 8,
-  },
-  emptyButton: { alignSelf: 'stretch' },
+    /* empty state */
+    emptyPanel: { alignItems: 'center', paddingVertical: 24 },
+    emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 10 },
+    emptyBody: {
+      color: colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+      textAlign: 'center',
+      marginTop: 6,
+      marginBottom: 18,
+      paddingHorizontal: 8,
+    },
+    emptyButton: { alignSelf: 'stretch' },
 
-  /* footnote */
-  footnote: { marginTop: 4 },
-  footnoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  footnoteText: { flex: 1, color: cardGame.textMuted, fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
-});
+    /* footnote */
+    footnote: { marginTop: 4 },
+    footnoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    footnoteText: { flex: 1, color: colors.textMuted, fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
+  });
+}

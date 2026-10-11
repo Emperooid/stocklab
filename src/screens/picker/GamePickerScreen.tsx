@@ -3,20 +3,23 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AppIcon, Illustration, IllustrationName } from '../../components/AppIcon';
-import { Colors, lightColors, radius, shadow, spacing, typography, useColors, useIsLight } from '../../theme/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, radius, shadow, spacing, typography, useColors } from '../../theme/theme';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
-import { computeCardStats, openCards, useCardsStore } from '../../store/cardsStore';
+import { computeCardStats, useCardsStore } from '../../store/cardsStore';
 import { ROUND_SLOTS } from '../../lib/schedule';
 import { formatMoney } from '../../lib/format';
 import { MainStackParamList } from '../../navigation/types';
 
-/** The two game pills keep fixed brand faces so they stay loud in both themes. */
-const PILL_AMBER = '#FFC24B';
-const PILL_AMBER_DEEP = '#D98A05';
-const PILL_PINK = '#F0357F';
-const PILL_PINK_DEEP = '#B9155A';
+// Per explicit reference image: the two game pills get their own fixed,
+// vivid faces (not the main green theme) so they read as two distinct game
+// choices at a glance — gold for Stock Rounds, pink for Cards.
+const PILL_GOLD = '#FFC94D';
+const PILL_GOLD_DEEP = '#E0A500';
+const PILL_PINK = '#EC4899';
+const PILL_PINK_DEEP = '#C2185B';
+const PILL_INK = '#241505';
 
 /**
  * The lobby — what you land on after signing in. Deliberately has **no navbar**:
@@ -26,15 +29,13 @@ const PILL_PINK_DEEP = '#B9155A';
  */
 export default function GamePickerScreen() {
   const colors = useColors();
-  const isLight = useIsLight();
-  const styles = useMemo(() => createStyles(colors, isLight), [colors, isLight]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
   const user = useAuthStore((s) => s.user);
   const balance = useWalletStore((s) => s.balance);
   const refreshWallet = useWalletStore((s) => s.refresh);
   const cards = useCardsStore((s) => s.cards);
-  const bankroll = useCardsStore((s) => s.bankroll);
   const ensureSeeded = useCardsStore((s) => s.ensureSeeded);
   const settleDue = useCardsStore((s) => s.settleDue);
 
@@ -46,7 +47,6 @@ export default function GamePickerScreen() {
     }, [ensureSeeded, settleDue, refreshWallet])
   );
 
-  const playable = openCards(cards).length;
   const cardStats = computeCardStats(cards);
 
   return (
@@ -54,7 +54,7 @@ export default function GamePickerScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <View style={styles.wordmark}>
-            <AppIcon name="stock" size={26} />
+            <Ionicons name="trending-up" size={26} color={colors.primary} />
             <Text style={styles.wordmarkText}>CrowdStock</Text>
           </View>
           <Pressable
@@ -62,64 +62,64 @@ export default function GamePickerScreen() {
             onPress={() => navigation.navigate('News')}
             accessibilityLabel="News and alerts"
           >
-            <AppIcon name="bell-outline" size={19} color={colors.onPrimary} />
+            <Ionicons name="notifications-outline" size={19} color={colors.text} />
           </Pressable>
         </View>
 
         {/* ── profile strip ──────────────────────────────────────────────── */}
         <View style={styles.infoCard}>
           <InfoColumn
-            art="wallet"
+            icon="wallet-outline"
             label="Wallet Balance"
             value={formatMoney(balance)}
             styles={styles}
+            colors={colors}
             first
+            onPress={() => navigation.navigate('LobbyWallet')}
           />
           <View style={styles.infoDivider} />
           <InfoColumn
-            art="person"
+            icon="person-outline"
             label="Name"
             value={user?.name?.split(' ')[0] ?? 'Player'}
             styles={styles}
+            colors={colors}
           />
           <View style={styles.infoDivider} />
-          <InfoColumn art="phone" label="Phone" value={user?.phone ?? '—'} styles={styles} small />
+          <InfoColumn icon="call-outline" label="Phone" value={user?.phone ?? '—'} styles={styles} colors={colors} small />
         </View>
 
         <Text style={styles.prompt}>Pick a game and play</Text>
 
         {/* ── game 1 ─────────────────────────────────────────────────────── */}
         <GamePill
-          art="crowd"
-          title="Stock Rounds"
-          subtitle="Play the hourly crowd pick"
+          icon="stats-chart"
+          badgeIcon="people"
+          title="Hourly Cash"
+          subtitle=" Choose Between 1 and 5 and Win Hourly"
           meta={`${ROUND_SLOTS.length} rounds a day`}
-          face={PILL_AMBER}
-          deep={PILL_AMBER_DEEP}
-          textColor={lightColors.ink}
-          metaColor="rgba(42,27,18,0.62)"
+          face={PILL_GOLD}
+          deep={PILL_GOLD_DEEP}
+          textColor={PILL_INK}
+          metaColor="rgba(36,21,5,0.62)"
           styles={styles}
           onPress={() => navigation.navigate('RoundsGame')}
-          accessibilityLabel="Play Stock Rounds"
+          accessibilityLabel="Play Hourly Cash"
         />
 
         {/* ── game 2 ─────────────────────────────────────────────────────── */}
         <GamePill
-          art="cash"
-          title="CrowdStock Cards"
-          subtitle="Draft a card, instantly"
-          meta={
-            bankroll == null
-              ? `${playable} open`
-              : `${formatMoney(bankroll)} on the table · ${playable} open`
-          }
+          icon="cash"
+          badgeIcon="card"
+          title="Hide or Guess"
+          subtitle="Hide a figure or Guess Right to Win Instantly"
           face={PILL_PINK}
           deep={PILL_PINK_DEEP}
           textColor="#FFFFFF"
           metaColor="rgba(255,255,255,0.82)"
           styles={styles}
           onPress={() => navigation.navigate('CardsGame')}
-          accessibilityLabel="Play CrowdStock Cards"
+          accessibilityLabel="Play Hide and Seek"
         />
 
         {/* ── invite ─────────────────────────────────────────────────────── */}
@@ -129,7 +129,10 @@ export default function GamePickerScreen() {
           accessibilityLabel="Invite contacts and earn points"
         >
           <View style={styles.inviteArt}>
-            <Illustration name="invite" size={132} />
+            <Ionicons name="megaphone" size={56} color={colors.primary} />
+            <View style={[styles.inviteArtBadge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="people" size={15} color={colors.onPrimary} />
+            </View>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.inviteTitle}>Invite contacts..</Text>
@@ -141,7 +144,7 @@ export default function GamePickerScreen() {
             </Text>
           </View>
           <View style={styles.inviteChevron}>
-            <AppIcon name="chevron-right" size={20} color={PILL_AMBER} />
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
           </View>
         </Pressable>
 
@@ -153,23 +156,27 @@ export default function GamePickerScreen() {
 }
 
 function InfoColumn({
-  art,
+  icon,
   label,
   value,
   styles,
+  colors,
   first,
   small,
+  onPress,
 }: {
-  art: IllustrationName;
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
   styles: ReturnType<typeof createStyles>;
+  colors: Colors;
   first?: boolean;
   small?: boolean;
+  onPress?: () => void;
 }) {
-  return (
-    <View style={styles.infoColumn}>
-      <Illustration name={art} size={52} />
+  const content = (
+    <>
+      <Ionicons name={icon} size={28} color={colors.primary} />
       <Text style={styles.infoLabel} numberOfLines={1}>
         {label}
       </Text>
@@ -181,12 +188,20 @@ function InfoColumn({
       >
         {value}
       </Text>
-    </View>
+    </>
+  );
+  return onPress ? (
+    <Pressable style={styles.infoColumn} onPress={onPress} accessibilityLabel="Open wallet">
+      {content}
+    </Pressable>
+  ) : (
+    <View style={styles.infoColumn}>{content}</View>
   );
 }
 
 function GamePill({
-  art,
+  icon,
+  badgeIcon,
   title,
   subtitle,
   meta,
@@ -198,10 +213,12 @@ function GamePill({
   accessibilityLabel,
   styles,
 }: {
-  art: IllustrationName;
+  icon: keyof typeof Ionicons.glyphMap;
+  /** Small corner badge, layered over the main icon — matches the reference image's combined icon look. */
+  badgeIcon?: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
-  meta: string;
+  meta?: string;
   face: string;
   deep: string;
   textColor: string;
@@ -223,7 +240,12 @@ function GamePill({
         ]}
       >
         <View style={styles.pillArt}>
-          <Illustration name={art} size={88} />
+          <Ionicons name={icon} size={40} color={textColor} />
+          {!!badgeIcon && (
+            <View style={[styles.pillArtBadge, { backgroundColor: deep, borderColor: face }]}>
+              <Ionicons name={badgeIcon} size={14} color={textColor} />
+            </View>
+          )}
         </View>
         <View style={styles.pillText}>
           <Text style={[styles.pillTitle, { color: textColor }]} numberOfLines={1}>
@@ -232,23 +254,23 @@ function GamePill({
           <Text style={[styles.pillSubtitle, { color: textColor }]} numberOfLines={2}>
             {subtitle}
           </Text>
-          <Text style={[styles.pillMeta, { color: metaColor }]} numberOfLines={1}>
-            {meta}
-          </Text>
+          {!!meta && (
+            <Text style={[styles.pillMeta, { color: metaColor }]} numberOfLines={1}>
+              {meta}
+            </Text>
+          )}
         </View>
         <View style={[styles.pillChevron, { backgroundColor: deep }]}>
-          <AppIcon name="chevron-right" size={22} color="#FFFFFF" />
+          <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
         </View>
       </Pressable>
     </View>
   );
 }
 
-function createStyles(colors: Colors, isLight: boolean) {
-  const pageBg = isLight ? colors.primary : '#1B1145';
-  const softWhite = isLight ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.12)';
+function createStyles(colors: Colors) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: pageBg },
+    safe: { flex: 1, backgroundColor: colors.background },
     content: {
       padding: spacing.lg,
       paddingBottom: spacing.xxxl,
@@ -262,12 +284,12 @@ function createStyles(colors: Colors, isLight: boolean) {
 
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     wordmark: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-    wordmarkText: { ...typography.h2, color: colors.onPrimary, letterSpacing: -0.4 },
+    wordmarkText: { ...typography.h2, color: colors.text, letterSpacing: -0.4 },
     topBtn: {
       width: 42,
       height: 42,
       borderRadius: 16,
-      backgroundColor: softWhite,
+      backgroundColor: colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -290,7 +312,7 @@ function createStyles(colors: Colors, isLight: boolean) {
 
     prompt: {
       ...typography.h2,
-      color: colors.onPrimary,
+      color: colors.text,
       textAlign: 'center',
       marginTop: spacing.xl,
       marginBottom: spacing.md,
@@ -310,6 +332,17 @@ function createStyles(colors: Colors, isLight: boolean) {
       minHeight: 112,
     },
     pillArt: { width: 92, alignItems: 'center', justifyContent: 'center' },
+    pillArtBadge: {
+      position: 'absolute',
+      bottom: 10,
+      right: 10,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     pillText: { flex: 1, minWidth: 0 },
     pillTitle: { ...typography.h2, letterSpacing: -0.3 },
     pillSubtitle: { ...typography.small, fontWeight: '700', marginTop: 1, lineHeight: 17 },
@@ -331,21 +364,33 @@ function createStyles(colors: Colors, isLight: boolean) {
       paddingVertical: spacing.md,
     },
     inviteArt: { width: 118, alignItems: 'center', justifyContent: 'center' },
-    inviteTitle: { ...typography.h2, color: colors.onPrimary },
-    inviteHighlight: { ...typography.h2, color: PILL_AMBER, marginTop: -2 },
-    inviteMeta: { ...typography.tiny, color: 'rgba(255,255,255,0.72)', marginTop: 6, fontWeight: '700' },
+    inviteArtBadge: {
+      position: 'absolute',
+      bottom: 4,
+      right: 18,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 2,
+      borderColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    inviteTitle: { ...typography.h2, color: colors.text },
+    inviteHighlight: { ...typography.h2, color: colors.primary, marginTop: -2 },
+    inviteMeta: { ...typography.tiny, color: colors.textMuted, marginTop: 6, fontWeight: '700' },
     inviteChevron: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: softWhite,
+      backgroundColor: colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
 
     footnote: {
       ...typography.label,
-      color: 'rgba(255,255,255,0.6)',
+      color: colors.textDim,
       textAlign: 'center',
       marginTop: spacing.lg,
     },

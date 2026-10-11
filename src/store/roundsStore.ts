@@ -48,6 +48,8 @@ export function pruneOldKeys<T>(map: Record<string, T>, now: Date): Record<strin
 
 interface RoundsState {
   rounds: DailyRound[];
+  /** Local day the cached rounds belong to — a stale list is dropped, not shown. */
+  roundsCachedOn: string;
   isLoading: boolean;
   // CONFIRMED live: G13 never reflects a pending prediction before a round
   // settles — it keeps returning [] immediately after a successful G12
@@ -72,6 +74,7 @@ export const useRoundsStore = create<RoundsState>()(
   persist(
     (set, get) => ({
       rounds: [],
+      roundsCachedOn: '',
       isLoading: false,
       localPredictions: {},
 
@@ -79,7 +82,7 @@ export const useRoundsStore = create<RoundsState>()(
         set({ isLoading: true });
         try {
           const rounds = applyLocalOverrides(await api.rounds.getToday(), get().localPredictions, new Date());
-          set({ rounds, isLoading: false });
+          set({ rounds, isLoading: false, roundsCachedOn: localDateKey(new Date()) });
           syncNotificationsForRounds(rounds);
         } catch (e) {
           set({ isLoading: false });
@@ -103,9 +106,19 @@ export const useRoundsStore = create<RoundsState>()(
     {
       name: 'crowdstock-rounds',
       storage: createJSONStorage(() => AsyncStorage),
-      // rounds/isLoading are always refetched on launch — only the local
-      // prediction overrides need to survive a reload.
-      partialize: (state) => ({ localPredictions: state.localPredictions }),
+      // Cached so the Rounds tab paints on launch instead of waiting on G13.
+      // The day stamp is the guard: a round list only means anything for its
+      // own day, so yesterday's cache is dropped rather than shown as today's.
+      partialize: (state) => ({
+        localPredictions: state.localPredictions,
+        rounds: state.rounds,
+        roundsCachedOn: state.roundsCachedOn,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state && state.roundsCachedOn !== localDateKey(new Date())) {
+          useRoundsStore.setState({ rounds: [], roundsCachedOn: '' });
+        }
+      },
     }
   )
 );

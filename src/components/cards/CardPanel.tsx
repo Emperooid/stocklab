@@ -1,27 +1,34 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { Colors, radius, useColors } from '../../theme/theme';
 
 interface CardPanelProps {
   children: React.ReactNode;
   /** Small all-caps overline above the title. */
   eyebrow?: string;
   title?: string;
-  /** Tinted background instead of the standard table surface. */
+  /** Tinted background instead of the standard surface. */
   tone?: 'table' | 'deep' | 'gold' | 'magenta' | 'cyan';
   style?: StyleProp<ViewStyle>;
 }
 
-const TONES: Record<NonNullable<CardPanelProps['tone']>, { bg: string; border: string }> = {
-  table: { bg: cardGame.table, border: cardGame.rim },
-  deep: { bg: cardGame.tableDeep, border: cardGame.rimSoft },
-  gold: { bg: 'rgba(247,183,51,0.14)', border: 'rgba(247,183,51,0.42)' },
-  magenta: { bg: 'rgba(255,61,139,0.14)', border: 'rgba(255,61,139,0.42)' },
-  cyan: { bg: 'rgba(74,222,222,0.12)', border: 'rgba(74,222,222,0.4)' },
-};
+function getTones(colors: Colors): Record<NonNullable<CardPanelProps['tone']>, { bg: string; border: string }> {
+  return {
+    table: { bg: colors.surface, border: colors.border },
+    deep: { bg: colors.surfaceAlt, border: colors.borderLight },
+    // "gold" is a panel variant name (winnings/prize panels), not a literal
+    // reference to the brand color — it should read as gold/amber, not green.
+    gold: { bg: colors.warningTint, border: colors.warning },
+    magenta: { bg: colors.purpleTint, border: colors.purple },
+    cyan: { bg: colors.blueTint, border: colors.blue },
+  };
+}
 
-/** Rounded felt panel — the card game's answer to <Card>. */
+/** Rounded panel — the card game's answer to <Card>. */
 export function CardPanel({ children, eyebrow, title, tone = 'table', style }: CardPanelProps) {
-  const t = TONES[tone];
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const t = getTones(colors)[tone];
   return (
     <View style={[styles.panel, { backgroundColor: t.bg, borderColor: t.border }, style]}>
       {!!eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
@@ -31,8 +38,10 @@ export function CardPanel({ children, eyebrow, title, tone = 'table', style }: C
   );
 }
 
-const styles = StyleSheet.create({
-  panel: { borderRadius: cardRadius.panel, borderWidth: 1, padding: 16 },
-  eyebrow: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: cardGame.text, fontSize: 17, fontWeight: '900', marginTop: 2, marginBottom: 4 },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    panel: { borderRadius: radius.xl, borderWidth: 1, padding: 16 },
+    eyebrow: { color: colors.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
+    title: { color: colors.text, fontSize: 17, fontWeight: '900', marginTop: 2, marginBottom: 4 },
+  });
+}

@@ -5,14 +5,14 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainStack } from './MainStack';
 import { OnboardingCarousel } from '../components/OnboardingCarousel';
 import { AlertPopup } from '../components/AlertPopup';
-import { AppIcon } from '../components/AppIcon';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useWalletStore } from '../store/walletStore';
+import { useCardsStore } from '../store/cardsStore';
 import { useRoundsStore } from '../store/roundsStore';
 import { useTourStore } from '../store/tourStore';
 import { useAlertPopupStore } from '../store/alertPopupStore';
-import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
+import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { isBackendConfigured } from '../config/backend';
 import { navigationRef } from '../lib/navigationRef';
 import { useAutoPlayStore } from '../store/autoPlayStore';
@@ -46,25 +46,36 @@ export function RootNavigator() {
       refreshUser().catch(() => {});
       // Loaded here (not just on Predict's own focus) so Home's Auto Play
       // summary card has real data the moment the app opens, regardless of
-      // which tab the user lands on first.
+      // which tab the user lands on first. The backend now fully owns
+      // submitting/settling Auto Play rounds after A1 — the client no longer
+      // runs its own close-time engine, this is purely for display.
       useAutoPlayStore.getState().loadFromServer().catch(() => {});
     }
   }, [hasHydrated]);
 
-  // Auto-start onboarding once, for a user who's never seen it.
+  // Auto-start onboarding once, for a user who's never seen it — guarded by
+  // a ref (not just hasCompletedTour) so a later refreshUser() re-render
+  // can't retrigger it while it's already showing.
   const pendingPopupsCount = useAlertPopupStore((s) => s.pendingPopups.length);
   const tourAutoStarted = useRef(false);
   useEffect(() => {
     if (!hasHydrated || !user || tourAutoStarted.current) return;
     if (useTourStore.getState().hasCompletedTour) return;
+    // Let any alert/news popup from this login get seen and dismissed first
+    // — stacking the carousel's own full-screen modal on top of it would bury it.
     if (pendingPopupsCount > 0) return;
     tourAutoStarted.current = true;
     const timer = setTimeout(() => useTourStore.getState().startTour(), 600);
     return () => clearTimeout(timer);
   }, [hasHydrated, user, pendingPopupsCount]);
 
-  // A virtual-account deposit lands via a bank transfer, not an in-app action,
-  // so the balance can change while the app is merely backgrounded.
+  // A virtual-account deposit lands via a bank transfer, not an in-app
+  // action, so the balance can change while the app is merely backgrounded
+  // — no screen-focus event fires for that. Refreshing on every foreground
+  // (not just after a specific action) covers both that and a round
+  // settling while away. CONFIRMED live (from the old checkout-based
+  // deposit flow, same underlying gap): balance genuinely didn't update
+  // until manually pulling to refresh without this.
   const appState = useRef(AppState.currentState);
   useEffect(() => {
     if (!user) return;
@@ -72,6 +83,10 @@ export function RootNavigator() {
       if (appState.current.match(/inactive|background/) && next === 'active') {
         useWalletStore.getState().refresh().catch(() => {});
         useRoundsStore.getState().fetchRounds().catch(() => {});
+        // The card balance mirrors the wallet (see cardsStore.refreshFromServer),
+        // but a card screen that is already focused won't re-run its focus
+        // effect — so a win paid while the app was backgrounded would not show.
+        useCardsStore.getState().refreshFromServer().catch(() => {});
       }
       appState.current = next;
     });
@@ -81,24 +96,25 @@ export function RootNavigator() {
   if (!hasHydrated) {
     return (
       <View style={styles.splash}>
-        <View style={styles.splashWell}>
-          <Image source={require('../../assets/icon.png')} style={styles.splashLogo} resizeMode="contain" />
-        </View>
-        <Text style={styles.splashWord}>CrowdStock</Text>
-        <Text style={styles.splashTag}>Predict · Play · Win</Text>
-        <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: spacing.xl }} />
+        <Image source={require('../../assets/icon.png')} style={styles.splashLogo} resizeMode="contain" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
 
-  // CONFIRMED live cause of "Could not reach the server" on an installed APK:
-  // EXPO_PUBLIC_* vars are baked into the JS bundle at BUILD time.
+  // CONFIRMED live cause of "Could not reach the server" on an installed
+  // APK that works fine in Expo Go: EXPO_PUBLIC_* vars are baked into the
+  // JS bundle at BUILD time, not read from the device at runtime. .env is
+  // (correctly) gitignored, so unless these three are also set as EAS
+  // Environment Variables for the build profile used, an EAS-built APK
+  // bundles BACKEND_BASE_URL as an empty string — every request then hits
+  // a malformed URL and fails at the network layer, which reads exactly
+  // like a real connectivity problem even though it never touches the
+  // network. Surfacing this distinctly instead of letting it masquerade as
+  // "check your internet connection".
   if (!isBackendConfigured()) {
     return (
       <View style={styles.splash}>
-        <View style={[styles.configIcon, { backgroundColor: colors.amberTint }]}>
-          <AppIcon name="alert" size={40} color={colors.amber} />
-        </View>
         <Text style={styles.configTitle}>App isn't configured</Text>
         <Text style={styles.configBody}>
           This build is missing its backend connection details. This isn't a network problem — the app needs to
@@ -120,34 +136,9 @@ export function RootNavigator() {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    splash: {
-      flex: 1,
-      backgroundColor: colors.background,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.xl,
-    },
-    splashWell: {
-      width: 112,
-      height: 112,
-      borderRadius: radius.xxl,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.lg,
-    },
-    splashLogo: { width: 84, height: 84, borderRadius: radius.lg },
-    splashWord: { ...typography.display, color: colors.text },
-    splashTag: { ...typography.small, color: colors.textMuted, marginTop: 4, fontWeight: '700' },
-    configIcon: {
-      width: 88,
-      height: 88,
-      borderRadius: radius.xxl,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.lg,
-    },
-    configTitle: { ...typography.h2, color: colors.text, marginBottom: spacing.sm },
-    configBody: { ...typography.small, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
+    splash: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    splashLogo: { width: 96, height: 96, borderRadius: 22, marginBottom: spacing.xl },
+    configTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+    configBody: { ...typography.small, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
   });
 }

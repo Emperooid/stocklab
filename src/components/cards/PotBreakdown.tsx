@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
-import { AppIcon } from '../AppIcon';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, radius, useColors } from '../../theme/theme';
 import { formatMoney } from '../../lib/format';
 import { PLATFORM_SHARE, WINNER_SHARE, payoutFor, potFor } from '../../store/cardsStore';
 
@@ -8,27 +9,44 @@ interface PotBreakdownProps {
   amount: number;
   /** Who won, so the winner row can be highlighted. */
   won?: boolean | null;
+  /**
+   * What the gateway actually paid. Pass this for a settled card so the split
+   * shows real money; without it the local 80/20 rule is used, which is only
+   * truthful as a preview of a card that hasn't been played yet.
+   */
+  payout?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 /** Total pot → winner's 80% → the house's 20%. */
-export function PotBreakdown({ amount, won, style }: PotBreakdownProps) {
+export function PotBreakdown({ amount, won, payout: reported, style }: PotBreakdownProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pot = potFor(amount);
-  const payout = payoutFor(amount);
+  const payout = reported ?? payoutFor(amount);
   const fee = pot - payout;
 
   return (
     <View style={[styles.wrap, style]}>
-      <Row label="Total Pot" value={formatMoney(pot)} icon="pot" />
+      <Row colors={colors} styles={styles} label="Total Pot" value={formatMoney(pot)} icon="cash" />
       <View style={styles.divider} />
       <Row
+        colors={colors}
+        styles={styles}
         label={`Winner gets (${Math.round(WINNER_SHARE * 100)}%)`}
         value={formatMoney(payout)}
-        icon="crown"
+        icon="trophy"
         highlight={won === true ? 'win' : won === false ? 'lose' : undefined}
       />
       <View style={styles.divider} />
-      <Row label={`Platform fee (${Math.round(PLATFORM_SHARE * 100)}%)`} value={formatMoney(fee)} icon="bank-outline" muted />
+      <Row
+        colors={colors}
+        styles={styles}
+        label={`Platform fee (${Math.round(PLATFORM_SHARE * 100)}%)`}
+        value={formatMoney(fee)}
+        icon="business-outline"
+        muted
+      />
     </View>
   );
 }
@@ -39,18 +57,22 @@ function Row({
   icon,
   highlight,
   muted,
+  colors,
+  styles,
 }: {
   label: string;
   value: string;
-  icon: Parameters<typeof AppIcon>[0]['name'];
+  icon: keyof typeof Ionicons.glyphMap;
   highlight?: 'win' | 'lose';
   muted?: boolean;
+  colors: Colors;
+  styles: ReturnType<typeof createStyles>;
 }) {
-  const colour = highlight === 'win' ? cardGame.success : highlight === 'lose' ? cardGame.danger : cardGame.text;
+  const colour = highlight === 'win' ? colors.success : highlight === 'lose' ? colors.danger : colors.text;
   return (
     <View style={styles.row}>
       <View style={styles.iconWrap}>
-        <AppIcon name={icon} size={16} color={muted ? cardGame.textDim : cardGame.gold} />
+        <Ionicons name={icon} size={16} color={muted ? colors.textDim : colors.warning} />
       </View>
       <Text style={[styles.label, muted && styles.labelMuted]} numberOfLines={1}>
         {label}
@@ -62,18 +84,17 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: cardGame.tableDeep,
-    borderWidth: 1,
-    borderColor: cardGame.rim,
-    borderRadius: cardRadius.chip,
-    paddingHorizontal: 12,
-  },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
-  iconWrap: { width: 22, alignItems: 'center' },
-  label: { color: cardGame.textMuted, fontSize: 13, fontWeight: '700', flex: 1 },
-  labelMuted: { color: cardGame.textDim },
-  value: { fontSize: 15, fontWeight: '900' },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: cardGame.rimSoft },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    // No background/border of its own — this sits directly inside a
+    // CardPanel (gold-tinted), and a second nested box-within-a-box read as
+    // visually busy rather than blended. Dividers alone separate the rows.
+    wrap: {},
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
+    iconWrap: { width: 22, alignItems: 'center' },
+    label: { color: colors.textMuted, fontSize: 13, fontWeight: '700', flex: 1 },
+    labelMuted: { color: colors.textDim },
+    value: { fontSize: 15, fontWeight: '900' },
+    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  });
+}

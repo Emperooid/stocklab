@@ -39,9 +39,11 @@ export type MainStackParamList = {
   Withdrawal: undefined;
   News: undefined;
   Invite: undefined;
+  LobbyWallet: undefined;
 
   // Card-duel flow
   SetCard: undefined;
   UnveilCard: { cardId: string };
   CardResult: { cardId: string };
+  CardHistory: undefined;
 };

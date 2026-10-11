@@ -563,6 +563,98 @@ export const httpApi = {
       };
     },
     /**
+     * Step 1 of a deposit: initialize a Flutterwave payment via theKey "PAY"
+     * (the same deposit key the old card-checkout flow used, now re-targeted
+     * at Flutterwave). CONFIRMED live: PAY is session-exempt — it succeeds
+     * with only the bearer header, no refID/phone/deviceid.
+     *
+     * Flow (confirmed live):
+     *   1. Call PAY with the Flutterwave payload below. `cref` must be unique
+     *      per attempt — generated client-side.
+     *   2. The outer response's `response` field is a JSON-encoded *string*
+     *      (not a nested object) — JSON.parse() it, then read
+     *      `responseData.redirectUrl` — a hosted Flutterwave checkout page.
+     *   3. Open that URL (plain browser open is enough — no WebView needed).
+     *   4. The backend credits the wallet via webhook once payment completes;
+     *      nothing for the client to call afterward. The existing balance
+     *      refresh picks up the new balance once the webhook lands.
+     *
+     * `amount` is sent in naira (Flutterwave's native unit) — NOT kobo. The
+     * old pre-Flutterwave gateway wanted kobo (`amount * 100`); Flutterwave
+     * reads `amount` as naira directly, so multiplying by 100 now over-charges
+     * 100x. Confirmed live via the echoed `request.amount` forwarded to
+     * Flutterwave unchanged.
+     * `channel`/`currency` are new Flutterwave fields, fixed to WEB/NGN.
+     */
+    async createDepositReference(
+      amount: number,
+      opts: { name?: string; email?: string } = {}
+    ): Promise<{ redirectUrl: string; reference: string }> {
+      const { phone } = requireSession();
+      const cref = `dep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      // The gateway validates femail as a real email address and rejects a
+      // bare phone number — use the account's real email when known, else a
+      // synthesized address that at least passes format validation.
+      const femail = opts.email?.trim() || `${phone.replace(/\D/g, '')}@crowdstock.app`;
+
+      const res = await callGateway<any>(
+        'PAY',
+        {
+          cref,
+          amount: Math.round(amount),
+          description: 'Wallet deposit',
+          cname: opts.name?.trim() || phone,
+          femail,
+          cmobile: phone,
+          channel: 'WEB',
+          currency: 'NGN',
+        },
+        { requiresSession: false }
+      );
+
+      let inner = res?.response;
+      if (typeof inner === 'string') {
+        try {
+          inner = JSON.parse(inner);
+        } catch {
+          throw new Error('PAY succeeded but its response could not be parsed. Please try again.');
+        }
+      }
+      // Two response shapes seen live across gateway switches:
+      //   - Flutterwave (current): response.data.link — hosted checkout URL
+      //   - old Sling gateway:        responseData.redirectUrl (nested in a
+      //     JSON-encoded `response` string)
+      // Read the current shape first, then fall back defensively.
+      const redirectUrl = inner?.data?.link ?? inner?.responseData?.redirectUrl;
+      if (!redirectUrl) {
+        throw new Error('PAY succeeded but returned no checkout link. Please try again.');
+      }
+      return { redirectUrl, reference: inner?.responseData?.transactionReference ?? res?.tx_ref ?? res?.cref ?? cref };
+    },
+    /**
+     * Step 2 of a deposit: verify a Flutterwave payment by its tx_ref via
+     * theKey "UPS" (Update Payment Status). CONFIRMED live: UPS needs only
+     * {tx_ref} — the backend resolves the Flutterwave transaction_id itself.
+     *
+     * Response when the payment exists and has settled:
+     *   { status: "success", message: "Payment verified successfully",
+     *     data: { status: "successful", amount, ... } }
+     * Response when not found / still pending:
+     *   { status: "error", message: "No Flutterwave transaction was found ...",
+     *     data: {...} }
+     */
+    async verifyDeposit(reference: string): Promise<{ verified: boolean; message: string }> {
+      // CONFIRMED live: UPS is session-exempt (like PAY) — it succeeds with
+      // only the bearer header, no refID/phone/deviceid. Calling it with
+      // requiresSession:true would mint a G1001 token first, which fails and
+      // force-logs-out the user if their session has lapsed while they were
+      // away on the checkout page. Keep it exempt.
+      const res = await callGateway<any>('UPS', { tx_ref: reference }, { requiresSession: false });
+      const dataStatus = res?.data?.status;
+      const verified = res?.status === 'success' && (dataStatus === 'successful' || dataStatus === 'success');
+      return { verified: !!verified, message: res?.message ?? '' };
+    },
+    /**
      * CONFIRMED shape per Mr Yemi's doc (theKey "AAA") — resolves the real
      * account holder's name from just a bank + account number, third-party
      * (VigiPay-style) name-enquiry underneath. Request: {bankCode,

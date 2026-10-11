@@ -1,14 +1,13 @@
 import { useCallback, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AppIcon, Illustration } from '../../components/AppIcon';
+import { Ionicons } from '@expo/vector-icons';
 import { CardPanel } from '../../components/cards/CardPanel';
-import { CardTableScreen } from '../../components/cards/CardTableScreen';
+import { Screen } from '../../components/Screen';
 import { PlayingCard } from '../../components/cards/PlayingCard';
-import { cardGame, cardRadius, goldGlow } from '../../theme/cardsTheme';
-import { IconName } from '../../theme/icons';
+import { Colors, radius, useColors, glow } from '../../theme/theme';
 import { CardsTabParamList, MainStackParamList } from '../../navigation/types';
 import { formatMoney, formatSigned, formatPercent } from '../../lib/format';
 import { useWalletStore } from '../../store/walletStore';
@@ -22,6 +21,8 @@ import {
   payoutFor,
 } from '../../store/cardsStore';
 import type { GameCard } from '../../store/cardsStore';
+
+type IconName = keyof typeof Ionicons.glyphMap;
 
 const HOME_CARD_SIZE = 92;
 const RESULT_CARD_SIZE = 44;
@@ -50,6 +51,8 @@ function secondFigure(card: GameCard): number | null {
 }
 
 export default function CardsHomeScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const tabNavigation = useNavigation<BottomTabNavigationProp<CardsTabParamList>>();
   const stackNavigation = tabNavigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
 
@@ -80,10 +83,10 @@ export default function CardsHomeScreen() {
   const waitingStake = waiting.reduce((sum, c) => sum + c.amount, 0);
 
   return (
-    <CardTableScreen>
+    <Screen>
       {/* 1 ── identity + way out to the game picker */}
       <View style={styles.identity}>
-        <Illustration name="cards" size={64} />
+        <Ionicons name="albums" size={64} color={colors.primary} />
         <View style={styles.identityText}>
           <Text style={styles.brand}>CROWDSTOCK CARDS</Text>
           <Text style={styles.tagline} numberOfLines={2}>
@@ -97,15 +100,15 @@ export default function CardsHomeScreen() {
           hitSlop={8}
           style={({ pressed }) => [styles.switchBtn, pressed && { opacity: 0.6 }]}
         >
-          <AppIcon name="cards-outline" size={19} color={cardGame.gold} />
+          <Ionicons name="albums-outline" size={19} color={colors.primary} />
         </Pressable>
       </View>
 
       {/* 2 ── balance hero */}
-      <CardPanel tone="deep" style={[styles.hero, goldGlow(0.24)]}>
+      <CardPanel tone="deep" style={[styles.hero, glow(colors.primary)]}>
         <View style={styles.heroRow}>
           <View style={styles.heroCoin}>
-            <AppIcon name="pot" size={26} color={cardGame.gold} />
+            <Ionicons name="cash" size={26} color={colors.primary} />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.heroLabel}>CARD BALANCE</Text>
@@ -126,25 +129,47 @@ export default function CardsHomeScreen() {
         </View>
       </CardPanel>
 
+      {/* 2b ── promo banner */}
+      <Pressable
+        onPress={() => tabNavigation.navigate('Play')}
+        accessibilityLabel="Hide a Number: pick a number between 1 and 5, then make your guess"
+        style={({ pressed }) => [styles.bannerWrap, pressed && { opacity: 0.9 }]}
+      >
+        <View style={styles.bannerClip}>
+          <Image
+            source={require('../../../assets/banner-hide-a-number.jpg')}
+            style={styles.banner}
+            resizeMode="cover"
+          />
+        </View>
+      </Pressable>
+
       {/* 3 ── quick actions */}
       <Text style={styles.blockLabel}>QUICK ACTIONS</Text>
       <QuickTile
+        icon="add"
+        label="Create a card"
+        hint="Select an amount and choose a figure to hide between 1 and 5"
+        onPress={() => stackNavigation?.navigate('SetCard')}
+      />
+      <View style={styles.orRow}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>OR</Text>
+        <View style={styles.orLine} />
+      </View>
+      <QuickTile
         icon="flame"
-        label="Play now"
-        hint={`${playable.length} card${playable.length === 1 ? '' : 's'} open`}
+        label="Unveil a card"
+        hint="Guess the hidden figure between 1 and 5"
         primary
         onPress={() => tabNavigation.navigate('Play')}
       />
-      <View style={styles.quickRow}>
-        <QuickTile icon="plus" label="Create card" hint="Hide a figure" onPress={() => stackNavigation?.navigate('SetCard')} />
-        <QuickTile icon="card" label="My cards" hint="See your cards" onPress={() => tabNavigation.navigate('MyCards')} />
-      </View>
 
       {/* 4 ── open cards */}
       <CardPanel
         tone="deep"
-        eyebrow="UP FOR GRABS"
-        title="Open cards"
+        eyebrow="Cashout Instantly"
+        title="Many Cards to Unveil"
         style={styles.section}
       >
         <Pressable onPress={() => tabNavigation.navigate('Play')} accessibilityRole="button" accessibilityLabel="See all open cards" hitSlop={8}>
@@ -153,7 +178,7 @@ export default function CardsHomeScreen() {
 
         {openPreview.length === 0 ? (
           <View style={styles.empty}>
-            <Illustration name="empty" size={96} />
+            <Ionicons name="file-tray-outline" size={96} color={colors.textDim} />
             <Text style={styles.emptyText}>No open cards right now. Create one and let someone answer it.</Text>
           </View>
         ) : (
@@ -181,7 +206,7 @@ export default function CardsHomeScreen() {
       <CardPanel tone="deep" title="Your cards waiting for an answer" style={styles.section}>
         {waiting.length === 0 ? (
           <View style={styles.waitingEmpty}>
-            <AppIcon name="card" size={22} color={cardGame.gold} />
+            <Ionicons name="albums" size={22} color={colors.primary} />
             <Text style={styles.waitingText}>Nothing waiting right now — your open cards show up here.</Text>
           </View>
         ) : (
@@ -209,7 +234,7 @@ export default function CardsHomeScreen() {
 
         {recent.length === 0 ? (
           <View style={styles.empty}>
-            <Illustration name="empty" size={96} />
+            <Ionicons name="file-tray-outline" size={96} color={colors.textDim} />
             <Text style={styles.emptyText}>No settled cards yet. Your wins and losses land here.</Text>
           </View>
         ) : (
@@ -231,7 +256,7 @@ export default function CardsHomeScreen() {
                       {versus} · {formatMoney(c.amount)}
                     </Text>
                   </View>
-                  <Text style={[styles.resultAmount, { color: won ? cardGame.success : cardGame.danger }]} numberOfLines={1}>
+                  <Text style={[styles.resultAmount, { color: won ? colors.success : colors.danger }]} numberOfLines={1}>
                     {signed}
                   </Text>
                 </View>
@@ -244,13 +269,13 @@ export default function CardsHomeScreen() {
       {/* 7 ── rules reminder */}
       <CardPanel tone="gold" style={styles.section}>
         <View style={styles.rules}>
-          <AppIcon name="bulb" size={20} color={cardGame.gold} />
+          <Ionicons name="bulb" size={20} color={colors.primary} />
           <Text style={styles.rulesText}>
             Match the originator&apos;s figure to win 80% of the pot.
           </Text>
         </View>
       </CardPanel>
-    </CardTableScreen>
+    </Screen>
   );
 }
 
@@ -266,6 +291,8 @@ interface QuickTileProps {
 }
 
 function QuickTile({ icon, label, hint, onPress, primary = false }: QuickTileProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable
       onPress={onPress}
@@ -273,148 +300,165 @@ function QuickTile({ icon, label, hint, onPress, primary = false }: QuickTilePro
       accessibilityLabel={label}
       style={({ pressed }) => [
         styles.quick,
-        primary ? styles.quickPrimary : styles.quickHalf,
+        primary ? styles.quickPrimary : styles.quickFull,
         pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
       ]}
     >
       <View style={[styles.quickIcon, primary && styles.quickIconPrimary]}>
-        <AppIcon name={icon} size={primary ? 22 : 18} color={primary ? cardGame.ink : cardGame.gold} />
+        <Ionicons name={icon} size={primary ? 22 : 18} color={primary ? colors.ink : colors.primary} />
       </View>
       <View style={styles.quickText}>
         <Text style={[styles.quickLabel, primary && styles.quickLabelPrimary]} numberOfLines={1}>
           {label}
         </Text>
-        <Text style={[styles.quickHint, primary && styles.quickHintPrimary]} numberOfLines={1}>
-          {hint}
-        </Text>
+        <Text style={[styles.quickHint, primary && styles.quickHintPrimary]}>{hint}</Text>
       </View>
-      <AppIcon name="chevron-right" size={18} color={primary ? cardGame.ink : cardGame.textDim} />
+      <Ionicons name="chevron-forward" size={18} color={primary ? colors.ink : colors.textDim} />
     </Pressable>
   );
 }
 
 /* ── styles ────────────────────────────────────────────────────────────────── */
 
-const styles = StyleSheet.create({
-  /* identity */
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  identityText: { flex: 1, minWidth: 0 },
-  brand: { color: cardGame.text, fontSize: 20, fontWeight: '900', letterSpacing: 0.2 },
-  tagline: { color: cardGame.textMuted, fontSize: 12.5, fontWeight: '700', marginTop: 3 },
-  switchBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: cardRadius.pill,
-    borderWidth: 1.5,
-    borderColor: cardGame.rim,
-    backgroundColor: cardGame.table,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    /* identity */
+    identity: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+    identityText: { flex: 1, minWidth: 0 },
+    brand: { color: colors.text, fontSize: 20, fontWeight: '900', letterSpacing: 0.2 },
+    tagline: { color: colors.textMuted, fontSize: 12.5, fontWeight: '700', marginTop: 3 },
+    switchBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  /* balance hero */
-  hero: { borderRadius: cardRadius.panel, padding: 18 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  heroCoin: {
-    width: 56,
-    height: 56,
-    borderRadius: cardRadius.chip + 6,
-    backgroundColor: 'rgba(247,183,51,0.16)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(247,183,51,0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroText: { flex: 1, minWidth: 0 },
-  heroLabel: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
-  heroValue: { color: cardGame.gold, fontSize: 38, fontWeight: '900', marginTop: 2 },
-  heroFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: cardGame.rimSoft,
-  },
-  heroHint: { color: cardGame.textMuted, fontSize: 12, fontWeight: '800', flexShrink: 1 },
-  heroMinor: { color: cardGame.textDim, fontSize: 11.5, fontWeight: '700' },
+    /* balance hero */
+    hero: { borderRadius: radius.xl, padding: 18 },
+    heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    heroCoin: {
+      width: 56,
+      height: 56,
+      borderRadius: radius.sm + 6,
+      backgroundColor: colors.primaryTint,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heroText: { flex: 1, minWidth: 0 },
+    heroLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
+    heroValue: { color: colors.primary, fontSize: 38, fontWeight: '900', marginTop: 2 },
+    heroFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      marginTop: 14,
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderLight,
+    },
+    heroHint: { color: colors.textMuted, fontSize: 12, fontWeight: '800', flexShrink: 1 },
+    heroMinor: { color: colors.textDim, fontSize: 11.5, fontWeight: '700' },
+    bannerWrap: { marginTop: 16 },
+    // Same treatment as the Home banner: the radius lives on a clipping wrapper
+    // (borderRadius + overflow directly on a raster <Image> is unreliable), and
+    // the ratio matches the artwork so nothing is cropped. radius.xl is what
+    // CardPanel uses, so the corners line up with the balance panel above.
+    bannerClip: {
+      width: '100%',
+      aspectRatio: 1.5071,
+      borderRadius: radius.xl,
+      overflow: 'hidden',
+    },
+    banner: { width: '100%', height: '100%' },
 
-  /* quick actions */
-  blockLabel: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1, marginTop: 20, marginBottom: 10 },
-  quickRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
-  quick: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(247,183,51,0.42)',
-    borderRadius: cardRadius.panel,
-    backgroundColor: cardGame.tableDeep,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    minHeight: 68,
-  },
-  quickPrimary: { backgroundColor: cardGame.gold, borderColor: cardGame.goldDeep, ...goldGlow(0.3) },
-  quickHalf: { flex: 1, minWidth: 0 },
-  quickIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: cardRadius.chip,
-    backgroundColor: 'rgba(247,183,51,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickIconPrimary: { backgroundColor: 'rgba(21,14,54,0.16)' },
-  quickText: { flex: 1, minWidth: 0 },
-  quickLabel: { color: cardGame.text, fontSize: 15, fontWeight: '900' },
-  quickLabelPrimary: { color: cardGame.ink },
-  quickHint: { color: cardGame.textDim, fontSize: 11.5, fontWeight: '700', marginTop: 2 },
-  quickHintPrimary: { color: 'rgba(21,14,54,0.72)' },
+    /* quick actions */
+    blockLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1, marginTop: 20, marginBottom: 10 },
+    quickRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
+    quick: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderRadius: radius.xl,
+      backgroundColor: colors.surfaceAlt,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      minHeight: 68,
+    },
+    quickPrimary: { backgroundColor: colors.primary, borderColor: colors.primaryDark, ...glow(colors.primary) },
+    quickFull: { minWidth: 0 },
+    // Breathing room on BOTH sides of the divider — it only had marginTop, so
+    // the second tile sat flush against it.
+    orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },
+    orLine: { flex: 1, height: 1, backgroundColor: colors.border },
+    orText: { color: colors.textMuted, fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+    quickIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.sm,
+      backgroundColor: colors.primaryTint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickIconPrimary: { backgroundColor: 'rgba(0,0,0,0.16)' },
+    quickText: { flex: 1, minWidth: 0 },
+    quickLabel: { color: colors.text, fontSize: 15, fontWeight: '900' },
+    quickLabelPrimary: { color: colors.ink },
+    quickHint: { color: colors.textDim, fontSize: 11.5, fontWeight: '700', marginTop: 2 },
+    quickHintPrimary: { color: 'rgba(0,0,0,0.6)' },
 
-  /* sections */
-  section: { marginTop: 16 },
-  link: { color: cardGame.cyan, fontSize: 12.5, fontWeight: '900' },
+    /* sections */
+    section: { marginTop: 16 },
+    link: { color: colors.blue, fontSize: 12.5, fontWeight: '900' },
 
-  /* open cards row */
-  cardRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  cardItem: { flex: 1, minWidth: 0, alignItems: 'center' },
-  cardName: { color: cardGame.textMuted, fontSize: 11.5, fontWeight: '800', marginBottom: 6, maxWidth: '100%' },
-  cardMeta: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '700', marginTop: 6 },
+    /* open cards row */
+    cardRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    cardItem: { flex: 1, minWidth: 0, alignItems: 'center' },
+    cardName: { color: colors.textMuted, fontSize: 11.5, fontWeight: '800', marginBottom: 6, maxWidth: '100%' },
+    cardMeta: { color: colors.textDim, fontSize: 10.5, fontWeight: '700', marginTop: 6 },
 
-  /* waiting strip */
-  waitingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
-  waitingBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: cardRadius.chip + 2,
-    backgroundColor: 'rgba(247,183,51,0.16)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(247,183,51,0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waitingCount: { color: cardGame.gold, fontSize: 22, fontWeight: '900' },
-  waitingBody: { flex: 1, minWidth: 0 },
-  waitingTitle: { color: cardGame.text, fontSize: 14.5, fontWeight: '900' },
-  waitingText: { color: cardGame.textMuted, fontSize: 12, fontWeight: '700', marginTop: 3, flexShrink: 1 },
-  waitingEmpty: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+    /* waiting strip */
+    waitingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+    waitingBadge: {
+      width: 46,
+      height: 46,
+      borderRadius: radius.sm + 2,
+      backgroundColor: colors.primaryTint,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    waitingCount: { color: colors.primary, fontSize: 22, fontWeight: '900' },
+    waitingBody: { flex: 1, minWidth: 0 },
+    waitingTitle: { color: colors.text, fontSize: 14.5, fontWeight: '900' },
+    waitingText: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 3, flexShrink: 1 },
+    waitingEmpty: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
 
-  /* results */
-  resultList: { marginTop: 8 },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  resultDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: cardGame.rimSoft },
-  resultBody: { flex: 1, minWidth: 0 },
-  resultTitle: { color: cardGame.text, fontSize: 13.5, fontWeight: '900' },
-  resultMeta: { color: cardGame.textMuted, fontSize: 11.5, fontWeight: '700', marginTop: 3 },
-  resultAmount: { fontSize: 15, fontWeight: '900' },
+    /* results */
+    resultList: { marginTop: 8 },
+    resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+    resultDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight },
+    resultBody: { flex: 1, minWidth: 0 },
+    resultTitle: { color: colors.text, fontSize: 13.5, fontWeight: '900' },
+    resultMeta: { color: colors.textMuted, fontSize: 11.5, fontWeight: '700', marginTop: 3 },
+    resultAmount: { fontSize: 15, fontWeight: '900' },
 
-  /* empty states */
-  empty: { alignItems: 'center', paddingVertical: 8, gap: 8 },
-  emptyText: { color: cardGame.textMuted, fontSize: 12.5, fontWeight: '700', textAlign: 'center', maxWidth: 280 },
+    /* empty states */
+    empty: { alignItems: 'center', paddingVertical: 8, gap: 8 },
+    emptyText: { color: colors.textMuted, fontSize: 12.5, fontWeight: '700', textAlign: 'center', maxWidth: 280 },
 
-  /* rules */
-  rules: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rulesText: { color: cardGame.text, fontSize: 13, fontWeight: '800', flex: 1 },
-});
+    /* rules */
+    rules: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    rulesText: { color: colors.text, fontSize: 13, fontWeight: '800', flex: 1 },
+  });
+}

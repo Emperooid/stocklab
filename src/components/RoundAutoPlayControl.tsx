@@ -1,148 +1,125 @@
-import { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { AppIcon } from './AppIcon';
-import { IconBubble } from './IconBubble';
-import { withAlpha } from '../lib/color';
-import { Colors, radius, shadow, spacing, typography, useColors } from '../theme/theme';
+import { useMemo } from 'react';
+import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 import { useAutoPlayStore } from '../store/autoPlayStore';
 
 const FIGURES = [1, 2, 3, 4, 5];
+const INK = '#1B1540';
 
 /**
- * Full-width per-round Auto Play row — toggle + figure picker, sitting below a
- * round's header. Renders nothing until `slots` has loaded from the server so
- * there's no flash of the default {enabled: false, figure: 3}.
+ * Per-round Auto Play row — toggle on top, then a direct 1-5 figure picker
+ * below (tap a number to pick it, no dropdown). Disabled once the round's
+ * already been played, since Auto Play for it is moot at that point. Renders
+ * nothing until `slots` has loaded from the server (A2), to avoid a flash of
+ * the default {enabled: false, figure: 3} before the real saved value loads.
  */
-export function RoundAutoPlayControl({ roundId, disabled }: { roundId: string; disabled: boolean }) {
+export function RoundAutoPlayControl({
+  roundId,
+  disabled,
+  vibrant,
+}: {
+  roundId: string;
+  disabled: boolean;
+  /** Sits on the saturated round-card gradient instead of the app's normal surface. */
+  vibrant?: boolean;
+}) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const loaded = useAutoPlayStore((s) => s.loaded);
   const config = useAutoPlayStore((s) => s.getSlotConfig(roundId));
   const setSlotEnabled = useAutoPlayStore((s) => s.setSlotEnabled);
   const setSlotFigure = useAutoPlayStore((s) => s.setSlotFigure);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!loaded) return null;
 
   const isInteractive = !disabled;
+  const labelColor = vibrant ? '#FFFFFF' : colors.text;
+  const wrapStyle = vibrant ? styles.vWrap : styles.wrap;
 
   return (
-    <View style={[styles.row, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-      <View style={styles.side}>
-        <IconBubble
-          name="bolt"
-          size={36}
-          iconSize={18}
-          color={config.enabled ? colors.primary : colors.textDim}
-          background={config.enabled ? withAlpha(colors.primary, 0.16) : colors.surface}
-        />
-        <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>
+    <View style={wrapStyle}>
+      <View style={styles.topRow}>
+        <Text style={[styles.label, { color: labelColor }]} numberOfLines={1}>
           Auto Play
         </Text>
         <Switch
           value={config.enabled}
           onValueChange={(v) => setSlotEnabled(roundId, v).catch(() => {})}
           disabled={!isInteractive}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={'#FFFFFF'}
+          trackColor={{ false: vibrant ? 'rgba(255,255,255,0.3)' : colors.border, true: vibrant ? '#0E9F57' : colors.primary }}
+          thumbColor={vibrant ? '#FFFFFF' : colors.text}
         />
       </View>
 
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-      <View style={styles.side}>
-        <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>
-          Figure
-        </Text>
-        <TouchableOpacity
-          disabled={!isInteractive}
-          onPress={() => setPickerOpen(true)}
-          style={[
-            styles.figureBox,
-            {
-              backgroundColor: colors.surface,
-              borderColor: isInteractive ? colors.primary : colors.border,
-            },
-            !isInteractive && { opacity: 0.6 },
-          ]}
-        >
-          <Text style={[styles.figureValue, { color: colors.text }]}>{config.figure}</Text>
-          <AppIcon name="chevron-down" size={13} color={isInteractive ? colors.text : colors.textDim} />
-        </TouchableOpacity>
+      <Text style={[styles.figureLabel, { color: vibrant ? 'rgba(255,255,255,0.8)' : colors.textMuted }]}>
+        FIGURE TO AUTO-PLAY
+      </Text>
+      <View style={styles.tilesRow}>
+        {FIGURES.map((v) => {
+          const selected = v === config.figure;
+          return (
+            <TouchableOpacity
+              key={v}
+              disabled={!isInteractive}
+              onPress={() => setSlotFigure(roundId, v).catch(() => {})}
+              style={[
+                vibrant ? styles.vTile : styles.tile,
+                selected && (vibrant ? styles.vTileSelected : styles.tileSelected),
+                !isInteractive && { opacity: 0.5 },
+              ]}
+            >
+              <Text
+                style={[
+                  vibrant ? styles.vTileText : styles.tileText,
+                  selected && { color: vibrant ? INK : colors.onPrimary },
+                ]}
+              >
+                {v}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-
-      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={() => setPickerOpen(false)}>
-          <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
-            <Text style={[styles.sheetTitle, { color: colors.textMuted }]}>AUTO PLAY FIGURE</Text>
-            <View style={styles.sheetGrid}>
-              {FIGURES.map((v) => {
-                const active = v === config.figure;
-                return (
-                  <TouchableOpacity
-                    key={v}
-                    style={[
-                      styles.sheetTile,
-                      {
-                        backgroundColor: active ? colors.primary : colors.surfaceAlt,
-                        borderColor: active ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSlotFigure(roundId, v).catch(() => {});
-                      setPickerOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.sheetTileText, { color: active ? '#FFFFFF' : colors.text }]}>{v}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    wrap: { marginBottom: spacing.lg },
+    vWrap: {
+      backgroundColor: 'rgba(255,255,255,0.16)',
       borderRadius: radius.md,
-      borderWidth: 1,
       padding: spacing.sm + 2,
       marginBottom: spacing.lg,
     },
-    // minWidth: 0 overrides RN's default flex-shrink floor, which is what let a
-    // long label push the figure box past the screen edge.
-    side: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    divider: { width: 1, height: 32, marginHorizontal: spacing.sm },
-    label: { ...typography.small, fontWeight: '800', flexShrink: 1 },
-    figureBox: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      borderRadius: radius.sm,
-      borderWidth: 2,
-      paddingHorizontal: spacing.md,
-      height: 38,
-      flexShrink: 0,
-    },
-    figureValue: { ...typography.body, fontWeight: '800' },
-    backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    sheet: { borderRadius: radius.xl, padding: spacing.lg, width: 280, ...shadow.lg },
-    sheetTitle: { ...typography.label, marginBottom: spacing.md },
-    sheetGrid: { flexDirection: 'row', gap: spacing.sm },
-    sheetTile: {
+    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    label: { ...typography.body, fontWeight: '700' },
+    figureLabel: { ...typography.tiny, fontWeight: '800', letterSpacing: 0.5, marginTop: spacing.sm, marginBottom: spacing.xs },
+    tilesRow: { flexDirection: 'row', gap: spacing.xs },
+    tile: {
       flex: 1,
-      aspectRatio: 1,
+      height: 36,
       borderRadius: radius.sm,
-      borderWidth: 2,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    sheetTileText: { ...typography.h3 },
+    tileSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+    tileText: { ...typography.body, color: colors.text, fontWeight: '700' },
+    vTile: {
+      flex: 1,
+      height: 36,
+      borderRadius: radius.sm,
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.4)',
+      backgroundColor: 'rgba(255,255,255,0.14)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    vTileSelected: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+    vTileText: { ...typography.body, color: '#FFFFFF', fontWeight: '700' },
   });
 }

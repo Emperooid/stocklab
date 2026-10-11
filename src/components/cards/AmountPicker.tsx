@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
-import { AppIcon } from '../AppIcon';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, radius, useColors } from '../../theme/theme';
 import { formatMoney } from '../../lib/format';
 
 interface AmountPickerProps {
@@ -25,10 +26,13 @@ export function AmountPicker({
   onChange,
   min = 100,
   max = 1000,
-  step = 50,
+  step = 100,
   disabled,
   style,
 }: AmountPickerProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={style}>
       <View style={styles.readout}>
@@ -38,7 +42,7 @@ export function AmountPicker({
           style={[styles.stepBtn, (disabled || value <= min) && styles.stepDisabled]}
           accessibilityLabel="Decrease price"
         >
-          <AppIcon name="minus" size={18} color={cardGame.gold} />
+          <Ionicons name="remove" size={18} color={colors.primary} />
         </Pressable>
 
         <View style={styles.amountWrap}>
@@ -54,7 +58,7 @@ export function AmountPicker({
           style={[styles.stepBtn, (disabled || value >= max) && styles.stepDisabled]}
           accessibilityLabel="Increase price"
         >
-          <AppIcon name="plus" size={18} color={cardGame.gold} />
+          <Ionicons name="add" size={18} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -77,40 +81,42 @@ export function AmountPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  readout: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    backgroundColor: cardGame.tableDeep,
-    borderWidth: 2,
-    borderColor: cardGame.rim,
-    borderRadius: cardRadius.chip,
-    padding: 10,
-  },
-  stepBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: cardRadius.chip,
-    borderWidth: 2,
-    borderColor: cardGame.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDisabled: { opacity: 0.35 },
-  amountWrap: { flex: 1, alignItems: 'center' },
-  amount: { color: cardGame.cream, fontSize: 26, fontWeight: '900' },
-  range: { color: cardGame.textDim, fontSize: 11, fontWeight: '700', marginTop: 1 },
-  presets: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
-  preset: {
-    borderRadius: cardRadius.pill,
-    borderWidth: 1.5,
-    borderColor: cardGame.rim,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  presetActive: { backgroundColor: cardGame.gold, borderColor: cardGame.gold },
-  presetText: { color: cardGame.textMuted, fontSize: 12.5, fontWeight: '800' },
-  presetTextActive: { color: cardGame.ink },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    readout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderRadius: radius.sm,
+      padding: 10,
+    },
+    stepBtn: {
+      width: 46,
+      height: 46,
+      borderRadius: radius.sm,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepDisabled: { opacity: 0.35 },
+    amountWrap: { flex: 1, alignItems: 'center' },
+    amount: { color: colors.cream, fontSize: 26, fontWeight: '900' },
+    range: { color: colors.textDim, fontSize: 11, fontWeight: '700', marginTop: 1 },
+    presets: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+    preset: {
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    presetActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    presetText: { color: colors.textMuted, fontSize: 12.5, fontWeight: '800' },
+    presetTextActive: { color: colors.ink },
+  });
+}

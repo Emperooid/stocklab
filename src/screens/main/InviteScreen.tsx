@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Contacts from 'expo-contacts';
 import { Screen } from '../../components/Screen';
@@ -7,14 +8,7 @@ import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { EmptyState } from '../../components/EmptyState';
-import { IconBubble } from '../../components/IconBubble';
-import { Badge } from '../../components/Badge';
-import { ListItem } from '../../components/ListItem';
-import { StatTile } from '../../components/StatTile';
-import { Illustration } from '../../components/AppIcon';
 import { Colors, radius, spacing, typography, useColors } from '../../theme/theme';
-import { withAlpha } from '../../lib/color';
-import { IconName } from '../../theme/icons';
 import { useAuthStore } from '../../store/authStore';
 import { useInviteStore } from '../../store/inviteStore';
 import { api } from '../../api';
@@ -179,54 +173,34 @@ export default function InviteScreen() {
         refreshing={false}
         ListHeaderComponent={
           <>
-            <Card tone="pink" variant="sticker" style={styles.heroCard}>
-              <View style={styles.headerRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.heroEyebrow}>INVITE & EARN</Text>
-                  <Text style={styles.subtitle}>Onboard Others, Earn More</Text>
-                </View>
-                <TouchableOpacity style={styles.giftButton} onPress={handleGiftInfo} hitSlop={8}>
-                  <IconBubble name="gift" size={48} iconSize={28} />
-                </TouchableOpacity>
+            <View style={styles.headerRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.subtitle}>Onboard Others, Earn More</Text>
               </View>
-              <Illustration name="hero" size={136} style={styles.heroArt} />
-            </Card>
+              <TouchableOpacity style={styles.giftButton} onPress={handleGiftInfo} hitSlop={8}>
+                <Ionicons name="gift-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
 
-            <Card tone="success" style={styles.statsCard}>
+            <Card style={styles.statsCard}>
               <Text style={styles.statsBody}>
                 Earn more by bringing others to CrowdStock — the more people you onboard, the higher your payout gets.
               </Text>
               <View style={styles.statsRow}>
+                <StatBlock icon="people-outline" value={stats?.successfulConversions ?? 0} label="People Onboarded" loading={statsLoading} />
+                <StatBlock icon="ribbon-outline" value={stats?.credits ?? 0} label="Reward Credits" loading={statsLoading} />
                 <StatBlock
-                  icon="people-outline"
-                  value={stats?.successfulConversions ?? 0}
-                  label="People Onboarded"
-                  loading={statsLoading}
-                  color={colors.teal}
-                />
-                <StatBlock
-                  icon="medal"
-                  value={stats?.credits ?? 0}
-                  label="Reward Credits"
-                  loading={statsLoading}
-                  color={colors.amber}
-                />
-                <StatBlock
-                  icon="wallet"
+                  icon="wallet-outline"
                   value={stats ? formatMoney(stats.payout) : 0}
                   label="Payout"
                   loading={statsLoading}
-                  color={colors.accent}
                 />
               </View>
             </Card>
 
             {Object.keys(invitedContacts).length > 0 && (
-              <Card tone="teal" style={styles.trackingCard}>
-                <View style={styles.trackingRow}>
-                  <IconBubble name="people" size={42} iconSize={22} />
-                  <Text style={styles.trackingTitle}>Your Invites</Text>
-                </View>
+              <Card style={styles.trackingCard}>
+                <Text style={styles.trackingTitle}>Your Invites</Text>
                 <Text style={styles.trackingBody}>
                   {Object.values(invitedContacts).filter((c) => c.joined).length} of{' '}
                   {Object.keys(invitedContacts).length} people you invited from this device have joined so far.
@@ -243,8 +217,7 @@ export default function InviteScreen() {
                 }}
                 placeholder="Search contacts"
                 autoCapitalize="none"
-                leftIcon="search"
-                containerStyle={{ marginTop: spacing.lg }}
+                style={{ marginTop: spacing.lg }}
               />
             )}
           </>
@@ -259,44 +232,40 @@ export default function InviteScreen() {
         )}
         ListFooterComponent={
           showList && visibleCount < filtered.length ? (
-            <Button
-              title="Load more contacts"
-              variant="outline"
-              size="sm"
-              icon="chevron-down"
-              onPress={() => setVisibleCount((n) => n + PAGE_SIZE)}
-              style={styles.loadMore}
-            />
+            <TouchableOpacity style={styles.loadMore} onPress={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+              <Text style={styles.loadMoreText}>Load more contacts</Text>
+              <Ionicons name="chevron-down" size={14} color={colors.primary} />
+            </TouchableOpacity>
           ) : null
         }
         ListEmptyComponent={
           permission === 'checking' ? (
             <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.primary} />
           ) : permission === 'undetermined' ? (
-            <Card tone="primary" variant="sticker" style={styles.permissionCard}>
-              <IconBubble name="people" size={88} iconSize={44} />
+            <Card style={styles.permissionCard}>
+              <Ionicons name="people-circle-outline" size={40} color={colors.primary} />
               <Text style={styles.permissionTitle}>See who's already on CrowdStock</Text>
               <Text style={styles.permissionBody}>
                 Allow contacts access so we can show which of your contacts have already joined, and help you invite
                 the rest.
               </Text>
-              <Button title="Allow Contacts Access" icon="people-outline" onPress={handleAllow} style={{ marginTop: spacing.md }} />
+              <Button title="Allow Contacts Access" onPress={handleAllow} style={{ marginTop: spacing.md }} />
             </Card>
           ) : permission === 'denied' ? (
-            <Card tone="danger" variant="sticker" style={styles.permissionCard}>
-              <IconBubble name="lock" size={88} iconSize={44} color={colors.textMuted} />
+            <Card style={styles.permissionCard}>
+              <Ionicons name="lock-closed-outline" size={40} color={colors.textMuted} />
               <Text style={styles.permissionTitle}>Contacts access denied</Text>
               <Text style={styles.permissionBody}>
                 You can enable it later in your device Settings to invite friends from your contact list.
               </Text>
-              <Button title="Open Settings" variant="outline" icon="lock" onPress={() => Linking.openSettings()} style={{ marginTop: spacing.md }} />
+              <Button title="Open Settings" variant="outline" onPress={() => Linking.openSettings()} style={{ marginTop: spacing.md }} />
             </Card>
           ) : allContacts === null ? (
             <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.primary} />
           ) : !!contactsError ? (
-            <EmptyState illustration="empty" title="Couldn't load contacts" message={contactsError} />
+            <EmptyState icon="alert-circle-outline" title="Couldn't load contacts" message={contactsError} />
           ) : (
-            <EmptyState illustration="empty" title="No contacts found" message="Try a different search." />
+            <EmptyState icon="search-outline" title="No contacts found" message="Try a different search." />
           )
         }
       />
@@ -309,24 +278,20 @@ function StatBlock({
   value,
   label,
   loading,
-  color,
 }: {
-  icon: IconName;
+  icon: keyof typeof Ionicons.glyphMap;
   value: number | string;
   label: string;
   loading: boolean;
-  color?: string;
 }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <StatTile
-      icon={icon}
-      value={loading ? '—' : String(value)}
-      label={label}
-      color={color}
-      style={styles.statTile}
-    />
+    <View style={styles.statBlock}>
+      <Ionicons name={icon} size={16} color={colors.primary} />
+      <Text style={styles.statValue}>{loading ? '—' : value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -343,75 +308,85 @@ function ContactRow({
 }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // Same per-contact letter avatar the original drew, now in the new palette.
-  const avatarPalette = [colors.primary, colors.teal, colors.accent, colors.pink, colors.blue, colors.amber];
-  const avatarTint = avatarPalette[(contact.name?.charCodeAt(0) ?? 0) % avatarPalette.length];
-  const initial = contact.name?.trim()?.[0]?.toUpperCase() ?? '?';
   return (
-    <Card tone="alt" style={styles.contactCard} padded={false}>
-      <ListItem
-        leading={
-          <View style={[styles.avatar, { backgroundColor: withAlpha(avatarTint, 0.16) }]}>
-            <Text style={[styles.avatarText, { color: avatarTint }]}>{initial}</Text>
-          </View>
-        }
-        title={contact.name}
-        subtitle={contact.phone}
-        style={styles.contactListItem}
-        right={
-          status === 'checking' || status === undefined ? (
-            <ActivityIndicator size="small" color={colors.textMuted} />
-          ) : status === true ? (
-            <Badge label="CrowdStock" tone="success" icon="check" size="sm" />
-          ) : (
-            <View style={styles.inviteButtonWrap}>
-              <Button
-                title={invited ? 'Invited' : 'Invite'}
-                variant="outline"
-                size="sm"
-                disabled={invited}
-                onPress={onInvite}
-                accessibilityLabel={invited ? `${contact.name} invited` : `Invite ${contact.name} via WhatsApp`}
-              />
-            </View>
-          )
-        }
-      />
+    <Card style={styles.contactCard}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{contact.name[0]?.toUpperCase() ?? '?'}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.contactName} numberOfLines={1}>
+          {contact.name}
+        </Text>
+        <Text style={styles.contactPhone}>{contact.phone}</Text>
+      </View>
+      {status === 'checking' || status === undefined ? (
+        <ActivityIndicator size="small" color={colors.textMuted} />
+      ) : status === true ? (
+        <View style={styles.registeredPill}>
+          <Text style={styles.registeredPillText}>CrowdStock</Text>
+          <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+        </View>
+      ) : (
+        <Button
+          title={invited ? 'Invited' : 'Invite'}
+          variant="outline"
+          size="sm"
+          disabled={invited}
+          onPress={onInvite}
+          accessibilityLabel={invited ? `${contact.name} invited` : `Invite ${contact.name} via WhatsApp`}
+        />
+      )}
     </Card>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    heroCard: { marginBottom: spacing.lg },
-    headerRow: { flexDirection: 'row', alignItems: 'center' },
-    heroEyebrow: { ...typography.label, color: colors.pink },
-    subtitle: { ...typography.h2, color: colors.text, marginTop: 2 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+    subtitle: { ...typography.small, color: colors.textMuted },
     giftButton: {
-      width: 48,
-      height: 48,
-      borderRadius: radius.pill,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.primaryTint,
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: spacing.md,
     },
-    heroArt: { alignSelf: 'center', marginTop: spacing.sm },
-    statsCard: {},
-    statsBody: { ...typography.small, color: colors.text, lineHeight: 19 },
-    statsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-    statTile: { minHeight: 108, padding: spacing.sm + 2 },
-    trackingCard: { marginTop: spacing.md },
-    trackingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    trackingTitle: { ...typography.h3, color: colors.text },
-    trackingBody: { ...typography.tiny, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 16 },
+    statsCard: { backgroundColor: colors.successTint, borderColor: colors.success },
+    trackingCard: { marginTop: spacing.md, backgroundColor: colors.blueTint, borderColor: colors.blue },
+    trackingTitle: { ...typography.small, color: colors.text, fontWeight: '700' },
+    trackingBody: { ...typography.tiny, color: colors.textMuted, marginTop: 2, lineHeight: 15 },
+    statsBody: { ...typography.small, color: colors.text, lineHeight: 18 },
+    statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
+    statBlock: { alignItems: 'center', flex: 1, gap: 2 },
+    statValue: { ...typography.h3, color: colors.text, marginTop: 2 },
+    statLabel: { ...typography.tiny, color: colors.textMuted, textAlign: 'center' },
     permissionCard: { alignItems: 'center', marginTop: spacing.lg, padding: spacing.xl },
     permissionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.md, textAlign: 'center' },
-    permissionBody: { ...typography.small, color: colors.textMuted, marginTop: spacing.xs, textAlign: 'center', lineHeight: 19 },
-    contactCard: { marginTop: spacing.sm },
-    contactListItem: { paddingHorizontal: spacing.md, borderBottomWidth: 0 },
-    avatar: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { ...typography.h3 },
-    inviteButtonWrap: { width: 108 },
-    loadMore: { marginTop: spacing.lg },
+    permissionBody: { ...typography.small, color: colors.textMuted, marginTop: spacing.xs, textAlign: 'center', lineHeight: 18 },
+    contactCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primaryTint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { ...typography.body, color: colors.primary, fontWeight: '700' },
+    contactName: { ...typography.body, color: colors.text, fontWeight: '600' },
+    contactPhone: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
+    registeredPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.successTint,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+    },
+    registeredPillText: { ...typography.tiny, color: colors.success, fontWeight: '700' },
+    loadMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: spacing.md },
+    loadMoreText: { ...typography.small, color: colors.primary, fontWeight: '700' },
   });
 }

@@ -1,14 +1,14 @@
 import { useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CardTableScreen } from '../../components/cards/CardTableScreen';
+import { Screen } from '../../components/Screen';
 import { CardPanel } from '../../components/cards/CardPanel';
 import { CardButton } from '../../components/cards/CardButton';
 import { PlayingCard } from '../../components/cards/PlayingCard';
-import { AppIcon, Illustration } from '../../components/AppIcon';
-import { cardGame, cardRadius } from '../../theme/cardsTheme';
+import { Colors, radius, useColors } from '../../theme/theme';
 import { openCards, useCardsStore } from '../../store/cardsStore';
 import { formatMoney } from '../../lib/format';
 import { CardsTabParamList, MainStackParamList } from '../../navigation/types';
@@ -27,6 +27,8 @@ function timeAgo(iso: string): string {
  * its price. Tapping one takes you to the unveil step.
  */
 export default function PlayCardsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const tabNavigation = useNavigation<BottomTabNavigationProp<CardsTabParamList>>();
   const stackNavigation = tabNavigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
 
@@ -46,14 +48,14 @@ export default function PlayCardsScreen() {
   const affordable = playable.filter((c) => (bankroll ?? 0) >= c.amount).length;
 
   return (
-    <CardTableScreen>
+    <Screen>
       <View style={styles.headerRow}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.eyebrow}>THE OPEN TABLE</Text>
           <Text style={styles.title}>Play a card</Text>
         </View>
         <View style={styles.balanceChip}>
-          <AppIcon name="coin" size={15} />
+          <Ionicons name="cash-outline" size={15} color={colors.primary} />
           <Text style={styles.balanceText} numberOfLines={1}>
             {bankroll == null ? '—' : formatMoney(bankroll)}
           </Text>
@@ -68,15 +70,21 @@ export default function PlayCardsScreen() {
       {playable.length > 0 && (
         <View style={styles.summaryRow}>
           <View style={styles.summaryChip}>
-            <Text style={styles.summaryValue}>{playable.length}</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {playable.length}
+            </Text>
             <Text style={styles.summaryLabel}>open</Text>
           </View>
           <View style={styles.summaryChip}>
-            <Text style={styles.summaryValue}>{affordable}</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {affordable}
+            </Text>
             <Text style={styles.summaryLabel}>you can afford</Text>
           </View>
           <View style={styles.summaryChip}>
-            <Text style={styles.summaryValue}>{formatMoney(playable[0]?.amount ?? 0)}</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              {formatMoney(playable[0]?.amount ?? 0)}
+            </Text>
             <Text style={styles.summaryLabel}>lowest stake</Text>
           </View>
         </View>
@@ -84,14 +92,15 @@ export default function PlayCardsScreen() {
 
       {playable.length === 0 ? (
         <CardPanel tone="deep" style={{ marginTop: 16, alignItems: 'center' }}>
-          <Illustration name="cards" size={140} />
+          {/* Placeholder for the removed bundled "cards" illustration. */}
+          <Ionicons name="albums-outline" size={140} color={colors.textDim} />
           <Text style={styles.emptyTitle}>The table is empty</Text>
           <Text style={styles.emptyBody}>
             Nobody has a card open right now. Put one down and let someone come to you.
           </Text>
           <CardButton
             title="Create a card"
-            icon="plus"
+            icon="add"
             onPress={() => stackNavigation?.navigate('SetCard')}
             style={{ marginTop: 16 }}
           />
@@ -111,11 +120,11 @@ export default function PlayCardsScreen() {
                     hid a figure · {timeAgo(card.createdAt)}
                   </Text>
                   <View style={styles.stakeRow}>
-                    <AppIcon name="lock" size={12} color={cardGame.gold} />
+                    <Ionicons name="lock-closed-outline" size={12} color={colors.primary} />
                     <Text style={styles.stakeText}>Match {formatMoney(card.amount)} to play</Text>
                   </View>
                   <CardButton
-                    title={canAfford ? 'Unveil' : 'Not enough balance'}
+                    title={canAfford ? 'Unveil a card' : 'Not enough balance'}
                     size="sm"
                     icon={canAfford ? 'eye' : 'alert'}
                     variant={canAfford ? 'gold' : 'outline'}
@@ -132,58 +141,60 @@ export default function PlayCardsScreen() {
 
       <CardPanel tone="gold" style={{ marginTop: 18 }}>
         <View style={styles.tipRow}>
-          <AppIcon name="bulb" size={16} color={cardGame.gold} />
+          <Ionicons name="bulb-outline" size={16} color={colors.primary} />
           <Text style={styles.tipText}>
             Every figure is equally likely, so there's no clever pick — only a confident one. A match pays
             back 80% of the two stakes combined.
           </Text>
         </View>
       </CardPanel>
-    </CardTableScreen>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  eyebrow: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: cardGame.text, fontSize: 26, fontWeight: '900', marginTop: 1 },
-  balanceChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: cardGame.tableDeep,
-    borderWidth: 1.5,
-    borderColor: cardGame.gold,
-    borderRadius: cardRadius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  balanceText: { color: cardGame.gold, fontSize: 13.5, fontWeight: '900' },
-  subtitle: { color: cardGame.textMuted, fontSize: 13.5, lineHeight: 20, marginTop: 10 },
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    eyebrow: { color: colors.textDim, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.1 },
+    title: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: 1 },
+    balanceChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    balanceText: { color: colors.primary, fontSize: 13.5, fontWeight: '900' },
+    subtitle: { color: colors.textMuted, fontSize: 13.5, lineHeight: 20, marginTop: 10 },
 
-  summaryRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  summaryChip: {
-    flex: 1,
-    backgroundColor: cardGame.table,
-    borderWidth: 1,
-    borderColor: cardGame.rim,
-    borderRadius: cardRadius.chip,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  summaryValue: { color: cardGame.gold, fontSize: 18, fontWeight: '900' },
-  summaryLabel: { color: cardGame.textDim, fontSize: 10.5, fontWeight: '800', marginTop: 1 },
+    summaryRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+    summaryChip: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.sm,
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+    },
+    summaryValue: { color: colors.primary, fontSize: 18, fontWeight: '900' },
+    summaryLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: '800', marginTop: 1 },
 
-  cardRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
-  cardInfo: { flex: 1, minWidth: 0 },
-  originator: { color: cardGame.text, fontSize: 16, fontWeight: '900' },
-  cardMeta: { color: cardGame.textDim, fontSize: 12, marginTop: 2, fontWeight: '600' },
-  stakeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
-  stakeText: { color: cardGame.gold, fontSize: 12.5, fontWeight: '800' },
+    cardRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
+    cardInfo: { flex: 1, minWidth: 0 },
+    originator: { color: colors.text, fontSize: 16, fontWeight: '900' },
+    cardMeta: { color: colors.textDim, fontSize: 12, marginTop: 2, fontWeight: '600' },
+    stakeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+    stakeText: { color: colors.primary, fontSize: 12.5, fontWeight: '800' },
 
-  emptyTitle: { color: cardGame.text, fontSize: 19, fontWeight: '900', marginTop: 12 },
-  emptyBody: { color: cardGame.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 6 },
+    emptyTitle: { color: colors.text, fontSize: 19, fontWeight: '900', marginTop: 12 },
+    emptyBody: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 6 },
 
-  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  tipText: { color: cardGame.textMuted, fontSize: 12.5, flex: 1, lineHeight: 18 },
-});
+    tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    tipText: { color: colors.textMuted, fontSize: 12.5, flex: 1, lineHeight: 18 },
+  });
+}

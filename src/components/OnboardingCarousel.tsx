@@ -1,11 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { Dimensions, Modal, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
-import { Illustration } from './AppIcon';
-import { IconBubble } from './IconBubble';
-import { withAlpha } from '../lib/color';
-import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
+import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { useTourStore } from '../store/tourStore';
 import { TOUR_STEPS } from '../lib/tourSteps';
 
@@ -13,8 +11,12 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 /**
  * First-login onboarding — a full-screen, swipeable card carousel (swipe
- * either direction, or use Next/Skip). Each slide leads with a picture bubble
- * or hero artwork, matching the rest of the redesign.
+ * either direction, or use Next/Skip) replacing the earlier spotlight/
+ * coach-mark tour that highlighted live UI elements across different
+ * screens. That approach needed per-screen <TourTarget> wrappers, tab
+ * auto-navigation, and live view measurement to work — all removed along
+ * with it, per explicit product decision that the highlight approach
+ * looked "weird" and a simple explanatory card set reads better.
  */
 export function OnboardingCarousel() {
   const colors = useColors();
@@ -61,13 +63,9 @@ export function OnboardingCarousel() {
         >
           {TOUR_STEPS.map((step, i) => (
             <View key={i} style={[styles.card, { width: SCREEN_WIDTH }]}>
-              {step.illustration ? (
-                <Illustration name={step.illustration} size={190} style={{ marginBottom: spacing.xl }} />
-              ) : (
-                <View style={[styles.art, { backgroundColor: withAlpha(step.color, 0.12) }]}>
-                  <IconBubble name={step.icon} size={96} iconSize={46} color={step.color} background="transparent" />
-                </View>
-              )}
+              <View style={styles.iconCircle}>
+                <Ionicons name={step.icon} size={40} color={colors.primary} />
+              </View>
               <Text style={styles.title}>{step.title}</Text>
               <Text style={styles.body}>{step.body}</Text>
             </View>
@@ -75,20 +73,13 @@ export function OnboardingCarousel() {
         </ScrollView>
 
         <View style={styles.dotsRow}>
-          {TOUR_STEPS.map((step, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                { backgroundColor: i === page ? step.color : colors.border },
-                i === page && styles.dotActive,
-              ]}
-            />
+          {TOUR_STEPS.map((_, i) => (
+            <View key={i} style={[styles.dot, i === page && styles.dotActive]} />
           ))}
         </View>
 
         <View style={styles.footer}>
-          <Button title={isLast ? "Let's go!" : 'Next'} icon={isLast ? 'check' : 'arrow-right'} onPress={goNext} />
+          <Button title={isLast ? 'Get Started' : 'Next'} onPress={goNext} />
         </View>
       </SafeAreaView>
     </Modal>
@@ -99,12 +90,13 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     skipRow: { alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
-    skipText: { ...typography.small, color: colors.textMuted, fontWeight: '800', padding: spacing.sm },
+    skipText: { ...typography.small, color: colors.textMuted, fontWeight: '600', padding: spacing.sm },
     card: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
-    art: {
-      width: 190,
-      height: 190,
-      borderRadius: radius.xxl,
+    iconCircle: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: colors.primaryTint,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.xl,
@@ -112,8 +104,8 @@ function createStyles(colors: Colors) {
     title: { ...typography.h1, color: colors.text, textAlign: 'center' },
     body: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginTop: spacing.md, lineHeight: 22 },
     dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xs, marginBottom: spacing.lg },
-    dot: { width: 8, height: 8, borderRadius: 4 },
-    dotActive: { width: 24 },
+    dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.border },
+    dotActive: { backgroundColor: colors.primary, width: 20 },
     footer: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   });
 }

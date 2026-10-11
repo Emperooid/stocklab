@@ -1,98 +1,26 @@
 import { useMemo } from 'react';
-import { StyleProp, StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
-import { withAlpha } from '../lib/color';
+import { StyleSheet, View, ViewProps } from 'react-native';
 import { Colors, radius, shadow, spacing, useColors } from '../theme/theme';
 
-export type CardTone =
-  | 'surface'
-  | 'alt'
-  | 'primary'
-  | 'accent'
-  | 'teal'
-  | 'pink'
-  | 'amber'
-  | 'success'
-  | 'danger'
-  | 'info'
-  | 'hero';
-
-interface CardProps extends ViewProps {
-  /** Tinted body colour — the quickest way to make a card feel like a sticker. */
-  tone?: CardTone;
-  /** Soft rounded pebble (default) or a hard-shadow sticker with an ink outline. */
-  variant?: 'soft' | 'sticker';
-  padded?: boolean;
-  style?: StyleProp<ViewStyle>;
-}
-
-function toneColors(colors: Colors): Record<CardTone, { bg: string; border: string }> {
-  return {
-    surface: { bg: colors.surface, border: colors.border },
-    alt: { bg: colors.surfaceAlt, border: colors.border },
-    primary: { bg: colors.primaryTint, border: withAlpha(colors.primary, 0.28) },
-    accent: { bg: colors.accentTint, border: withAlpha(colors.accent, 0.28) },
-    teal: { bg: colors.tealTint, border: withAlpha(colors.teal, 0.28) },
-    pink: { bg: colors.pinkTint, border: withAlpha(colors.pink, 0.28) },
-    amber: { bg: colors.amberTint, border: withAlpha(colors.amber, 0.32) },
-    success: { bg: colors.successTint, border: withAlpha(colors.success, 0.28) },
-    danger: { bg: colors.dangerTint, border: withAlpha(colors.danger, 0.28) },
-    info: { bg: colors.blueTint, border: withAlpha(colors.blue, 0.28) },
-    hero: { bg: colors.primary, border: colors.primaryDark },
-  };
-}
-
-/**
- * The app's base surface. Soft cards are rounded pebbles with a hairline tinted
- * border; sticker cards add a hard offset shadow and a bold outline for hero
- * moments.
- */
-export function Card({ style, children, tone = 'surface', variant = 'soft', padded = true, ...rest }: CardProps) {
+export function Card({ style, children, ...rest }: ViewProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { bg, border } = toneColors(colors)[tone];
-
-  if (variant === 'sticker') {
-    const depth = 5;
-    // The hard-shadow layer is absolutely positioned against the wrapper, so
-    // the face must always span the wrapper's full width. Callers legitimately
-    // pass content alignment (e.g. `alignItems: 'center'`) via `style` — if that
-    // reached the wrapper it would shrink the face to its content and leave the
-    // shadow slab poking out, so split alignment onto the face and keep the
-    // rest (margins, flex) on the wrapper.
-    const flat = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
-    const { alignItems, justifyContent, ...wrapperStyle } = flat;
-    return (
-      <View style={[styles.stickerWrap, { paddingBottom: depth, paddingRight: depth }, wrapperStyle]} {...rest}>
-        <View pointerEvents="none" style={[styles.stickerBase, { top: depth, left: depth, backgroundColor: withAlpha(colors.ink, 0.9) }]} />
-        <View
-          style={[
-            styles.card,
-            padded && styles.padded,
-            { backgroundColor: bg, borderColor: border, borderWidth: 2, alignSelf: 'stretch', alignItems, justifyContent },
-          ]}
-        >
-          {children}
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <View style={[styles.card, padded && styles.padded, { backgroundColor: bg, borderColor: border }, style]} {...rest}>
+    <View style={[styles.card, style]} {...rest}>
       {children}
     </View>
   );
 }
 
-function createStyles(_colors: Colors) {
+function createStyles(colors: Colors) {
   return StyleSheet.create({
     card: {
+      backgroundColor: colors.surface,
       borderRadius: radius.xl,
       borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.lg,
       ...shadow.md,
     },
-    padded: { padding: spacing.lg },
-    stickerWrap: { position: 'relative' },
-    stickerBase: { position: 'absolute', right: 0, bottom: 0, borderRadius: radius.xl, opacity: 0.14 },
   });
 }

@@ -1,77 +1,89 @@
-import { callGateway } from './backendClient';
+import { callGateway, getSession } from './backendClient';
 
 /**
- * CrowdStock Cards — the wire contract, exactly as specified:
+ * CrowdStock Cards — CONFIRMED live theKeys (C1-C6), per the backend owner's
+ * actual C# dispatch table:
  *
- *   SetCardFigure(Phone, Figure, Amount)              -> logs a Card
- *   ScoreCardFigure(CardID, phone2, Figure, Amount)   -> returns the Result
- *   GetOpenCardLists()                                -> cards awaiting an answer
- *   GetResultsList()                                  -> settled results
+ *   if (theKey == "C1") SetCardValue(jsonData)            — create a card
+ *   if (theKey == "C2") theGuessCardValue(jsonData)        — answer + score a card
+ *   if (theKey == "C3") GetMyCards(jsonData)               — my own cards
+ *   if (theKey == "C4") GetCardResultsAll()                — global results feed
+ *   if (theKey == "C5") GetCardsResultByPhone(jsonData)    — results for one phone
+ *   if (theKey == "C6") GetOpenCardsAvailable(jsonData)    — open cards to answer
  *
- * The live gateway (backendClient.callGateway) currently exposes G10-G25,
- * B1-B3, BB, PP, UU and VV — none of these four. Rather than ship screens that
- * can't render, the app talks to `cardsApi`, which is either:
+ * An earlier version of this file was built against the backend owner's FIRST,
+ * informal description (literal theKeys "SetCardFigure"/"ScoreCardFigure"/
+ * "GetOpenCardLists"/"GetResultsList") — those never matched the real gateway's
+ * dispatch branches above and would have silently failed. This version uses the
+ * real C1-C6 keys, confirmed directly against the dispatch table screenshot.
  *
- *   • the REMOTE implementation below (the four calls, using the literal
- *     endpoint names as gateway keys and the documented parameter names), or
- *   • the LOCAL implementation in store/cardsStore, which is the default.
- *
- * When the backend is ready, flip CARDS_API_REMOTE to true (or set
- * EXPO_PUBLIC_CARDS_API=remote) and adjust the four keys/params here if Mr Yemi
- * named them differently. Nothing outside this file needs to change.
+ * CONFIRMED live (2026-10-09) against the real backend with account 09071929127:
+ *   - C3/C4/C5/C6 all share one envelope: {status, message, count, data: []}
+ *     (C5 additionally echoes back `Phone`).
+ *   - C6 actually REQUIRES `Phone` despite the spec table saying "Required
+ *     input: None" — tested empirically: {theKey:'C6'} and {theKey:'C6', phone}
+ *     (lowercase) both returned {status:false, message:"Phone is required"};
+ *     {theKey:'C6', Phone} (capital P) succeeded. Trust this over the doc.
+ *   - C4 genuinely takes no params — tested with {} and it succeeded.
+ *   - Every list call returned `data: []` — no card has ever been created on
+ *     this backend yet, so the shape of one card/result record INSIDE `data`
+ *     is NOT confirmed. The mapping in `store/cardsStore.ts` is a best-guess
+ *     following the input-param casing (CardID/Phone/Amount/Figure) and must
+ *     be corrected the first time a real card exists to inspect.
+ *   - C1 (create) and C2 (answer) have NOT been called live — both move real
+ *     money and the test account currently has ₦0 balance. Their request
+ *     params below match the confirmed "Required input" table exactly; their
+ *     response shapes are unconfirmed until tested with a funded account.
  */
-export const CARDS_API_REMOTE =
-  (process.env.EXPO_PUBLIC_CARDS_API ?? 'local') === 'remote';
 
-export interface RemoteCard {
-  ID: string;
-  Figure: number;
-  Amount: number;
-  Phone: string;
-  Name?: string;
-  CreatedAt?: string;
+export const CARDS_API_REMOTE = (process.env.EXPO_PUBLIC_CARDS_API ?? 'remote') === 'remote';
+
+function requirePhone(): string {
+  const session = getSession();
+  if (!session) throw new Error('Not logged in.');
+  return session.phone;
 }
 
-export interface RemoteResult {
-  CardID: string;
-  OriginatorFigure: number;
-  AnsweringFigure: number;
-  Winner: string;
-  Pot: number;
-  Payout: number;
-}
+/** UNCONFIRMED per-record shape — no real card has existed yet to verify field names against. */
+export type RemoteCardRecord = Record<string, any>;
 
 export const remoteCardsApi = {
-  /** 1. SetCardFigure(Phone, Figure, Amount) — logs the card, returns its id. */
-  async setCardFigure(phone: string, figure: number, amount: number): Promise<{ CardID: string }> {
-    return callGateway<{ CardID: string }>('SetCardFigure', { Phone: phone, Figure: figure, Amount: amount });
+  /** C1 SetCardValue — creates a card with a hidden figure + stake. UNCONFIRMED response shape. */
+  async setCardValue(figure: number, amount: number): Promise<RemoteCardRecord> {
+    const phone = requirePhone();
+    return callGateway<any>('C1', { Phone: phone, Amount: String(amount), Figure: String(figure) });
   },
 
-  /** 2. ScoreCardFigure(CardID, phone2, Figure, Amount) — settles and returns the result. */
-  async scoreCardFigure(
-    cardId: string,
-    phone2: string,
-    figure: number,
-    amount: number
-  ): Promise<RemoteResult> {
-    return callGateway<RemoteResult>('ScoreCardFigure', {
-      CardID: cardId,
-      phone2,
-      Figure: figure,
-      Amount: amount,
-    });
+  /** C2 theGuessCardValue — pays the stake, submits the answering figure, reveal+score in one call. UNCONFIRMED response shape. */
+  async guessCardValue(cardId: string, figure: number, amount: number): Promise<RemoteCardRecord> {
+    const phone = requirePhone();
+    return callGateway<any>('C2', { CardID: cardId, Phone: phone, Amount: String(amount), Figure: String(figure) });
   },
 
-  /** 3. GetOpenCardLists() — cards still waiting for an answering user. */
-  async getOpenCardLists(): Promise<RemoteCard[]> {
-    const raw = await callGateway<any>('GetOpenCardLists', {});
-    return Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+  /** C3 GetMyCards(Phone) — the signed-in user's own cards, any status. */
+  async getMyCards(): Promise<RemoteCardRecord[]> {
+    const phone = requirePhone();
+    const res = await callGateway<any>('C3', { Phone: phone });
+    return Array.isArray(res?.data) ? res.data : [];
   },
 
-  /** 4. GetResultsList() — settled results for the signed-in user. */
-  async getResultsList(): Promise<RemoteResult[]> {
-    const raw = await callGateway<any>('GetResultsList', {});
-    return Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+  /** C4 GetCardResultsAll() — global settled-results feed, confirmed no params needed. */
+  async getCardResultsAll(): Promise<RemoteCardRecord[]> {
+    const res = await callGateway<any>('C4', {});
+    return Array.isArray(res?.data) ? res.data : [];
+  },
+
+  /** C5 GetCardsResultByPhone(Phone) — settled results for one phone. */
+  async getCardsResultByPhone(phone?: string): Promise<RemoteCardRecord[]> {
+    const res = await callGateway<any>('C5', { Phone: phone ?? requirePhone() });
+    return Array.isArray(res?.data) ? res.data : [];
+  },
+
+  /** C6 GetOpenCardsAvailable(Phone) — CONFIRMED Phone is required despite the spec table saying none. */
+  async getOpenCardsAvailable(): Promise<RemoteCardRecord[]> {
+    const phone = requirePhone();
+    const res = await callGateway<any>('C6', { Phone: phone });
+    return Array.isArray(res?.data) ? res.data : [];
   },
 };
 

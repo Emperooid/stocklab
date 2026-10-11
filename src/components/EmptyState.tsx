@@ -1,43 +1,41 @@
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Illustration, IllustrationName } from './AppIcon';
-import { IconBubble } from './IconBubble';
-import { IconName } from '../theme/icons';
-import { spacing, typography, useColors } from '../theme/theme';
+import { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, spacing, typography, useColors } from '../theme/theme';
 
 interface EmptyStateProps {
-  /** Picture icon shown in the bubble. */
-  icon?: IconName;
-  /** Larger artwork instead of the icon bubble. */
-  illustration?: IllustrationName;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   message?: string;
-  children?: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
 }
 
-export function EmptyState({ icon = 'compass', illustration, title, message, children, style }: EmptyStateProps) {
+export function EmptyState({ icon, title, message }: EmptyStateProps) {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[styles.wrap, style]}>
-      {illustration ? (
-        <Illustration name={illustration} size={132} style={{ marginBottom: spacing.md }} />
-      ) : (
-        <IconBubble name={icon} size={76} iconSize={36} color={colors.primary} style={{ marginBottom: spacing.md }} />
-      )}
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {!!message && <Text style={[styles.message, { color: colors.textMuted }]}>{message}</Text>}
-      {children}
+    <View style={styles.wrap}>
+      <View style={styles.iconCircle}>
+        <Ionicons name={icon} size={26} color={colors.textDim} />
+      </View>
+      <Text style={styles.title}>{title}</Text>
+      {!!message && <Text style={styles.message}>{message}</Text>}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-    paddingHorizontal: spacing.xl,
-  },
-  title: { ...typography.h3, textAlign: 'center' },
-  message: { ...typography.small, textAlign: 'center', marginTop: spacing.xs, maxWidth: 280, lineHeight: 19 },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    wrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xxl, paddingHorizontal: spacing.xl },
+    iconCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.md,
+    },
+    title: { ...typography.h3, color: colors.textMuted, textAlign: 'center' },
+    message: { ...typography.small, color: colors.textDim, textAlign: 'center', marginTop: spacing.xs, maxWidth: 260 },
+  });
+}

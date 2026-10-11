@@ -1,22 +1,25 @@
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { CountdownBadge } from '../../components/CountdownBadge';
 import { EmptyState } from '../../components/EmptyState';
-import { IconBubble } from '../../components/IconBubble';
+import { AnalogClock } from '../../components/AnalogClock';
 import { PredictionControl } from '../../components/PredictionControl';
 import { RoundAutoPlayControl } from '../../components/RoundAutoPlayControl';
 import { MasterAutoPlayToggle } from '../../components/MasterAutoPlayToggle';
+import { AutoPlayFigureOverview } from '../../components/AutoPlayFigureOverview';
 import { Colors, radius, spacing, typography, useColors, ROUND_CARD_PALETTES } from '../../theme/theme';
-import { withAlpha } from '../../lib/color';
 import { useRoundsStore } from '../../store/roundsStore';
 import { useAuthStore } from '../../store/authStore';
 import { useAutoPlayStore } from '../../store/autoPlayStore';
 import { useRoundsLiveRefresh } from '../../hooks/useRoundsLiveRefresh';
 import { getSlotStatus } from '../../lib/schedule';
 import { formatTime12h } from '../../lib/format';
+import { shade } from '../../lib/colorMath';
 
 export default function PredictScreen() {
   const colors = useColors();
@@ -49,23 +52,15 @@ export default function PredictScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* ── Bold header band ─────────────────────────────────────────────── */}
-      <View style={styles.heroHeader}>
-        <IconBubble name="stock" size={56} iconSize={30} color={colors.teal} background={colors.surface} />
-        <View style={styles.heroText}>
-          <Text style={styles.heroEyebrow}>MAKE YOUR PICK</Text>
-          <Text style={styles.title}>Stock</Text>
-          <Text style={styles.heroSub}>Pick your figure for any round today.</Text>
-        </View>
-      </View>
+      <Text style={styles.title}>Stock</Text>
 
       <View style={{ marginBottom: spacing.lg }}>
         <CountdownBadge />
       </View>
 
-      <Card tone="info" style={styles.infoCard}>
+      <Card style={styles.infoCard}>
         <View style={styles.infoHeader}>
-          <IconBubble name="bulb" size={36} iconSize={18} color={colors.blue} background={colors.surface} />
+          <Ionicons name="bulb-outline" size={18} color={colors.primary} />
           <Text style={styles.infoTitle}>How scoring works</Text>
         </View>
         <Text style={styles.infoText}>
@@ -78,46 +73,55 @@ export default function PredictScreen() {
       </Card>
 
       <MasterAutoPlayToggle />
+      <AutoPlayFigureOverview rounds={openRounds} />
 
       {openRounds.length === 0 && (
         <Card style={{ marginTop: spacing.lg }}>
           <EmptyState
-            illustration="empty"
+            icon="hourglass-outline"
             title="No rounds left to pick a stock for today"
             message="Check back after the next operating day starts."
           />
         </Card>
       )}
 
-      <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+      <View style={{ gap: spacing.lg, marginTop: spacing.lg }}>
         {openRounds.map((round) => {
-          // slot.index is 0-based — see RoundsScreen for why `(index - 1) % len` crashed.
           const palette = ROUND_CARD_PALETTES[round.slot.index % ROUND_CARD_PALETTES.length];
+          const [hh] = round.slot.submitTime.split(':').map(Number);
+          const timeLabel = formatTime12h(round.slot.submitTime);
+          const [timeDigits, timePeriod] = timeLabel.split(' ');
           return (
-            <Card key={round.slot.id} padded={false}>
-              <View style={[styles.roundBand, { backgroundColor: palette.background, borderBottomColor: palette.border }]}>
-                <View style={[styles.roundIndexCircle, { backgroundColor: palette.accent }]}>
-                  <Text style={[styles.roundIndexText, { color: colors.cream }]}>{round.slot.index}</Text>
-                </View>
-                <View style={styles.roundHeaderText}>
-                  <Text style={[styles.roundLabel, { color: palette.ink }]}>Round {round.slot.index}</Text>
-                  <Text style={[styles.roundTime, { color: palette.ink }]}>
-                    Opens {formatTime12h(round.slot.submitTime)} · Settles {formatTime12h(round.slot.settleTime)}
-                  </Text>
+            <LinearGradient
+              key={round.slot.id}
+              colors={[shade(palette.accent, 0.12), palette.accent, shade(palette.accent, -0.14)]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.vibrantCard}
+            >
+              <View style={styles.vibrantHeaderRow}>
+                <AnalogClock hour={hh} ringColor={palette.accent} />
+                <View style={styles.timePill}>
+                  <Text style={styles.timePillDigits}>{timeDigits}</Text>
+                  <Text style={styles.timePillPeriod}>{timePeriod}</Text>
                 </View>
               </View>
 
-              <View style={styles.roundBody}>
-                <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} />
+              <Text style={styles.vibrantHeadline}>
+                Round {round.slot.index}{'\n'}
+                <Text style={styles.vibrantHeadlineAccent}>pick your figure</Text>
+              </Text>
 
-                <PredictionControl
-                  roundId={round.slot.id}
-                  currentValue={round.prediction?.value}
-                  slotAmount={slotAmount}
-                  onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
-                />
-              </View>
-            </Card>
+              <RoundAutoPlayControl roundId={round.slot.id} disabled={round.prediction != null} vibrant />
+
+              <PredictionControl
+                roundId={round.slot.id}
+                currentValue={round.prediction?.value}
+                slotAmount={slotAmount}
+                onSubmit={(value, amount) => submitPrediction(round.slot.id, value, amount)}
+                vibrant
+              />
+            </LinearGradient>
           );
         })}
       </View>
@@ -127,43 +131,34 @@ export default function PredictScreen() {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    heroHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      backgroundColor: withAlpha(colors.teal, 0.1),
-      borderRadius: radius.xxl,
-      padding: spacing.lg,
-      marginBottom: spacing.lg,
-    },
-    heroText: { flex: 1, minWidth: 0 },
-    heroEyebrow: { ...typography.label, color: colors.teal },
-    title: { ...typography.h1, color: colors.text, marginTop: 2 },
-    heroSub: { ...typography.small, color: colors.textMuted, marginTop: 3 },
-    infoCard: { marginTop: spacing.lg },
-    infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    title: { ...typography.h2, color: colors.text, marginBottom: spacing.lg },
+    infoCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceAlt },
+    infoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
     infoTitle: { ...typography.h3, color: colors.text },
-    infoText: { ...typography.small, color: colors.textMuted, lineHeight: 19 },
-    roundBand: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
+    infoText: { ...typography.small, color: colors.textMuted, lineHeight: 18 },
+
+    vibrantCard: {
+      borderRadius: radius.xl,
       padding: spacing.lg,
-      borderBottomWidth: 1,
-      borderTopLeftRadius: radius.xl - 1,
-      borderTopRightRadius: radius.xl - 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 6,
     },
-    roundIndexCircle: {
-      width: 42,
-      height: 42,
-      borderRadius: radius.sm,
-      alignItems: 'center',
-      justifyContent: 'center',
+    vibrantHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
+    timePill: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 4,
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
     },
-    roundIndexText: { ...typography.h3 },
-    roundHeaderText: { flex: 1, minWidth: 0 },
-    roundLabel: { ...typography.h3 },
-    roundTime: { ...typography.small, marginTop: 2, opacity: 0.78 },
-    roundBody: { padding: spacing.lg, paddingBottom: spacing.md },
+    timePillDigits: { fontSize: 24, fontWeight: '900', color: '#FFFFFF' },
+    timePillPeriod: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
+    vibrantHeadline: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', lineHeight: 30, marginBottom: spacing.lg },
+    vibrantHeadlineAccent: { color: '#FFE86B' },
   });
 }
