@@ -87,9 +87,14 @@ export const useAutoPlayStore = create<AutoPlayState>()(
 
   setSlotFigure: async (roundId, figure) => {
     const previous = get().slots[roundId] ?? DEFAULT_SLOT_CONFIG;
-    const next = { ...previous, figure };
+    // Picking a figure ARMS the round, because A1 only stores Figure alongside
+    // Status=1 — with Status=0 the backend ignores it entirely. The old code
+    // returned early whenever the round was off, so a figure chosen in the "Auto
+    // Set Daily Figure" panel was never sent at all: the panel staged it, said
+    // Saved, and the next A2 quietly restored the old value. That is the whole
+    // of "my figures aren't saved" and "Auto Play turns itself off".
+    const next = { ...previous, figure, enabled: true };
     set((state) => ({ slots: { ...state.slots, [roundId]: next } }));
-    if (!next.enabled) return; // matches A1's own rule: Figure isn't stored while OFF, so nothing to push yet
     try {
       await api.rounds.setAutoPlayConfig(indexFromRoundId(roundId), true, figure);
     } catch (e) {

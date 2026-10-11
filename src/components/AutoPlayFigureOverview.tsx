@@ -19,8 +19,9 @@ const FIGURES = [1, 2, 3, 4, 5];
  *
  * Collapsed by default — tap the header to open it. Picks are staged locally
  * (not sent as you tap) and only reach the server on "Save", one
- * setSlotFigure call per changed round — the same store action/backend call
- * the per-round picker already uses.
+ * setSlotFigure call per changed round. Saving a figure arms that round: A1
+ * only stores Figure while Status=1, so that is the only way it can be saved at
+ * all — see setSlotFigure in the store.
  */
 export function AutoPlayFigureOverview({ rounds }: { rounds: DailyRound[] }) {
   const colors = useColors();
@@ -74,7 +75,7 @@ export function AutoPlayFigureOverview({ rounds }: { rounds: DailyRound[] }) {
             Auto Set Daily Figure
           </Text>
           <Text style={styles.subtitle} numberOfLines={2}>
-            Every round's Auto Play figure for the day, all in one place.
+            Pick each round's figure for the day — choosing one switches that round's Auto Play on.
           </Text>
         </View>
         {/* A solid pill, not a chevron in a circle: the chevron read as
