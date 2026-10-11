@@ -1063,7 +1063,7 @@ function mapTransaction(raw: any): WalletTransaction {
     description = raw.Bank ? `Withdrawal to ${raw.Bank}` : 'Withdrawal';
   } else if (labelId === 'P') {
     type = 'round_stake';
-    description = `Round ${raw.Label} stake`;
+    description = `Round ${raw.Label} entry`;
   } else {
     // 'G'/'L'/'N' — a settled round's gain/loss outcome, not seen populated yet
     type = amount >= 0 ? 'round_gain' : 'round_loss';
