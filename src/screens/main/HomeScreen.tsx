@@ -22,12 +22,12 @@ import { DailyRound, RoundStatus, WalletTransaction } from '../../types';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { ROUND_CARD_PALETTES } from '../../theme/theme';
 
-// A loss has to be RED, and the palette can't do that on the brand green:
-// `danger` (#F87171) measures 1.15:1 against colors.primary — invisible. Red
-// text on a dark-red chip reads as red and clears contrast (5.75:1), so that is
-// what a loss gets, here and on the result card. The arrow carries direction too.
-const LOSS_CHIP = '#781616';
-const LOSS_TEXT = '#FCA5A5';
+// Red on the GREEN hero, with no chip behind it. A light red is hopeless there —
+// `danger` (#F87171) is 1.15:1 against colors.primary, and white is the ceiling
+// for anything light at 3.17:1. So the loss uses the darkest red that still
+// reads as red: 3.82:1. On the DARK result card plain `danger` is 6.55:1, so it
+// needs no special treatment there.
+const LOSS_TEXT_ON_GREEN = '#6B1414';
 
 const TX_ICON: Record<WalletTransaction['type'], keyof typeof Ionicons.glyphMap> = {
   deposit: 'arrow-down-circle',
@@ -125,21 +125,16 @@ export default function HomeScreen() {
                 profit used to render in the card's own background colour — invisible —
                 and the loss red clashed with it. Solid chips instead: white for a gain,
                 ink for a loss, both far past the contrast the tints managed. */}
-            <View
-              style={[
-                styles.profitPill,
-                { backgroundColor: isProfitPositive ? colors.onPrimary : LOSS_CHIP },
-              ]}
-            >
+            <View style={styles.profitPill}>
               <Ionicons
                 name={isProfitPositive ? 'trending-up' : 'trending-down'}
                 size={12}
-                color={isProfitPositive ? colors.primaryDark : LOSS_TEXT}
+                color={isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN}
               />
               <Text
                 style={[
                   styles.profitPillText,
-                  { color: isProfitPositive ? colors.primaryDark : LOSS_TEXT },
+                  { color: isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN },
                 ]}
               >
                 {formatPercent(totalProfitPercent)}
@@ -149,16 +144,17 @@ export default function HomeScreen() {
           <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
           {formatMoney(balance)}
         </Text>
-          <View
-            style={[styles.profitChip, { backgroundColor: isProfitPositive ? colors.onPrimary : LOSS_CHIP }]}
-          >
+          <View style={styles.profitChip}>
             <Ionicons
               name={isProfitPositive ? 'arrow-up' : 'arrow-down'}
               size={13}
-              color={isProfitPositive ? colors.primaryDark : LOSS_TEXT}
+              color={isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN}
             />
             <Text
-              style={[styles.profit, { color: isProfitPositive ? colors.primaryDark : LOSS_TEXT }]}
+              style={[
+                styles.profit,
+                { color: isProfitPositive ? colors.onPrimary : LOSS_TEXT_ON_GREEN },
+              ]}
             >
               {formatSigned(totalProfit)} today
             </Text>
@@ -345,7 +341,7 @@ function LatestResultCard({ round }: { round: DailyRound }) {
   const gainPositive = result.finalOutcome ? result.finalOutcome === 'gain' : (result.valueGained ?? 0) >= 0;
 
   return (
-    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.primary : LOSS_CHIP }]}>
+    <Card style={[styles.resultCard, { borderColor: gainPositive ? colors.success : colors.danger }]}>
       <View style={styles.resultHeaderRow}>
         <View style={styles.resultHeaderText}>
           <Text style={styles.resultEyebrow}>LATEST RESULT</Text>
@@ -353,14 +349,14 @@ function LatestResultCard({ round }: { round: DailyRound }) {
             Round {round.slot.index} · {formatTime12h(round.slot.submitTime)}
           </Text>
         </View>
-        <View style={[styles.resultPill, { backgroundColor: gainPositive ? colors.successTint : LOSS_CHIP }]}>
+        <View style={styles.resultPill}>
           <Ionicons
             name={gainPositive ? 'trending-up' : 'trending-down'}
             size={14}
-            color={gainPositive ? colors.success : LOSS_TEXT}
+            color={gainPositive ? colors.success : colors.danger}
           />
           <Text
-            style={[styles.resultPillText, { color: gainPositive ? colors.success : LOSS_TEXT }]}
+            style={[styles.resultPillText, { color: gainPositive ? colors.success : colors.danger }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
@@ -448,16 +444,7 @@ function createStyles(colors: Colors) {
     profitPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
     profitPillText: { ...typography.tiny, fontWeight: '700' },
     balance: { ...typography.h1, color: colors.onPrimary, marginTop: spacing.xs },
-    profitChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      alignSelf: 'flex-start',
-      marginTop: spacing.sm,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 3,
-      borderRadius: radius.pill,
-    },
+    profitChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm },
     profit: { ...typography.small, fontWeight: '700', color: colors.onPrimary },
     bannerWrap: { marginTop: spacing.lg },
     // The radius lives on a clipping wrapper, not on the Image: borderRadius +
