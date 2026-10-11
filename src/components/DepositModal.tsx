@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -172,7 +181,13 @@ export function DepositModal({ visible, onClose }: { visible: boolean; onClose: 
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      {/* The sheet is bottom-anchored, so the number pad sat straight on top of the
+          amount field. A Modal renders outside the app's own Screen, which is where
+          keyboard avoidance normally comes from — hence the explicit wrapper. */}
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={[styles.sheet, { paddingBottom: Math.round(spacing.xl + insets.bottom) }]}>
           <View style={styles.headerRow}>
             <Text style={styles.title}>{checkoutUrl ? 'Complete Your Deposit' : 'Add Money'}</Text>
@@ -243,7 +258,7 @@ export function DepositModal({ visible, onClose }: { visible: boolean; onClose: 
             </View>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
