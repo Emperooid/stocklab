@@ -244,7 +244,10 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
                 {'   ·   '}
                 Crowd value{' '}
                 <Text style={styles.detailValue}>
-                  {r.result?.average != null ? r.result.average.toFixed(2) : '—'}
+                  {/* A crowd average of 0 isn't real — picks are 1-5 — it means the
+                      backend never populated it. The rest of the app already treats
+                      0 as unknown. */}
+                  {r.result?.average != null && r.result.average > 0 ? r.result.average.toFixed(2) : '—'}
                 </Text>
               </Text>
               <Text

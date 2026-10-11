@@ -238,7 +238,7 @@ function TransactionRow({
         {tx.roundIndex != null && (
           <Text style={styles.txFigures}>
             Picked {played?.picked ?? '—'} · Crowd value{' '}
-            {played?.crowd != null ? played.crowd.toFixed(2) : '—'}
+            {played?.crowd != null && played.crowd > 0 ? played.crowd.toFixed(2) : '—'}
           </Text>
         )}
         <View style={styles.txMetaRow}>

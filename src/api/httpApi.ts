@@ -1102,10 +1102,23 @@ function groupHistoryByDate(raw: any[]): DailyHistoryEntry[] {
       const rounds: DailyRound[] = entries.map((entry, i) => {
         const slotIndex = Number(entry.Slot ?? entry.slot ?? entry.roundId ?? i + 1);
         const slot = ROUND_SLOTS.find((s) => s.index === slotIndex) ?? ROUND_SLOTS[i % ROUND_SLOTS.length];
+        const result = mapResult(slot.id, entry);
         return {
           slot,
           status: 'settled' as const,
-          result: mapResult(slot.id, entry),
+          result,
+          // G14 returns the pick on the same record as the result, and this used
+          // to be dropped here — so every history row read "Picked —" however
+          // real the pick was. RoundHistoryScreen had been reading r.prediction
+          // all along.
+          prediction:
+            result.userPrediction != null
+              ? {
+                  roundId: slot.id,
+                  value: result.userPrediction,
+                  submittedAt: `${entry.Datein ?? ''}T${entry.Timein ?? '00:00:00'}`,
+                }
+              : undefined,
         };
       });
       const settled = rounds.filter((r) => r.result);
