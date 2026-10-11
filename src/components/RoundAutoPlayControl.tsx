@@ -1,17 +1,23 @@
 import { useMemo } from 'react';
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 import { useAutoPlayStore } from '../store/autoPlayStore';
 
-const FIGURES = [1, 2, 3, 4, 5];
-const INK = '#1B1540';
-
 /**
- * Per-round Auto Play row — toggle on top, then a direct 1-5 figure picker
- * below (tap a number to pick it, no dropdown). Disabled once the round's
- * already been played, since Auto Play for it is moot at that point. Renders
- * nothing until `slots` has loaded from the server (A2), to avoid a flash of
- * the default {enabled: false, figure: 3} before the real saved value loads.
+ * Per-round Auto Play row — a toggle, and nothing else.
+ *
+ * It used to carry its own 1-5 figure picker directly beneath this. On a round
+ * card that put two identical-looking rows of 1-5 one above the other: the
+ * auto-play figure, then the round's real figure. Picking a number for the
+ * round meant reading past a row that looked exactly like the answer, so the
+ * picker is gone from here.
+ *
+ * The auto-play figure is still set from the Auto Play panel at the top of the
+ * Predict screen, so nothing is lost — the round card keeps only its switch.
+ *
+ * Disabled once the round's already been played, since Auto Play for it is moot
+ * at that point. Renders nothing until `slots` has loaded from the server (A2),
+ * to avoid a flash of the default {enabled: false} before the real value loads.
  */
 export function RoundAutoPlayControl({
   roundId,
@@ -28,57 +34,25 @@ export function RoundAutoPlayControl({
   const loaded = useAutoPlayStore((s) => s.loaded);
   const config = useAutoPlayStore((s) => s.getSlotConfig(roundId));
   const setSlotEnabled = useAutoPlayStore((s) => s.setSlotEnabled);
-  const setSlotFigure = useAutoPlayStore((s) => s.setSlotFigure);
 
   if (!loaded) return null;
 
-  const isInteractive = !disabled;
-  const labelColor = vibrant ? '#FFFFFF' : colors.text;
-  const wrapStyle = vibrant ? styles.vWrap : styles.wrap;
-
   return (
-    <View style={wrapStyle}>
+    <View style={vibrant ? styles.vWrap : styles.wrap}>
       <View style={styles.topRow}>
-        <Text style={[styles.label, { color: labelColor }]} numberOfLines={1}>
+        <Text style={[styles.label, { color: vibrant ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
           Auto Play
         </Text>
         <Switch
           value={config.enabled}
           onValueChange={(v) => setSlotEnabled(roundId, v).catch(() => {})}
-          disabled={!isInteractive}
-          trackColor={{ false: vibrant ? 'rgba(255,255,255,0.3)' : colors.border, true: vibrant ? '#0E9F57' : colors.primary }}
+          disabled={disabled}
+          trackColor={{
+            false: vibrant ? 'rgba(255,255,255,0.3)' : colors.border,
+            true: vibrant ? '#0E9F57' : colors.primary,
+          }}
           thumbColor={vibrant ? '#FFFFFF' : colors.text}
         />
-      </View>
-
-      <Text style={[styles.figureLabel, { color: vibrant ? 'rgba(255,255,255,0.8)' : colors.textMuted }]}>
-        FIGURE TO AUTO-PLAY
-      </Text>
-      <View style={styles.tilesRow}>
-        {FIGURES.map((v) => {
-          const selected = v === config.figure;
-          return (
-            <TouchableOpacity
-              key={v}
-              disabled={!isInteractive}
-              onPress={() => setSlotFigure(roundId, v).catch(() => {})}
-              style={[
-                vibrant ? styles.vTile : styles.tile,
-                selected && (vibrant ? styles.vTileSelected : styles.tileSelected),
-                !isInteractive && { opacity: 0.5 },
-              ]}
-            >
-              <Text
-                style={[
-                  vibrant ? styles.vTileText : styles.tileText,
-                  selected && { color: vibrant ? INK : colors.onPrimary },
-                ]}
-              >
-                {v}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
       </View>
     </View>
   );
@@ -95,31 +69,5 @@ function createStyles(colors: Colors) {
     },
     topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     label: { ...typography.body, fontWeight: '700' },
-    figureLabel: { ...typography.tiny, fontWeight: '800', letterSpacing: 0.5, marginTop: spacing.sm, marginBottom: spacing.xs },
-    tilesRow: { flexDirection: 'row', gap: spacing.xs },
-    tile: {
-      flex: 1,
-      height: 36,
-      borderRadius: radius.sm,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    tileSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-    tileText: { ...typography.body, color: colors.text, fontWeight: '700' },
-    vTile: {
-      flex: 1,
-      height: 36,
-      borderRadius: radius.sm,
-      borderWidth: 1.5,
-      borderColor: 'rgba(255,255,255,0.4)',
-      backgroundColor: 'rgba(255,255,255,0.14)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    vTileSelected: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
-    vTileText: { ...typography.body, color: '#FFFFFF', fontWeight: '700' },
   });
 }
