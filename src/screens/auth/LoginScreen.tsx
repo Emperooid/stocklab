@@ -100,7 +100,7 @@ export default function LoginScreen({ navigation, route }: Props) {
           up. The card is 1080x520, so the aspect ratio is fixed to keep it from
           stretching on narrow phones. */}
       <Image
-        source={require('../../../assets/welcome-card.jpg')}
+        source={require('../../../assets/hero-welcome.png')}
         style={styles.hero}
         resizeMode="contain"
         accessibilityLabel="Welcome back! Log in to continue picking stock."
@@ -192,14 +192,12 @@ function createStyles(colors: Colors) {
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
-    // A definite height. `width:'100%'` with only an aspectRatio was not
-    // constraining the height, so the artwork rendered about twice size and
-    // filled the screen. 150pt is the mockup's proportion; `contain` keeps the
-    // whole card visible inside it.
+    // The cropped card is 900x413. A definite height, and `contain` so its
+    // rounded corners are never clipped.
     hero: {
       width: '100%',
-      height: 150,
-      marginTop: spacing.sm,
+      height: 170,
+      marginTop: spacing.md,
     },
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },

@@ -119,7 +119,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
   if (step === 'details') {
     return (
-      <Screen style={styles.centerContent} hideGameSwitcher>
+      <Screen style={styles.centerContent} hideGameSwitcher background={require('../../../assets/auth-background.png')}>
         <Text style={styles.title}>Tell us about you</Text>
         <Text style={styles.subtitle}>Almost done — just a few more details.</Text>
 
@@ -183,7 +183,7 @@ export default function RegisterScreen({ navigation }: Props) {
   }
 
   return (
-    <Screen style={styles.centerContent} hideGameSwitcher>
+    <Screen style={styles.centerContent} hideGameSwitcher background={require('../../../assets/auth-background.png')}>
       <View style={styles.header}>
         <Image source={require('../../../assets/logo-mark-badge.png')} style={styles.logoMark} resizeMode="contain" />
         <Text style={styles.wordmark}>
@@ -193,16 +193,12 @@ export default function RegisterScreen({ navigation }: Props) {
         <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
       </View>
 
-      <View style={styles.hero}>
-        <View style={styles.heroText}>
-          <Text style={styles.heroTitle}>
-            Create your{'\n'}
-            <Text style={styles.heroTitleAccent}>account</Text>
-          </Text>
-          <Text style={styles.heroBody}>Enter your phone number to get started.</Text>
-        </View>
-        <Image source={require('../../../assets/register-hero.png')} style={styles.heroArt} resizeMode="contain" />
-      </View>
+      <Image
+        source={require('../../../assets/hero-register.png')}
+        style={styles.hero}
+        resizeMode="contain"
+        accessibilityLabel="Create your account. Enter your phone number to get started."
+      />
 
       <View style={styles.form}>
         <Input
@@ -236,13 +232,8 @@ function createStyles(colors: Colors) {
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     hero: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      // The artwork's own background (sampled from register-hero.png), not the
-      // brand green: primaryDark made the green "account" invisible on it.
-      backgroundColor: '#031B1D',
-      borderRadius: radius.xl,
-      padding: spacing.lg,
+      width: '100%',
+      height: 165,
       marginBottom: spacing.lg,
       overflow: 'hidden',
     },
