@@ -10,17 +10,9 @@ import { CardButton } from '../../components/cards/CardButton';
 import { PlayingCard } from '../../components/cards/PlayingCard';
 import { Colors, radius, useColors } from '../../theme/theme';
 import { openCards, useCardsStore } from '../../store/cardsStore';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, formatCreatedAt } from '../../lib/format';
 import { CardsTabParamList, MainStackParamList } from '../../navigation/types';
 
-function timeAgo(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
 
 /**
  * Page 2 — the open table. Other players' face-down cards, each showing only
@@ -117,7 +109,7 @@ export default function PlayCardsScreen() {
                     {card.originatorName}
                   </Text>
                   <Text style={styles.cardMeta} numberOfLines={1}>
-                    hid a number · {timeAgo(card.createdAt)}
+                    hid a number · {formatCreatedAt(card.createdAtRaw, card.createdAt)}
                   </Text>
                   <View style={styles.stakeRow}>
                     <Ionicons name="lock-closed-outline" size={12} color={colors.primary} />

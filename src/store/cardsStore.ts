@@ -138,6 +138,10 @@ export function mapRemoteCard(raw: RemoteCardRecord, myPhone: string): GameCard 
     id,
     amount,
     createdAt: parseBackendDate(field(raw, 'CreatedAt', 'DateCreated', 'DateIn1', 'DateIn')) ?? new Date().toISOString(),
+    createdAtRaw: (() => {
+      const v = field(raw, 'CreatedAt', 'DateCreated', 'DateIn1', 'DateIn');
+      return v == null ? undefined : String(v);
+    })(),
     originatorFigure: Number(field(raw, 'Figure', 'OriginatorFigure', 'CreatorFigure') ?? 0),
     originatorName: nameRaw ?? (mine ? 'You' : maskedPhone(originatorPhone)),
     originatorPhone,
@@ -166,6 +170,12 @@ export interface GameCard {
   /** The stake each side puts in (they always match). */
   amount: number;
   createdAt: string;
+  /**
+   * The creation timestamp exactly as the backend wrote it ("10/12/2026 9:45:00
+   * AM"). `createdAt` is the same instant re-parsed through the device's clock,
+   * which is what made a just-created card read "1h ago" — see formatCreatedAt.
+   */
+  createdAtRaw?: string;
   /** The figure the originator hid. Only revealed once the card is settled. */
   originatorFigure: number;
   originatorName: string;

@@ -11,20 +11,12 @@ import { PlayingCard } from '../../components/cards/PlayingCard';
 import { Colors, radius, useColors, glow } from '../../theme/theme';
 import { computeCardStats, iWon, myOpenCards, settledCards, useCardsStore } from '../../store/cardsStore';
 import type { GameCard } from '../../store/cardsStore';
-import { formatMoney, formatSigned } from '../../lib/format';
+import { formatMoney, formatSigned, formatCreatedAt } from '../../lib/format';
 import { CardsTabParamList, MainStackParamList } from '../../navigation/types';
 
 type TabKey = 'active' | 'completed';
 
 /** "just now" · "2m ago" · "3h ago" · "5d ago" — for a card's createdAt. */
-function timeAgo(iso: string): string {
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000));
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
 
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -130,7 +122,7 @@ export default function MyCardsScreen() {
                       </Text>
                       <View style={styles.timeChip}>
                         <Text style={styles.timeChipText} numberOfLines={1}>
-                          {timeAgo(card.createdAt)}
+                          {formatCreatedAt(card.createdAtRaw, card.createdAt)}
                         </Text>
                       </View>
                     </View>

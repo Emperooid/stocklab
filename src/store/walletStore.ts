@@ -162,7 +162,7 @@ export const useWalletStore = create<WalletState>()(
       },
 
       fetchWithdrawalHistory: async () => {
-        const withdrawalHistory = await api.wallet.getWithdrawalHistory();
+        const withdrawalHistory = await api.wallet.getWithdrawals();
         set({ withdrawalHistory });
       },
 

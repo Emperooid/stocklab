@@ -568,13 +568,23 @@ function WithdrawalHistoryRow({ entry }: { entry: WithdrawalHistoryEntry }) {
       </View>
       <View style={styles.historyStatsRow}>
         <View>
-          <Text style={styles.historyStatLabel}>Balance Before</Text>
-          <Text style={styles.historyStatValue}>{formatMoney(entry.balanceBefore)}</Text>
+          <Text style={styles.historyStatLabel}>Amount</Text>
+          <Text style={styles.historyStatValue}>{formatMoney(entry.amount ?? 0)}</Text>
         </View>
-        <View>
-          <Text style={styles.historyStatLabel}>Balance After</Text>
-          <Text style={styles.historyStatValue}>{formatMoney(entry.balanceAfter)}</Text>
-        </View>
+        {entry.bank ? (
+          <View style={{ flexShrink: 1 }}>
+            <Text style={styles.historyStatLabel}>To</Text>
+            <Text style={styles.historyStatValue} numberOfLines={1}>
+              {entry.bank}
+            </Text>
+          </View>
+        ) : null}
+        {entry.balanceAfter != null ? (
+          <View>
+            <Text style={styles.historyStatLabel}>Balance After</Text>
+            <Text style={styles.historyStatValue}>{formatMoney(entry.balanceAfter)}</Text>
+          </View>
+        ) : null}
       </View>
       {entry.dateCredited && (
         <Text style={styles.historyCredited}>Credited {new Date(entry.dateCredited).toLocaleString()}</Text>

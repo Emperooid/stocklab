@@ -126,8 +126,11 @@ export interface SupportContact {
 export interface WithdrawalHistoryEntry {
   id: string;
   dateRequested: string;
-  balanceBefore: number;
-  balanceAfter: number;
+  /** From G15's "W" ledger. The running balances were never in it. */
+  amount?: number;
+  bank?: string;
+  balanceBefore?: number;
+  balanceAfter?: number;
   status: 'open' | 'closed';
   dateCredited?: string;
 }

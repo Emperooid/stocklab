@@ -66,7 +66,7 @@ function findSlot(roundId: string) {
 }
 
 function notSupported(feature: string): never {
-  throw new Error(`${feature} isn't available yet — no backend endpoint exists for it.`);
+  throw new Error(`${feature} isn't available just yet. Please check back soon.`);
 }
 
 /**
@@ -813,9 +813,30 @@ export const httpApi = {
       const { phone } = requireSession();
       await callGateway('IP', { Phone: phone, Amount: amount, OTP: otp, PinCode: pinCode });
     },
-    /** No confirmed endpoint yet for the withdrawal history table (Date Requested/Balance Before/After/Open-Closed/Date Credited). */
-    async getWithdrawalHistory(): Promise<WithdrawalHistoryEntry[]> {
-      notSupported('Fetching withdrawal history');
+    /**
+     * There is no separate withdrawal-history endpoint, but G15's "W" code is the
+     * withdrawal ledger itself. Deriving from it is why this no longer throws:
+     * requestWithdrawal refreshes the history after submitting, so a withdrawal that
+     * had SUCCEEDED still surfaced "no backend endpoint exists for it" to the user.
+     */
+    async getWithdrawals(): Promise<WithdrawalHistoryEntry[]> {
+      const { phone } = requireSession();
+      const now = new Date();
+      const res = await callGateway<any>('G15', {
+        Year: String(now.getFullYear()),
+        Month: String(now.getMonth() + 1).padStart(2, '0'),
+        Phone: phone,
+        Code: 'W',
+      });
+      const records = Array.isArray(res?.Records) ? res.Records : [];
+      return records.map((raw: any) => ({
+        id: String(raw.Id),
+        dateRequested: `${raw.Datein ?? ''}T${raw.Timein ?? '00:00:00'}`,
+        amount: Math.abs(Number(raw.Amount ?? 0)),
+        bank: raw.Bank,
+        // The ledger only holds completed withdrawals.
+        status: 'closed' as const,
+      }));
     },
     /**
      * CONFIRMED shape (G15_ShowDepositsAND_Others, per Mr Yemi's docs):
