@@ -4,6 +4,7 @@ import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from '@react-navi
 import { AuthNavigator } from './AuthNavigator';
 import { MainStack } from './MainStack';
 import { SplashScreen } from '../components/SplashScreen';
+import { AuthIntroCarousel } from '../components/AuthIntroCarousel';
 import { OnboardingCarousel } from '../components/OnboardingCarousel';
 import { AlertPopup } from '../components/AlertPopup';
 import { useAuthStore } from '../store/authStore';
@@ -12,6 +13,7 @@ import { useWalletStore } from '../store/walletStore';
 import { useCardsStore } from '../store/cardsStore';
 import { useRoundsStore } from '../store/roundsStore';
 import { useTourStore } from '../store/tourStore';
+import { useIntroStore } from '../store/introStore';
 import { useAlertPopupStore } from '../store/alertPopupStore';
 import { Colors, spacing, typography, useColors } from '../theme/theme';
 import { isBackendConfigured } from '../config/backend';
@@ -36,6 +38,7 @@ function buildNavTheme(colors: Colors, mode: 'light' | 'dark'): Theme {
 export function RootNavigator() {
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const hasSeenIntro = useIntroStore((s) => s.hasSeenIntro);
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const colors = useColors();
   const mode = useThemeStore((s) => s.mode);
@@ -133,7 +136,7 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
-      {user ? <MainStack /> : <AuthNavigator />}
+      {user ? <MainStack /> : hasSeenIntro ? <AuthNavigator /> : <AuthIntroCarousel />}
       {user && <AlertPopup />}
       {user && <OnboardingCarousel />}
     </NavigationContainer>
