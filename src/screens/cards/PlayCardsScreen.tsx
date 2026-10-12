@@ -63,8 +63,8 @@ export default function PlayCardsScreen() {
       </View>
 
       <Text style={styles.subtitle}>
-        Someone has hidden a figure behind each of these. Match the stake, pick your number, and if it lands
-        on theirs you win.
+        Someone has hidden a number between 1 and 5 behind a card. Guess correctly to win the value on the
+        card, or lose your entry stake if you guess wrong.
       </Text>
 
       {playable.length > 0 && (
@@ -85,7 +85,7 @@ export default function PlayCardsScreen() {
             <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
               {formatMoney(playable[0]?.amount ?? 0)}
             </Text>
-            <Text style={styles.summaryLabel}>lowest stake</Text>
+            <Text style={styles.summaryLabel}>lowest entry</Text>
           </View>
         </View>
       )}
@@ -117,11 +117,11 @@ export default function PlayCardsScreen() {
                     {card.originatorName}
                   </Text>
                   <Text style={styles.cardMeta} numberOfLines={1}>
-                    hid a figure · {timeAgo(card.createdAt)}
+                    hid a number · {timeAgo(card.createdAt)}
                   </Text>
                   <View style={styles.stakeRow}>
                     <Ionicons name="lock-closed-outline" size={12} color={colors.primary} />
-                    <Text style={styles.stakeText}>Match {formatMoney(card.amount)} to play</Text>
+                    <Text style={styles.stakeText}>Put in {formatMoney(card.amount)} to play</Text>
                   </View>
                   <CardButton
                     title={canAfford ? 'Unveil a card' : 'Not enough balance'}
@@ -143,8 +143,7 @@ export default function PlayCardsScreen() {
         <View style={styles.tipRow}>
           <Ionicons name="bulb-outline" size={16} color={colors.primary} />
           <Text style={styles.tipText}>
-            Every figure is equally likely, so there's no clever pick — only a confident one. A match pays
-            out.
+            Every number is equally likely. There's no clever pick — only a confident one.
           </Text>
         </View>
       </CardPanel>

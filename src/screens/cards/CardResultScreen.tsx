@@ -70,7 +70,7 @@ export default function CardResultScreen() {
           ? 'The answering player matched the hidden figure, so they take the pot.'
           : winner === 'originator'
             ? 'The answering player missed the hidden figure, so the originator keeps the pot.'
-            : 'This card has settled.';
+            : 'This card has been played.'
   // Two cards plus the VS column have to fit the panel on any device. A fixed
   // 116 overflowed a narrow phone, so the cards are sized from the row's
   // measured width with a readable floor and the old 116 as the ceiling.
@@ -83,7 +83,7 @@ export default function CardResultScreen() {
   const originatorLabel = card.mine ? 'You' : card.originatorName;
   const answererLabel = card.mine ? card.answeredByName ?? 'Answerer' : 'You';
   const delta = won === true ? card.payout : won === false ? -card.amount : undefined;
-  const verdictTitle = won === true ? 'You won!' : won === false ? 'Not this time' : 'Settled';
+  const verdictTitle = won === true ? 'You won!' : won === false ? 'Not this time' : 'Played';
 
   return (
     <Screen>

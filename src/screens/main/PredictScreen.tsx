@@ -64,11 +64,10 @@ export default function PredictScreen() {
           <Text style={styles.infoTitle}>How scoring works</Text>
         </View>
         <Text style={styles.infoText}>
-          Pick a number — each round is played with your fixed stake amount, which comes out of your wallet balance,
-          separate from the rest. You can pick a stock for any round today in advance, not just the one currently
-          open, but each round can only be played once — there's no changing it after you submit. Once a round
-          settles, results are based on the average pick across all players that round — the closer your number
-          was to the average, the higher your gain; the farther away, the bigger the loss.
+          Pick a number from 1 to 5 for any round today — not just the one playing now. Each round costs the
+          same entry amount, which comes out of your wallet. You can only play a round once, and you cannot
+          change your number after you send it. When a round ends, we work out the average of everyone's picks.
+          The closer your number is to that average, the more you win; the further away, the more you lose.
         </Text>
       </Card>
 

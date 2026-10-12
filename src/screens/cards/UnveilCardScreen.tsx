@@ -80,17 +80,17 @@ export default function UnveilCardScreen() {
       <View style={styles.heroRow}>
         <PlayingCard amount={card.amount} size={124} />
         <View style={styles.heroInfo}>
-          <Text style={styles.originatorLabel}>ORIGINATOR</Text>
+            <Text style={styles.originatorLabel}>CARD MAKER</Text>
           <Text style={styles.originator} numberOfLines={1}>
             {card.originatorName}
           </Text>
           <View style={styles.pillRow}>
             <Ionicons name="lock-closed-outline" size={12} color={colors.warning} />
-            <Text style={[styles.pillText, { color: colors.warning }]}>Figure hidden</Text>
+              <Text style={[styles.pillText, { color: colors.warning }]}>Number hidden</Text>
           </View>
           <View style={[styles.pillRow, styles.pillRowCyan]}>
             <Ionicons name="cash-outline" size={12} color={colors.blue} />
-            <Text style={[styles.pillText, { color: colors.blue }]}>Stake {formatMoney(card.amount)}</Text>
+              <Text style={[styles.pillText, { color: colors.blue }]}>Entry {formatMoney(card.amount)}</Text>
           </View>
         </View>
       </View>

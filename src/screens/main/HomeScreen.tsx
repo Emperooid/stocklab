@@ -176,7 +176,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.ctaTextWrap}>
             <Text style={styles.ctaTitle}>Round {openRound.slot.index} is open</Text>
-            <Text style={styles.ctaSubtitle}>Submit your stock pick before {openRound.slot.settleTime}.</Text>
+            <Text style={styles.ctaSubtitle}>Pick your number before {openRound.slot.settleTime}.</Text>
           </View>
           {otherPickableCount > 0 && (
             <View style={styles.moreRoundsBadge}>
@@ -205,7 +205,7 @@ export default function HomeScreen() {
         <Card style={styles.statCard}>
           <Ionicons name="checkmark-done-circle-outline" size={20} color={colors.primary} style={{ marginBottom: 6 }} />
           <Text style={styles.statValue}>{settledToday}/{rounds.length}</Text>
-          <Text style={styles.statLabel}>Rounds settled today</Text>
+          <Text style={styles.statLabel}>Rounds played today</Text>
           {closedToday > 0 && (
             <Text style={styles.statHint}>
               {closedToday} round{closedToday === 1 ? '' : 's'} closed so far today

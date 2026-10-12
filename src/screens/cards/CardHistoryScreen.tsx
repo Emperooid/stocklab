@@ -55,7 +55,7 @@ export default function CardHistoryScreen() {
     <Screen>
       <CardFlowHeader title="History" step="EVERY SETTLED CARD" onBack={() => navigation.goBack()} />
 
-      <CardPanel tone="deep" eyebrow="YOUR RECORD" title="All settled cards" style={{ marginTop: 16 }}>
+      <CardPanel tone="deep" eyebrow="YOUR RECORD" title="All played cards" style={{ marginTop: 16 }}>
         <View style={styles.grid}>
           <Cell label="Played" value={String(stats.played)} />
           <Cell label="Won" value={String(stats.wins)} tone={colors.success} />

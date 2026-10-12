@@ -80,7 +80,7 @@ export default function RoundsScreen() {
       </View>
 
       <Card style={styles.summaryCard}>
-        <SummaryStat label="Settled" value={`${settled.length}/${rounds.length}`} colors={colors} />
+        <SummaryStat label="Played" value={`${settled.length}/${rounds.length}`} colors={colors} />
         <View style={styles.summaryDivider} />
         <SummaryStat label="Gains Today" value={formatSigned(totalGains)} color={colors.success} colors={colors} />
         <View style={styles.summaryDivider} />
@@ -173,8 +173,8 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
         <View style={styles.vPanel}>
           <View style={styles.resultRow}>
             <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} />
-            <MiniStat label="Avg Pick" value={result.average != null ? result.average.toFixed(2) : '—'} />
-            <MiniStat label="Deviation" value={result.distance != null ? result.distance.toFixed(2) : '—'} />
+            <MiniStat label="Crowd average" value={result.average != null && result.average > 0 ? result.average.toFixed(2) : '—'} />
+            <MiniStat label="Off by" value={result.distance != null ? result.distance.toFixed(2) : '—'} />
           </View>
           <View style={styles.resultValueRow}>
             <Text style={styles.vPanelLabel}>VALUE</Text>

@@ -221,7 +221,7 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.dateText}>{formatDate(entry.date)}</Text>
-          <Text style={styles.subText}>{entry.roundsSettled}/{entry.rounds.length} rounds settled</Text>
+          <Text style={styles.subText}>{entry.roundsSettled}/{entry.rounds.length} rounds played</Text>
         </View>
         <View style={{ alignItems: 'flex-end', marginRight: spacing.xs }}>
           <Text style={[styles.gainText, { color: gainColor }]}>{formatSigned(entry.totalGain)}</Text>

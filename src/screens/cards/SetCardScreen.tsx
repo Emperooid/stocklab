@@ -74,7 +74,7 @@ export default function SetCardScreen() {
 
       {step === 'figure' && (
         <>
-          <CardPanel eyebrow="MAKE YOUR PICK" title="Choose the figure you'll hide">
+          <CardPanel eyebrow="MAKE YOUR PICK" title="Choose the number you'll hide">
             <Text style={styles.helper}>
               Any number from 1 to 5. Nobody sees it — not even after the card is created. Only the price is public.
             </Text>
@@ -92,9 +92,9 @@ export default function SetCardScreen() {
             </Text>
             <View style={styles.steps}>
               {[
-                ['1', 'Hide a figure', 'Pick any number from 1 to 5. It stays secret — even after the card goes live.'],
-                ['2', 'Set the price', `Choose what the card is worth (${'₦'}100 – ${'₦'}1,000). Whoever plays it must stake the same amount.`],
-                ['3', 'Someone takes it on', 'Any player can match your price and guess your figure. Your balance covers the stake the moment you create the card.'],
+                ['1', 'Hide a number', 'Pick any number from 1 to 5. It stays secret — even after the card goes live.'],
+                ['2', 'Set the value', `Choose what the card is worth (${'₦'}100 – ${'₦'}1,000). Whoever plays it puts in the same amount.`],
+                ['3', 'Someone plays it', 'Any player can put in the same amount and guess your number. The amount leaves your balance as soon as you make the card.'],
                 ['4', 'The reveal', 'Guess right and they win. Guess wrong and you win it.'],
               ].map(([n, title, body]) => (
                 <View key={n} style={styles.stepRow}>

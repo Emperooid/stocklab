@@ -149,7 +149,7 @@ export default function CardsHomeScreen() {
       <QuickTile
         icon="add"
         label="Create a card"
-        hint="Select an amount and choose a figure to hide between 1 and 5"
+        hint="Select an amount and choose a number to hide between 1 and 5"
         onPress={() => stackNavigation?.navigate('SetCard')}
       />
       <View style={styles.orRow}>
@@ -160,7 +160,7 @@ export default function CardsHomeScreen() {
       <QuickTile
         icon="flame"
         label="Unveil a card"
-        hint="Guess the hidden figure between 1 and 5"
+        hint="Guess the hidden number between 1 and 5"
         primary
         onPress={() => tabNavigation.navigate('Play')}
       />
@@ -235,7 +235,7 @@ export default function CardsHomeScreen() {
         {recent.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="file-tray-outline" size={96} color={colors.textDim} />
-            <Text style={styles.emptyText}>No settled cards yet. Your wins and losses land here.</Text>
+            <Text style={styles.emptyText}>No cards played yet. Your wins and losses land here.</Text>
           </View>
         ) : (
           <View style={styles.resultList}>
@@ -271,7 +271,7 @@ export default function CardsHomeScreen() {
         <View style={styles.rules}>
           <Ionicons name="bulb" size={20} color={colors.primary} />
           <Text style={styles.rulesText}>
-            Match the originator&apos;s figure to win.
+              Guess the hidden number and you win.
           </Text>
         </View>
       </CardPanel>

@@ -120,8 +120,8 @@ export default function RewardsScreen() {
     filter === 'wins'
       ? { title: 'No wins yet', body: 'Match the hidden figure and your first win lands here.' }
       : filter === 'losses'
-        ? { title: 'No losses yet', body: 'Every settled card so far went your way. Nice run.' }
-        : { title: 'No results yet', body: 'Play a card and the reveal is recorded here the moment it settles.' };
+        ? { title: 'No losses yet', body: 'Every card played so far went your way. Nice run.' }
+        : { title: 'No results yet', body: 'Play a card and the result is recorded here as soon as it is done.' };
 
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
@@ -213,7 +213,7 @@ export default function RewardsScreen() {
       {visible.length > 0 ? (
         <>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Settled results</Text>
+            <Text style={styles.sectionTitle}>Your results</Text>
             <Text style={styles.sectionCount}>
               {visible.length} {visible.length === 1 ? 'card' : 'cards'}
             </Text>
@@ -261,7 +261,7 @@ export default function RewardsScreen() {
 
                     <View style={styles.resultFoot}>
                       <Text style={styles.potLine} numberOfLines={1}>
-                        Pot {formatMoney(pot)}
+                        Both entries {formatMoney(pot)}
                       </Text>
                       <Text style={styles.dateLine} numberOfLines={1}>
                         {formatResultDate(card.createdAt)}

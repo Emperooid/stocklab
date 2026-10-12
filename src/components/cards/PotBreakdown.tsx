@@ -27,7 +27,7 @@ export function PotBreakdown({ amount, won, payout: reported, style }: PotBreakd
 
   return (
     <View style={[styles.wrap, style]}>
-      <Row colors={colors} styles={styles} label="Total Pot" value={formatMoney(pot)} icon="cash" />
+      <Row colors={colors} styles={styles} label="Both entries" value={formatMoney(pot)} icon="cash" />
       <View style={styles.divider} />
       <Row
         colors={colors}

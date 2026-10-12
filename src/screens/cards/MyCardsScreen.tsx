@@ -88,7 +88,7 @@ export default function MyCardsScreen() {
       </View>
 
       <Text style={styles.subtitle} numberOfLines={1}>
-        Every figure you've hidden, waiting or settled.
+        Every number you've hidden — waiting or played.
       </Text>
 
       <View style={styles.segmented}>
@@ -113,7 +113,7 @@ export default function MyCardsScreen() {
             <Ionicons name="file-tray-outline" size={120} color={colors.textDim} />
             <Text style={styles.emptyTitle}>No cards waiting</Text>
             <Text style={styles.emptyBody}>
-              You have nothing face down right now. Hide a figure at your own price and let the table answer.
+              You have nothing face down right now. Hide a number at your own price and let the table answer.
             </Text>
             <CardButton title="Create a card" icon="add" onPress={createCard} style={{ marginTop: 16 }} />
           </CardPanel>
@@ -177,9 +177,9 @@ export default function MyCardsScreen() {
             <CardPanel tone="deep" style={styles.empty}>
               {/* Placeholder for the removed bundled "empty" illustration. */}
               <Ionicons name="file-tray-outline" size={120} color={colors.textDim} />
-              <Text style={styles.emptyTitle}>Nothing settled yet</Text>
+              <Text style={styles.emptyTitle}>Nothing played yet</Text>
               <Text style={styles.emptyBody}>
-                Once one of your cards is answered, the reveal lands here with the figures and what it paid.
+                Once someone plays one of your cards, the answer lands here with the numbers and what it paid.
               </Text>
               <CardButton
                 title="Create a card"
