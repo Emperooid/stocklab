@@ -114,78 +114,84 @@ const [pullBusy, setPullBusy] = useState(false);
     />
   ) : undefined;
 
+  // The artwork sits OUTSIDE the SafeAreaView so it covers the status bar too.
+  // Inside it, the safe-area padding inset the image and left a black band
+  // across the top of every screen that used one.
+  const backdrop = background ? (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Image source={background} style={StyleSheet.absoluteFill} resizeMode="cover" />
+    </View>
+  ) : null;
+  const orbs = (
+    <>
+      <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
+      <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+    </>
+  );
+  const safeStyle = [styles.safe, !!background && styles.clear];
+
   if (!scroll) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.flex}>
-            {background ? (
-              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-                <Image source={background} style={StyleSheet.absoluteFill} resizeMode="cover" />
-              </View>
-            ) : (
-              <>
-                <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
-                <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
-              </>
-            )}
-            {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
-            <View style={[styles.flex, styles.content, styles.centered, style]}>{children}</View>
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+      <View style={styles.root}>
+        {backdrop}
+        <SafeAreaView style={safeStyle}>
+          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.flex}>
+              {!background && orbs}
+              {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
+              <View style={[styles.flex, styles.content, styles.centered, style]}>{children}</View>
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.flex}>
-          {background ? (
-            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-                <Image source={background} style={StyleSheet.absoluteFill} resizeMode="cover" />
-              </View>
-          ) : (
-            <>
-              <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
-              <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
-            </>
-          )}
-          {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
-          <KeyboardScrollContext.Provider value={scrollRef}>
-            <ScrollView
-              ref={scrollRef}
-              style={[styles.container, !!background && styles.containerClear]}
-              contentContainerStyle={[
-                styles.content,
-                styles.centered,
-                style,
-                // Room to scroll the last field clear of the keyboard.
-                keyboardHeight > 0 && { paddingBottom: spacing.xxl + keyboardHeight },
-              ]}
-              showsVerticalScrollIndicator={false}
-              refreshControl={refreshControl}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-            >
-              {children}
-            </ScrollView>
-          </KeyboardScrollContext.Provider>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <View style={styles.root}>
+      {backdrop}
+      <SafeAreaView style={safeStyle}>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.flex}>
+            {!background && orbs}
+            {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
+            <KeyboardScrollContext.Provider value={scrollRef}>
+              <ScrollView
+                ref={scrollRef}
+                style={[styles.container, !!background && styles.clear]}
+                contentContainerStyle={[
+                  styles.content,
+                  styles.centered,
+                  style,
+                  // Room to scroll the last field clear of the keyboard.
+                  keyboardHeight > 0 && { paddingBottom: spacing.xxl + keyboardHeight },
+                ]}
+                showsVerticalScrollIndicator={false}
+                refreshControl={refreshControl}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+              >
+                {children}
+              </ScrollView>
+            </KeyboardScrollContext.Provider>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
     safe: { flex: 1, backgroundColor: colors.background },
+    clear: { backgroundColor: 'transparent' },
     flex: { flex: 1 },
     container: { flex: 1, backgroundColor: colors.background },
     // The ScrollView is a sibling painted over the artwork, so its own opaque
     // background hid the designed background on every screen that passes one —
     // the waves simply never appeared.
-    containerClear: { backgroundColor: 'transparent' },
+
     content: { padding: spacing.lg, paddingBottom: spacing.xxl },
     centered: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
     orb: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.22 },
