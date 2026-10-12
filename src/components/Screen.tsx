@@ -155,7 +155,7 @@ const [pullBusy, setPullBusy] = useState(false);
           <KeyboardScrollContext.Provider value={scrollRef}>
             <ScrollView
               ref={scrollRef}
-              style={styles.container}
+              style={[styles.container, !!background && styles.containerClear]}
               contentContainerStyle={[
                 styles.content,
                 styles.centered,
@@ -182,6 +182,10 @@ function createStyles(colors: Colors) {
     safe: { flex: 1, backgroundColor: colors.background },
     flex: { flex: 1 },
     container: { flex: 1, backgroundColor: colors.background },
+    // The ScrollView is a sibling painted over the artwork, so its own opaque
+    // background hid the designed background on every screen that passes one —
+    // the waves simply never appeared.
+    containerClear: { backgroundColor: 'transparent' },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl },
     centered: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
     orb: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.22 },
