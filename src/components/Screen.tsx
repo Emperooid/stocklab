@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   RefreshControl,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +30,11 @@ interface ScreenProps {
   /** Pull-to-refresh. Omit it and the pull reloads every cached store instead. */
   /** Hides the "Other Games" strip — only for screens that come before a game is picked (auth). */
   hideGameSwitcher?: boolean;
+  /**
+   * Full-bleed artwork behind the content, replacing the default orbs. The auth
+   * screens have a designed background the orbs only approximate.
+   */
+  background?: ImageSourcePropType;
 }
 
 /**
@@ -52,7 +59,15 @@ function GameSwitcherBar({ colors }: { colors: Colors }) {
   );
 }
 
-export function Screen({ children, scroll = true, style, refreshing, onRefresh, hideGameSwitcher }: ScreenProps) {
+export function Screen({
+  children,
+  scroll = true,
+  style,
+  refreshing,
+  onRefresh,
+  hideGameSwitcher,
+  background,
+}: ScreenProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const hasSession = useAuthStore((s) => !!s.user);
@@ -104,8 +119,16 @@ const [pullBusy, setPullBusy] = useState(false);
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.flex}>
-            <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
-            <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+            {background ? (
+              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <Image source={background} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              </View>
+            ) : (
+              <>
+                <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
+                <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+              </>
+            )}
             {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
             <View style={[styles.flex, styles.content, styles.centered, style]}>{children}</View>
           </View>
@@ -118,8 +141,16 @@ const [pullBusy, setPullBusy] = useState(false);
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.flex}>
-          <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
-          <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+          {background ? (
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <Image source={background} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              </View>
+          ) : (
+            <>
+              <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
+              <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
+            </>
+          )}
           {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
           <KeyboardScrollContext.Provider value={scrollRef}>
             <ScrollView

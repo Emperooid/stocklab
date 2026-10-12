@@ -93,7 +93,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
   if (step === 'otp') {
     return (
-      <Screen style={styles.centerContent} hideGameSwitcher>
+      <Screen style={styles.centerContent} hideGameSwitcher background={require('../../../assets/auth-background.png')}>
         <Text style={styles.title}>Enter the code</Text>
         <Text style={styles.subtitle}>We sent a 6-digit code to {phone}.</Text>
 
