@@ -240,9 +240,9 @@ function DayCard({ entry, expanded, onToggle }: { entry: DailyHistoryEntry; expa
                   read "picked 3 · Avg 2.40" — "Avg" meant nothing, and the crowd
                   value vanished from the row when the backend didn't send it. */}
               <Text style={styles.detailInfo}>
-                Picked <Text style={styles.detailValue}>{r.prediction ? r.prediction.value : '—'}</Text>
+                Entry figure <Text style={styles.detailValue}>{r.prediction ? r.prediction.value : '—'}</Text>
                 {'   ·   '}
-                Crowd value{' '}
+                Winning figure{' '}
                 <Text style={styles.detailValue}>
                   {/* A crowd average of 0 isn't real — picks are 1-5 — it means the
                       backend never populated it. The rest of the app already treats

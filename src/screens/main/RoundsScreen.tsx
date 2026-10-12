@@ -172,8 +172,8 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
       {result && (
         <View style={styles.vPanel}>
           <View style={styles.resultRow}>
-            <MiniStat label="Your Pick" value={String(result.userPrediction ?? '—')} />
-            <MiniStat label="Crowd average" value={result.average != null && result.average > 0 ? result.average.toFixed(2) : '—'} />
+            <MiniStat label="Entry figure" value={String(result.userPrediction ?? '—')} />
+            <MiniStat label="Winning figure" value={result.average != null && result.average > 0 ? result.average.toFixed(2) : '—'} />
             <MiniStat label="Off by" value={result.distance != null ? result.distance.toFixed(2) : '—'} />
           </View>
           <View style={styles.resultValueRow}>
@@ -195,7 +195,7 @@ function RoundCard({ round, now }: { round: DailyRound; now: Date }) {
           <Ionicons name={round.prediction ? 'time-outline' : 'help-circle-outline'} size={16} color="#FFFFFF" />
           <Text style={styles.pendingText}>
             {round.prediction
-              ? `You picked ${round.prediction.value} — waiting for the result`
+              ? `Entry figure ${round.prediction.value} — waiting for the result`
               : 'Round closed — no stock was submitted'}
           </Text>
         </View>

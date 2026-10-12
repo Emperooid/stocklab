@@ -339,7 +339,7 @@ function LatestResultCard({ round }: { round: DailyRound }) {
         </View>
       </View>
       <Text style={styles.resultSubtitle}>
-        You picked {result.userPrediction ?? '—'} · Avg Pick {result.average != null ? result.average.toFixed(2) : '—'} ·
+        Entry figure {result.userPrediction ?? '—'} · Winning figure {result.average != null && result.average > 0 ? result.average.toFixed(2) : '—'} ·
         Deviation {result.distance != null ? result.distance.toFixed(2) : '—'}
       </Text>
     </Card>
