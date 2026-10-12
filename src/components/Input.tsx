@@ -7,11 +7,13 @@ import { useBringIntoViewOnFocus } from '../lib/keyboardScroll';
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
+  /** Sits in a tinted square before the label, as the auth mockups show. */
+  icon?: keyof typeof Ionicons.glyphMap;
   /** Styles the outer wrapper (e.g. `{ flex: 1 }` for side-by-side inputs) — `style` only reaches the TextInput itself. */
   containerStyle?: StyleProp<ViewStyle>;
 }
 
-export function Input({ label, error, style, containerStyle, secureTextEntry, onFocus, onBlur, ...rest }: InputProps) {
+export function Input({ label, error, style, containerStyle, secureTextEntry, icon, onFocus, onBlur, ...rest }: InputProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [focused, setFocused] = useState(false);
@@ -22,7 +24,16 @@ const [revealed, setRevealed] = useState(false);
 
   return (
     <View style={[styles.wrap, containerStyle]} onLayout={onLayout}>
-      {!!label && <Text style={styles.label}>{label}</Text>}
+      {!!(label || icon) && (
+        <View style={styles.labelRow}>
+          {icon && (
+            <View style={styles.labelIcon}>
+              <Ionicons name={icon} size={14} color={colors.primary} />
+            </View>
+          )}
+          {!!label && <Text style={styles.label}>{label}</Text>}
+        </View>
+      )}
       <View style={styles.inputRow}>
         <TextInput
           style={[
@@ -64,7 +75,16 @@ const [revealed, setRevealed] = useState(false);
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     wrap: { width: '100%' },
-    label: { ...typography.small, color: colors.textMuted, marginBottom: spacing.xs },
+    labelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    labelIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: radius.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryTint,
+    },
+    label: { ...typography.small, color: colors.text, fontWeight: '700' },
     inputRow: { position: 'relative', justifyContent: 'center' },
     input: {
       backgroundColor: colors.surfaceAlt,

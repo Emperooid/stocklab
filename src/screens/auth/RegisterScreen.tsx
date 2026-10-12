@@ -176,7 +176,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {!!error && <FormError message={error} />}
 
-          <Button title="Create Account" onPress={handleCompleteRegistration} loading={isLoading} style={{ marginTop: spacing.lg }} />
+          <Button title="Create Account" icon="person-add-outline" onPress={handleCompleteRegistration} loading={isLoading} style={{ marginTop: spacing.lg }} />
         </View>
       </Screen>
     );
@@ -215,7 +215,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
         {!!error && <FormError message={error} />}
 
-        <Button title="Send Code" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.lg }} />
+        <Button title="Send Code" icon="send" onPress={handleSendOtp} loading={isLoading} style={{ marginTop: spacing.lg }} />
         <Button title="I already have an account" variant="ghost" onPress={() => navigation.navigate('Login')} style={{ marginTop: spacing.sm }} />
       </View>
     </Screen>

@@ -122,6 +122,7 @@ export default function LoginScreen({ navigation, route }: Props) {
         )}
 
         <Input
+          icon="call"
           label="Phone number"
           value={phone}
           onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 11))}
@@ -129,6 +130,7 @@ export default function LoginScreen({ navigation, route }: Props) {
           placeholder="08012345678"
         />
         <Input
+          icon="lock-closed"
           label="Password"
           value={password}
           onChangeText={setPassword}
@@ -140,11 +142,12 @@ export default function LoginScreen({ navigation, route }: Props) {
 
         {!!error && <FormError message={error} />}
 
-        <Button title="Log In" onPress={handleLogin} loading={isLoading} style={{ marginTop: spacing.lg }} />
+        <Button title="Log In" icon="log-in-outline" onPress={handleLogin} loading={isLoading} style={{ marginTop: spacing.lg }} />
 
         {biometricReady && (
           <Button
             title="Log in with Face ID / Fingerprint"
+            icon="finger-print"
             variant="outline"
             onPress={handleBiometricLogin}
             loading={biometricLoading}

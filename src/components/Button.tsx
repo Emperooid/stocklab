@@ -8,8 +8,10 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  View,
   ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
@@ -18,10 +20,12 @@ interface ButtonProps extends Omit<PressableProps, 'style'> {
   size?: 'md' | 'sm';
   loading?: boolean;
   disabled?: boolean;
+  /** Leading glyph, as the auth mockups show on Log In, Send Code and the biometric button. */
+  icon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Button({ title, variant = 'primary', size = 'md', loading, style, disabled, onPressIn, onPressOut, ...rest }: ButtonProps) {
+export function Button({ title, variant = 'primary', size = 'md', loading, style, disabled, icon, onPressIn, onPressOut, ...rest }: ButtonProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -58,9 +62,18 @@ export function Button({ title, variant = 'primary', size = 'md', loading, style
         {loading ? (
           <ActivityIndicator color={variant === 'primary' || variant === 'danger' ? colors.onPrimary : colors.primary} />
         ) : (
-          <Text style={[styles.text, size === 'sm' && styles.textSm, TEXT_STYLE(colors)[variant]]} numberOfLines={1}>
-            {title}
-          </Text>
+          <View style={styles.content}>
+            {icon && (
+              <Ionicons
+                name={icon}
+                size={size === 'sm' ? 15 : 18}
+                color={variant === 'primary' || variant === 'danger' ? colors.onPrimary : colors.primary}
+              />
+            )}
+            <Text style={[styles.text, size === 'sm' && styles.textSm, TEXT_STYLE(colors)[variant]]} numberOfLines={1}>
+              {title}
+            </Text>
+          </View>
         )}
       </Pressable>
     </Animated.View>
@@ -76,6 +89,7 @@ const TEXT_STYLE = (colors: Colors) => ({
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
+    content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     base: {
       height: 52,
       borderRadius: radius.lg,
