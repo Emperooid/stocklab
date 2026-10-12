@@ -175,11 +175,9 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     header: {
       alignItems: 'center',
-      marginTop: spacing.lg,
-      marginBottom: spacing.xxl,
-      paddingVertical: spacing.xl,
-      borderRadius: radius.xl,
-      backgroundColor: colors.primaryTint,
+      marginTop: spacing.sm,
+      marginBottom: spacing.lg,
+      paddingVertical: spacing.md,
     },
     logoMark: {
       width: 72,
@@ -191,10 +189,14 @@ function createStyles(colors: Colors) {
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
+    // Height-driven, not width-driven: at full width the artwork came out ~240pt
+    // tall on a phone and pushed the form off screen, so signing in meant
+    // scrolling first. The width follows from the aspect ratio.
     hero: {
-      width: '100%',
+      height: 148,
       aspectRatio: 1080 / 520,
-      marginTop: spacing.lg,
+      alignSelf: 'center',
+      marginTop: spacing.sm,
     },
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
