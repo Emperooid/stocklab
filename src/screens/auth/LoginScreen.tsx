@@ -192,12 +192,13 @@ function createStyles(colors: Colors) {
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
-    // Full width: a fixed height with alignSelf:'center' made it narrower than the
-    // screen, so the page background showed as bars down either side of the
-    // artwork. The height follows from the artwork's own ratio.
+    // A definite height. `width:'100%'` with only an aspectRatio was not
+    // constraining the height, so the artwork rendered about twice size and
+    // filled the screen. 150pt is the mockup's proportion; `contain` keeps the
+    // whole card visible inside it.
     hero: {
       width: '100%',
-      aspectRatio: 1080 / 520,
+      height: 150,
       marginTop: spacing.sm,
     },
     title: { ...typography.h2, color: colors.text },
