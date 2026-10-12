@@ -97,8 +97,16 @@ export default function LoginScreen({ navigation, route }: Props) {
         <Text style={styles.tagline}>Predict · Play · Prosper</Text>
       </View>
 
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Log in to continue picking stock.</Text>
+      {/* The supplied hero card, used whole: its lettering is part of the
+          artwork, so rendering the same words as text over it would double them
+          up. The card is 1080x520, so the aspect ratio is fixed to keep it from
+          stretching on narrow phones. */}
+      <Image
+        source={require('../../../assets/welcome-card.jpg')}
+        style={styles.hero}
+        resizeMode="contain"
+        accessibilityLabel="Welcome back! Log in to continue picking stock."
+      />
 
       <View style={styles.form}>
         {!!sessionExpiredMessage && (
@@ -186,6 +194,11 @@ function createStyles(colors: Colors) {
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2 },
+    hero: {
+      width: '100%',
+      aspectRatio: 1080 / 520,
+      marginTop: spacing.lg,
+    },
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
     form: { gap: spacing.sm },
