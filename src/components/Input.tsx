@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleProp, StyleSheet, Text, TextInput, TextInputProps, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, radius, spacing, typography, useColors } from '../theme/theme';
+import { useBringIntoViewOnFocus } from '../lib/keyboardScroll';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -14,11 +15,13 @@ export function Input({ label, error, style, containerStyle, secureTextEntry, on
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [focused, setFocused] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+const [revealed, setRevealed] = useState(false);
+  // Reports where this field sits and scrolls it up when it takes focus.
+  const { onLayout, onFocus: bringIntoView } = useBringIntoViewOnFocus();
   const isPasswordField = !!secureTextEntry;
 
   return (
-    <View style={[styles.wrap, containerStyle]}>
+    <View style={[styles.wrap, containerStyle]} onLayout={onLayout}>
       {!!label && <Text style={styles.label}>{label}</Text>}
       <View style={styles.inputRow}>
         <TextInput
@@ -33,6 +36,7 @@ export function Input({ label, error, style, containerStyle, secureTextEntry, on
           secureTextEntry={isPasswordField && !revealed}
           onFocus={(e) => {
             setFocused(true);
+            bringIntoView();
             onFocus?.(e);
           }}
           onBlur={(e) => {

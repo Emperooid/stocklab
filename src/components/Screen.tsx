@@ -1,11 +1,23 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, layout, spacing, typography, useColors } from '../theme/theme';
 import { navigationRef } from '../lib/navigationRef';
 import { refreshAppData } from '../lib/refresh';
 import { useAuthStore } from '../store/authStore';
+import { KeyboardScrollContext } from '../lib/keyboardScroll';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -44,7 +56,24 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh, 
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const hasSession = useAuthStore((s) => !!s.user);
-  const [pullBusy, setPullBusy] = useState(false);
+const [pullBusy, setPullBusy] = useState(false);
+
+  // How much room the keyboard is taking. Input scrolls the focused field up
+  // (see keyboardScroll), but the content also has to be able to scroll at all
+  // past the keyboard — otherwise a form shorter than the screen cannot move,
+  // and its lower fields are simply unreachable.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollRef = useRef<ScrollView | null>(null);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Every screen pulls to refresh, not just the handful that wired their own.
   // Without an onRefresh the pull reloads everything the app caches from the
@@ -92,15 +121,25 @@ export function Screen({ children, scroll = true, style, refreshing, onRefresh, 
           <View pointerEvents="none" style={[styles.orb, styles.orbTop]} />
           <View pointerEvents="none" style={[styles.orb, styles.orbBottom]} />
           {!hideGameSwitcher && <GameSwitcherBar colors={colors} />}
-          <ScrollView
-            style={styles.container}
-            contentContainerStyle={[styles.content, styles.centered, style]}
-            showsVerticalScrollIndicator={false}
-            refreshControl={refreshControl}
-            keyboardShouldPersistTaps="handled"
-          >
-            {children}
-          </ScrollView>
+          <KeyboardScrollContext.Provider value={scrollRef}>
+            <ScrollView
+              ref={scrollRef}
+              style={styles.container}
+              contentContainerStyle={[
+                styles.content,
+                styles.centered,
+                style,
+                // Room to scroll the last field clear of the keyboard.
+                keyboardHeight > 0 && { paddingBottom: spacing.xxl + keyboardHeight },
+              ]}
+              showsVerticalScrollIndicator={false}
+              refreshControl={refreshControl}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
+              {children}
+            </ScrollView>
+          </KeyboardScrollContext.Provider>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

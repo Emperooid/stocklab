@@ -166,6 +166,8 @@ export default function InviteScreen() {
   return (
     <Screen scroll={false}>
       <FlatList
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         data={showList ? visible : []}
         keyExtractor={(c) => c.phone}
         contentContainerStyle={{ paddingBottom: spacing.xxl }}
