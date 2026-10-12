@@ -87,7 +87,7 @@ export default function LoginScreen({ navigation, route }: Props) {
   return (
     <Screen hideGameSwitcher>
       <View style={styles.header}>
-        <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
+        <Image source={require('../../../assets/logo-mark-mark-only.png')} style={styles.logoMark} resizeMode="contain" />
         <Text style={styles.wordmark}>
           <Text style={styles.wordmarkLight}>Crowd</Text>
           <Text style={styles.wordmarkGreen}>Stock</Text>
