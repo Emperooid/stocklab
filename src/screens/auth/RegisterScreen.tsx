@@ -227,10 +227,8 @@ function createStyles(colors: Colors) {
     centerContent: { flexGrow: 1, justifyContent: 'center' },
     header: {
       alignItems: 'center',
-      marginBottom: spacing.xl,
-      paddingVertical: spacing.lg,
-      borderRadius: radius.xl,
-      backgroundColor: colors.primaryTint,
+      marginBottom: spacing.lg,
+      paddingVertical: spacing.md,
     },
     logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
     wordmark: { fontSize: 32, fontWeight: '800', letterSpacing: 0.2, marginTop: spacing.md },
@@ -240,7 +238,9 @@ function createStyles(colors: Colors) {
     hero: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.primaryDark,
+      // The artwork's own background (sampled from register-hero.png), not the
+      // brand green: primaryDark made the green "account" invisible on it.
+      backgroundColor: '#031B1D',
       borderRadius: radius.xl,
       padding: spacing.lg,
       marginBottom: spacing.lg,

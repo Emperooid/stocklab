@@ -192,13 +192,12 @@ function createStyles(colors: Colors) {
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
-    // Height-driven, not width-driven: at full width the artwork came out ~240pt
-    // tall on a phone and pushed the form off screen, so signing in meant
-    // scrolling first. The width follows from the aspect ratio.
+    // Full width: a fixed height with alignSelf:'center' made it narrower than the
+    // screen, so the page background showed as bars down either side of the
+    // artwork. The height follows from the artwork's own ratio.
     hero: {
-      height: 148,
+      width: '100%',
       aspectRatio: 1080 / 520,
-      alignSelf: 'center',
       marginTop: spacing.sm,
     },
     title: { ...typography.h2, color: colors.text },
