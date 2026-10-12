@@ -185,17 +185,24 @@ export default function RegisterScreen({ navigation }: Props) {
   return (
     <Screen style={styles.centerContent} hideGameSwitcher>
       <View style={styles.header}>
-        <View style={styles.lockup}>
-          <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
-          <Text style={styles.wordmark}>
-            <Text style={styles.wordmarkLight}>Crowd</Text>
-            <Text style={styles.wordmarkGreen}>Stock</Text>
-          </Text>
-        </View>
+        <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
+        <Text style={styles.wordmark}>
+          <Text style={styles.wordmarkLight}>Crowd</Text>
+          <Text style={styles.wordmarkGreen}>Stock</Text>
+        </Text>
+        <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
       </View>
 
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Enter your phone number to get started.</Text>
+      <View style={styles.hero}>
+        <View style={styles.heroText}>
+          <Text style={styles.heroTitle}>
+            Create your{'\n'}
+            <Text style={styles.heroTitleAccent}>account</Text>
+          </Text>
+          <Text style={styles.heroBody}>Enter your phone number to get started.</Text>
+        </View>
+        <Image source={require('../../../assets/register-hero.png')} style={styles.heroArt} resizeMode="contain" />
+      </View>
 
       <View style={styles.form}>
         <Input
@@ -226,10 +233,24 @@ function createStyles(colors: Colors) {
       backgroundColor: colors.primaryTint,
     },
     logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
-    lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    wordmark: { fontSize: 27, fontWeight: '800', letterSpacing: 0.2 },
+    wordmark: { fontSize: 32, fontWeight: '800', letterSpacing: 0.2, marginTop: spacing.md },
+    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
+    hero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primaryDark,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+      overflow: 'hidden',
+    },
+    heroText: { flex: 1, minWidth: 0 },
+    heroTitle: { fontSize: 28, lineHeight: 32, fontWeight: '800', color: colors.onPrimary },
+    heroTitleAccent: { color: colors.primary },
+    heroBody: { ...typography.small, color: 'rgba(255,255,255,0.85)', marginTop: spacing.sm, lineHeight: 18 },
+    heroArt: { width: 132, height: 152, marginRight: -spacing.md },
     title: { ...typography.h2, color: colors.text, textAlign: 'center' },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl, textAlign: 'center' },
     form: { gap: spacing.sm },

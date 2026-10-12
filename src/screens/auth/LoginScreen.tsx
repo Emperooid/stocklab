@@ -87,14 +87,12 @@ export default function LoginScreen({ navigation, route }: Props) {
   return (
     <Screen hideGameSwitcher>
       <View style={styles.header}>
-        <View style={styles.lockup}>
-          <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
-          <Text style={styles.wordmark}>
-            <Text style={styles.wordmarkLight}>Crowd</Text>
-            <Text style={styles.wordmarkGreen}>Stock</Text>
-          </Text>
-        </View>
-        <Text style={styles.tagline}>Predict · Play · Prosper</Text>
+        <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
+        <Text style={styles.wordmark}>
+          <Text style={styles.wordmarkLight}>Crowd</Text>
+          <Text style={styles.wordmarkGreen}>Stock</Text>
+        </Text>
+        <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
       </View>
 
       {/* The supplied hero card, used whole: its lettering is part of the
@@ -189,11 +187,10 @@ function createStyles(colors: Colors) {
       borderRadius: 18,
       marginBottom: spacing.md,
     },
-    lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-    wordmark: { fontSize: 30, fontWeight: '800', letterSpacing: 0.2 },
+    wordmark: { fontSize: 32, fontWeight: '800', letterSpacing: 0.2, marginTop: spacing.md },
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
-    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2 },
+    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
     hero: {
       width: '100%',
       aspectRatio: 1080 / 520,
