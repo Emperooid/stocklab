@@ -188,7 +188,7 @@ function createStyles(colors: Colors) {
       borderRadius: 18,
       marginBottom: spacing.md,
     },
-    wordmark: { fontSize: 32, fontWeight: '800', letterSpacing: 0.2, marginTop: spacing.md },
+    wordmark: { fontSize: 36, fontWeight: '800', letterSpacing: 0.2, marginTop: spacing.sm },
     wordmarkLight: { color: colors.text },
     wordmarkGreen: { color: colors.primary },
     tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
