@@ -38,7 +38,8 @@ export default function GamePickerScreen() {
   const refreshWallet = useWalletStore((s) => s.refresh);
   const cards = useCardsStore((s) => s.cards);
   const ensureSeeded = useCardsStore((s) => s.ensureSeeded);
-  const settleDue = useCardsStore((s) => s.settleDue);
+const settleDue = useCardsStore((s) => s.settleDue);
+  const logout = useAuthStore((s) => s.logout);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,7 +62,7 @@ export default function GamePickerScreen() {
   const cardStats = computeCardStats(cards);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+<SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -171,6 +172,19 @@ export default function GamePickerScreen() {
         </Pressable>
 
         <View style={styles.spacer} />
+
+        {/* The lobby is the screen both games open from, and it had no way out
+            of the account at all — signing out meant going into a game and
+            finding its Profile tab. */}
+        <Pressable
+          onPress={logout}
+          style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Ionicons name="log-out-outline" size={17} color={colors.textMuted} />
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable>
         <Text style={styles.footnote}>Predict · Play · Win</Text>
       </ScrollView>
     </SafeAreaView>
@@ -293,9 +307,23 @@ function GamePill({
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
+    signOut: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.xl,
+      paddingVertical: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    signOutText: { ...typography.small, color: colors.textMuted, fontWeight: '800' },
     content: {
       padding: spacing.lg,
-      paddingBottom: spacing.xxxl,
+      // Clears the home indicator and any tab bar the lobby sits above, so the
+      // last line of the page is actually reachable.
+      paddingBottom: spacing.xxxl * 3,
       width: '100%',
       maxWidth: 520,
       alignSelf: 'center',
