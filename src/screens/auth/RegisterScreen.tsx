@@ -185,8 +185,13 @@ export default function RegisterScreen({ navigation }: Props) {
   return (
     <Screen style={styles.centerContent} hideGameSwitcher>
       <View style={styles.header}>
-        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.logo}>CrowdStock</Text>
+        <View style={styles.lockup}>
+          <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
+          <Text style={styles.wordmark}>
+            <Text style={styles.wordmarkLight}>Crowd</Text>
+            <Text style={styles.wordmarkGreen}>Stock</Text>
+          </Text>
+        </View>
       </View>
 
       <Text style={styles.title}>Create your account</Text>
@@ -221,7 +226,10 @@ function createStyles(colors: Colors) {
       backgroundColor: colors.primaryTint,
     },
     logoMark: { width: 64, height: 64, borderRadius: 16, marginBottom: spacing.sm },
-    logo: { ...typography.h2, color: colors.primary, letterSpacing: 0.2 },
+    lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    wordmark: { fontSize: 27, fontWeight: '800', letterSpacing: 0.2 },
+    wordmarkLight: { color: colors.text },
+    wordmarkGreen: { color: colors.primary },
     title: { ...typography.h2, color: colors.text, textAlign: 'center' },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl, textAlign: 'center' },
     form: { gap: spacing.sm },

@@ -87,9 +87,14 @@ export default function LoginScreen({ navigation, route }: Props) {
   return (
     <Screen hideGameSwitcher>
       <View style={styles.header}>
-        <Image source={require('../../../assets/icon.png')} style={styles.logoMark} resizeMode="contain" />
-        <Text style={styles.logo}>CrowdStock</Text>
-        <Text style={styles.tagline}>PREDICT · PLAY · PROSPER</Text>
+        <View style={styles.lockup}>
+          <Image source={require('../../../assets/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
+          <Text style={styles.wordmark}>
+            <Text style={styles.wordmarkLight}>Crowd</Text>
+            <Text style={styles.wordmarkGreen}>Stock</Text>
+          </Text>
+        </View>
+        <Text style={styles.tagline}>Predict · Play · Prosper</Text>
       </View>
 
       <Text style={styles.title}>Welcome back</Text>
@@ -176,8 +181,11 @@ function createStyles(colors: Colors) {
       borderRadius: 18,
       marginBottom: spacing.md,
     },
-    logo: { ...typography.h1, color: colors.primary, letterSpacing: 0.2 },
-    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs },
+    lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    wordmark: { fontSize: 30, fontWeight: '800', letterSpacing: 0.2 },
+    wordmarkLight: { color: colors.text },
+    wordmarkGreen: { color: colors.primary },
+    tagline: { ...typography.tiny, color: colors.textMuted, letterSpacing: 2 },
     title: { ...typography.h2, color: colors.text },
     subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.xl },
     form: { gap: spacing.sm },
