@@ -21,6 +21,7 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+temp_auto_push.bat
 # debug
 npm-debug.*
 yarn-debug.*
@@ -31,7 +32,6 @@ yarn-error.*
 *.pem
 
 # local env files
-.env
 .env*.local
 
 # typescript
@@ -45,3 +45,6 @@ AGENTS.md
 # generated native folders
 /ios
 /android
+.gitignore
+branch_structure.json
+config.bat
