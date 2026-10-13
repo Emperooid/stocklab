@@ -143,7 +143,7 @@ export default function UnveilCardScreen() {
       <CardButton
         // The stake is already on the card and in the pill above, so the action
         // just names what it does.
-        title={!canAfford ? 'Not enough balance' : figure == null ? 'Pick a figure to unveil' : 'Unveil'}
+        title={!canAfford ? 'Not enough balance' : figure == null ? 'Pick a number to unveil' : 'Unveil'}
         icon="eye"
         loading={saving}
         disabled={figure == null || !canAfford}

@@ -63,13 +63,13 @@ export default function CardResultScreen() {
   const outcome = matched === true ? 'IT’S A MATCH' : matched === false ? 'NO MATCH' : 'SETTLED';
   const body =
     matched === true
-      ? 'Both figures landed on the same number, so the answering player takes the pot.'
+      ? 'Both numbers matched, so the answering player takes the pot.'
       : matched === false
-        ? 'The figures were different, so the originator keeps the pot.'
+        ? 'The numbers were different, so the card maker keeps the pot.'
         : winner === 'answerer'
-          ? 'The answering player matched the hidden figure, so they take the pot.'
+          ? 'The answering player matched the hidden number, so they take the pot.'
           : winner === 'originator'
-            ? 'The answering player missed the hidden figure, so the originator keeps the pot.'
+            ? 'The answering player missed the hidden number, so the card maker keeps the pot.'
             : 'This card has been played.'
   // Two cards plus the VS column have to fit the panel on any device. A fixed
   // 116 overflowed a narrow phone, so the cards are sized from the row's

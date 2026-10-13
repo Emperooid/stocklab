@@ -135,7 +135,7 @@ const settleDue = useCardsStore((s) => s.settleDue);
           icon="cash"
           badgeIcon="card"
           title="Hide or Guess"
-          subtitle="Hide a figure or Guess Right to Win Instantly"
+          subtitle="Hide a number or guess right to win instantly"
           face={PILL_PINK}
           deep={PILL_PINK_DEEP}
           textColor="#FFFFFF"

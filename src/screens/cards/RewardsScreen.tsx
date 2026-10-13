@@ -118,7 +118,7 @@ export default function RewardsScreen() {
 
   const emptyCopy =
     filter === 'wins'
-      ? { title: 'No wins yet', body: 'Match the hidden figure and your first win lands here.' }
+      ? { title: 'No wins yet', body: 'Match the hidden number and your first win lands here.' }
       : filter === 'losses'
         ? { title: 'No losses yet', body: 'Every card played so far went your way. Nice run.' }
         : { title: 'No results yet', body: 'Play a card and the result is recorded here as soon as it is done.' };
