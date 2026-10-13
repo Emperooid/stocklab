@@ -136,7 +136,16 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
-      {user ? <MainStack /> : hasSeenIntro ? <AuthNavigator /> : <AuthIntroCarousel />}
+      {/* The slider comes first on every launch — before login, and before the
+          games for someone already signed in. Dismissing it reveals whichever
+          of the two applies. */}
+      {!hasSeenIntro ? (
+        <AuthIntroCarousel />
+      ) : user ? (
+        <MainStack />
+      ) : (
+        <AuthNavigator />
+      )}
       {user && <AlertPopup />}
       {user && <OnboardingCarousel />}
     </NavigationContainer>
