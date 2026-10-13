@@ -18,28 +18,19 @@ import { useIntroStore } from '../store/introStore';
 const { width: SCREEN_W } = Dimensions.get('window');
 
 /**
- * Three slides before sign-in, then on to login. Written from the app's own
- * art rather than the supplied "splash screen" files, which carry a StockLab
- * wordmark and a "SPLASH SCREEN 2" caption baked into the pixels.
+ * The edge colour of the supplied splash artwork. The pages letterbox it to fit
+ * the screen, and matching this exactly is what makes that letterbox vanish
+ * rather than read as bars above and below the picture.
  */
-const SLIDES = [
+const ART_EDGE = '#015419';
+
+const SLIDES: Array<{ key: string; art?: number; title?: string; body?: string }> = [
+  { key: 'splash-1', art: require('../../assets/splash-1.jpg') as number },
+  { key: 'splash-2', art: require('../../assets/splash-2.jpg') as number },
   {
-    key: 'welcome',
-    title: 'Welcome to CrowdStock',
-    body: 'Predict · Play · Prosper. Two games, one wallet — pick one and start playing.',
-    art: null as null | number,
-  },
-  {
-    key: 'hourly',
-    title: 'Hourly Cash',
-    body: 'Pick a number from 1 to 5 every hour. The closer your number is to the crowd’s average, the more you win.',
-    art: require('../../assets/banner-pick-1-5-hourly.jpg') as number,
-  },
-  {
-    key: 'cards',
-    title: 'Hide or Guess',
-    body: 'Someone hides a number between 1 and 5 behind a card. Guess it right to win the value on the card.',
-    art: require('../../assets/banner-hide-a-number.jpg') as number,
+    key: 'ready',
+    title: 'Ready to play?',
+    body: 'Two games, one wallet. Pick one and start playing — your balance is ready when you are.',
   },
 ];
 
@@ -68,7 +59,6 @@ export function AuthIntroCarousel() {
 
   return (
     <View style={styles.root}>
-      <Image source={require('../../assets/auth-background.png')} style={StyleSheet.absoluteFill} resizeMode="cover" />
       <SafeAreaView style={styles.safe}>
         <View style={styles.skipRow}>
           {!isLast && (
@@ -86,19 +76,21 @@ export function AuthIntroCarousel() {
           onMomentumScrollEnd={onScroll}
           style={styles.pager}
         >
-          {SLIDES.map((slide) => (
-            <View key={slide.key} style={styles.slide}>
-              <View style={styles.artWrap}>
-                {slide.art ? (
-                  <Image source={slide.art} style={styles.art} resizeMode="contain" />
-                ) : (
-                  <Image source={require('../../assets/logo-mark-badge.png')} style={styles.mark} resizeMode="contain" />
-                )}
+          {SLIDES.map((slide) =>
+            slide.art ? (
+              <View key={slide.key} style={styles.slide}>
+                {/* resizeMode contain so none of the artwork is cropped; the page
+                    behind it is the artwork's own edge colour. */}
+                <Image source={slide.art} style={styles.art} resizeMode="contain" />
               </View>
-              <Text style={styles.title}>{slide.title}</Text>
-              <Text style={styles.body}>{slide.body}</Text>
-            </View>
-          ))}
+            ) : (
+              <View key={slide.key} style={styles.slide}>
+                <Image source={require('../../assets/logo-mark-badge.png')} style={styles.mark} resizeMode="contain" />
+                <Text style={styles.title}>{slide.title}</Text>
+                <Text style={styles.body}>{slide.body}</Text>
+              </View>
+            )
+          )}
         </ScrollView>
 
         <View style={styles.dots}>
@@ -115,20 +107,19 @@ export function AuthIntroCarousel() {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: ART_EDGE },
     safe: { flex: 1 },
-    skipRow: { height: 44, justifyContent: 'center', paddingHorizontal: spacing.lg, alignItems: 'flex-end' },
-    skip: { ...typography.small, color: colors.textMuted, fontWeight: '700' },
+    skipRow: { height: 40, justifyContent: 'center', paddingHorizontal: spacing.lg, alignItems: 'flex-end' },
+    skip: { ...typography.small, color: '#FFFFFF', fontWeight: '800' },
     pager: { flex: 1 },
-    slide: { width: SCREEN_W, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
-    artWrap: { height: 210, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl },
-    art: { width: SCREEN_W - spacing.xl * 2, height: 190, borderRadius: radius.lg },
-    mark: { width: 180, height: 150 },
-    title: { ...typography.h1, color: colors.text, textAlign: 'center' },
-    body: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginTop: spacing.md, lineHeight: 22 },
-    dots: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
-    dotActive: { backgroundColor: colors.primary, width: 22 },
+    slide: { width: SCREEN_W, flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
+    art: { width: '100%', height: '100%' },
+    mark: { width: 170, height: 140, marginBottom: spacing.lg },
+    title: { ...typography.h1, color: '#FFFFFF', textAlign: 'center' },
+    body: { ...typography.body, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: spacing.md, lineHeight: 22 },
+    dots: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.md },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.4)' },
+    dotActive: { backgroundColor: '#FFFFFF', width: 22 },
     cta: { marginHorizontal: spacing.xl, marginBottom: spacing.lg },
   });
 }
